@@ -77,7 +77,15 @@ test('skip creates no pass; browser Back follows the actual path; reduced motion
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/#app');
   await expect(page.locator('.onboarding-mascot img')).toBeVisible();
-  await expect(page.locator('.onboarding-mascot svg')).toHaveCount(0);
+  // The figure is one picture, not drawn parts that move. Its pose badge is
+  // an icon beside the picture, and it does not move either.
+  await expect(page.locator('.onboarding-mascot__image svg')).toHaveCount(0);
+  expect(
+    await page
+      .locator('.onboarding-mascot__image')
+      .first()
+      .evaluate((figure) => getComputedStyle(figure).animationName),
+  ).toBe('none');
   await page.getByRole('button', { name: 'Get started', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.goBack();
