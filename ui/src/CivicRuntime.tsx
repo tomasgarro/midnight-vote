@@ -252,8 +252,19 @@ function CivicApp() {
       };
     }
   }, []);
-  // Built from public values only. It is handed no pass and no session.
-  const assistant = useMemo(() => createAppAssistant(import.meta.env, window.location.origin), []);
+  // Built from public values only. It is handed no pass and no session, and
+  // only the two values it reads, not the whole environment.
+  const assistant = useMemo(
+    () =>
+      createAppAssistant(
+        {
+          VITE_ASSISTANT_API_URL: import.meta.env.VITE_ASSISTANT_API_URL,
+          VITE_ASSISTANT_SOURCES_JSON: import.meta.env.VITE_ASSISTANT_SOURCES_JSON,
+        },
+        window.location.origin,
+      ),
+    [],
+  );
   const polls = useMemo(
     () =>
       CHAIN_RUNTIME_ENABLED && passportV2Runtime.config
