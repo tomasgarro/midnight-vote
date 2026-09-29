@@ -44,9 +44,10 @@ for (const viewport of [
     expect((await composer.boundingBox())?.y).toBeCloseTo(before!.y, 0);
     await page.screenshot({ path: `outputs/chat-stable-${viewport.width}.png` });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    // `--surface` in the dark theme (#262723).
     await expect(page.locator('.chat-followups button').first()).toHaveCSS(
       'background-color',
-      'rgb(44, 46, 45)',
+      'rgb(38, 39, 35)',
     );
     await page.screenshot({ path: `outputs/chat-stable-dark-${viewport.width}.png` });
     await page.getByRole('button', { name: 'Clear chat' }).click();

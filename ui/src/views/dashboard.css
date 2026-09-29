@@ -1,10 +1,6 @@
-/* App-only palette. The accepted landing keeps its own visual identity. */
-@font-face {
-  font-family: Outfit;
-  src: url("/fonts/outfit-variable.ttf") format("truetype");
-  font-weight: 100 900;
-  font-display: swap;
-}
+/* The app shell wears the brand tokens from styles/tokens.css. It used to
+   carry a palette of its own; only the names older views still ask for are
+   mapped here. */
 .app-shell.dashboard-v4 {
   --legacy-ink: var(--ink);
   --legacy-muted: var(--ink-muted);
@@ -13,22 +9,7 @@
   --legacy-sky: var(--accent);
   --legacy-sky-strong: var(--accent);
   --legacy-sky-pale: var(--accent-wash);
-  --ground: #f1f1ee;
-  --surface: #fcfcfa;
-  --surface-sunken: #e6e7e3;
-  --ink: #292b2a;
-  --ink-muted: #646963;
-  --line: #d9dcd6;
-  --line-strong: #bbc1b8;
-  --accent: #363837;
-  --accent-hover: #252726;
-  --accent-ink: #fff;
-  --accent-wash: #e3e5e1;
-  --country-sky: #8c9b92;
-  --font-body: Outfit, system-ui, sans-serif;
-  --font-display: Outfit, system-ui, sans-serif;
-  --shadow-card: 0 2px 8px #20262004;
-  --shadow-sheet: 0 -8px 32px #2026200c;
+  --country-sky: var(--brand-lake);
   --sky: var(--accent);
   --muted: var(--ink-muted);
   --mark-warm: #9c795e;
@@ -39,21 +20,8 @@
   container-name: dashboard;
   box-shadow: none;
 }
-[data-theme="dark"] .app-shell.dashboard-v4 {
-  --ground: #232424;
-  --surface: #2c2e2d;
-  --surface-sunken: #373a38;
-  --ink: #f1f3ed;
-  --ink-muted: #bcc0ba;
-  --line: #474b47;
-  --line-strong: #747b72;
-  --accent: #dce0d7;
-  --accent-hover: #ecefe7;
-  --accent-ink: #242823;
-  --accent-wash: #3b4139;
-}
 body:has(.dashboard-v4) {
-  background: #e6e8e3;
+  background: var(--surface-sunken);
   padding: 0;
 }
 body:has(.dashboard-v4) #root {

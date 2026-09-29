@@ -1,61 +1,107 @@
 /*
- * Warm-light design tokens.
+ * Alpine Civic Humanism: the design tokens.
  *
- * Spec: https://claude.ai/code/artifact/e6ccc025-c494-4565-a99d-c366dac24a09
- * Accent decided 2026-08-30: indigo #5B5BD6, flat.
+ * The brand is shared with Cleisthenes, the companion: rag paper, civic ink,
+ * limestone lines and one terracotta accent, set in Source Serif 4 and IBM
+ * Plex Sans. It replaced the warm-light indigo system on 2026-09-29.
  *
- * These tokens are the system the rebuilt views are built on. The legacy
- * palette in index.css (--sky, --yellow, --muted, ...) is deliberately left
- * alone: 455 hardcoded hex values still reference the old sky-blue look, and
- * swapping :root alone would leave the app half-migrated and incoherent.
- * Views move onto these tokens one at a time; the legacy block is deleted when
- * the last one lands.
+ * The legacy palette in index.css (--legacy-sky, --legacy-yellow, ...) is
+ * still being retired view by view. It is deleted when its count is zero.
  *
  * Three rules travel with this file:
  *   1. One accent. --accent is the primary action, the active state, and
  *      progress. Nothing else. No second hue appears on any screen.
- *   2. The accent is flat. No gradient, no glow, no accent-tinted shadow --
- *      those are what turn a real product colour into an AI tell.
+ *   2. The accent is flat. No gradient, no glow, no accent-tinted shadow.
  *   3. One grey family, warm. --country-sky is the sole exception and appears
  *      only on country chips and the flag mark.
+ *
+ * Every text pair below meets WCAG AA (4.5:1), ink on every surface meets AAA
+ * (7:1), and --line-strong meets 3:1 so an input's edge can be seen.
  */
 
-/* Fraunces, weight axis only (100-900), latin subset.
-   U+0000-00FF covers every Spanish accent plus the inverted marks, so the
-   latin-ext subset is not needed unless a language beyond es/en is added. */
+/* Latin subset. It covers English, Spanish, French, German and Italian,
+   including the ligature in words such as "cœur". */
 @font-face {
-  font-family: "Fraunces";
-  src: url("/fonts/fraunces-latin.woff2") format("woff2");
+  font-family: "Source Serif 4";
+  src: url("/fonts/source-serif-4-latin-400-normal.woff2") format("woff2");
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400;
   font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/fonts/source-serif-4-latin-600-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 :root {
-  /* ---- surfaces ---- */
-  --ground: #f5f1ec;
-  --surface: #ffffff;
-  --surface-sunken: #ede8e1;
+  /* ---- surfaces: rag paper ---- */
+  --ground: #f3eddf;
+  --surface: #fbf8f1;
+  --surface-sunken: #e9e2d2;
 
-  /* ---- ink ---- */
-  --ink: #1a1a18;
-  --ink-muted: #6b6560;
-  --line: #e2dcd3;
-  --line-strong: #cfc8be;
+  /* ---- ink: civic ink, limestone lines ---- */
+  --ink: #252823;
+  --ink-muted: #5c5e53;
+  --line: #d9cbb4;
+  --line-strong: #8f8168;
 
-  /* ---- accent (indigo, flat) ---- */
-  --accent: #5b5bd6;
-  --accent-ink: #ffffff;
-  --accent-hover: #4a4ac4;
-  --accent-wash: #eae8f7;
+  /* ---- accent (terracotta, flat) ---- */
+  --accent: #a24f40;
+  --accent-ink: #fffdf8;
+  --accent-hover: #7e3a2f;
+  --accent-wash: #f4e3dc;
 
   /* ---- semantic: state, never emphasis ---- */
-  --positive: #2f855a;
-  --positive-wash: #e3f2ea;
-  --warning: #b45309;
-  --warning-wash: #fbeee0;
-  --danger: #b42318;
-  --danger-wash: #fbe9e7;
+  --positive: #4a6a3c;
+  --positive-wash: #e4ead8;
+  --warning: #8a5a12;
+  --warning-wash: #f5e6c8;
+  --danger: #8f1d1d;
+  --danger-wash: #f6dcd8;
+
+  /* ---- the rest of the brand, for art and charts, never for text ---- */
+  --brand-limestone: #d9cbb4;
+  --brand-lake: #7e9ba5;
+  --brand-sage: #87907a;
 
   /* ---- identity ----
      Argentine sky-blue, demoted from page ground to a country cue. */
@@ -67,8 +113,8 @@
   --r-input: 12px;
 
   /* ---- elevation: warm neutral, never accent-tinted ---- */
-  --shadow-card: 0 1px 2px rgba(26, 26, 24, 0.04), 0 8px 24px rgba(26, 26, 24, 0.06);
-  --shadow-sheet: 0 -8px 32px rgba(26, 26, 24, 0.1);
+  --shadow-card: 0 1px 2px rgba(37, 40, 35, 0.04), 0 8px 24px rgba(37, 40, 35, 0.07);
+  --shadow-sheet: 0 -8px 32px rgba(37, 40, 35, 0.12);
 
   /* ---- space: base 4 ---- */
   --space-1: 4px;
@@ -81,8 +127,8 @@
   --space-8: 48px;
 
   /* ---- type ---- */
-  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
-  --font-body: "Encode Sans", system-ui, sans-serif;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
 
   /* ---- motion ----
      The frequency gate comes first: things done 100+ times a day get nothing.
@@ -101,23 +147,23 @@
  */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ground: #151412;
-  --surface: #211f1c;
-  --surface-sunken: #2b2824;
-  --ink: #f5f1ec;
-  --ink-muted: #b6afa6;
-  --line: #39352f;
-  --line-strong: #514b43;
-  --accent: #9a97ff;
-  --accent-ink: #17152d;
-  --accent-hover: #aaa8ff;
-  --accent-wash: #302e55;
-  --positive: #79c79c;
-  --positive-wash: #1d3a2a;
-  --warning: #efb36b;
-  --warning-wash: #402d1c;
-  --danger: #ff938a;
-  --danger-wash: #422522;
+  --ground: #1b1c19;
+  --surface: #262723;
+  --surface-sunken: #31322d;
+  --ink: #f3eddf;
+  --ink-muted: #b8b3a3;
+  --line: #3d3e37;
+  --line-strong: #7a7b6e;
+  --accent: #e08e7c;
+  --accent-ink: #2a120d;
+  --accent-hover: #eba293;
+  --accent-wash: #4a2a23;
+  --positive: #a9c796;
+  --positive-wash: #2a3a22;
+  --warning: #e6b566;
+  --warning-wash: #3f3016;
+  --danger: #f19a8e;
+  --danger-wash: #4a211d;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.4);
 }
