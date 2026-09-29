@@ -8,6 +8,9 @@
   padding: 8px 0 16px;
   scrollbar-width: none;
 }
+.discovery-subjects[hidden] {
+  display: none;
+}
 .discovery-subjects button {
   flex-shrink: 0;
   border: 1px solid var(--line);

@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { CatalogueChat } from '@/views/CatalogueChat';
 import { BottomNav } from '@/views/Chrome';
 import { answerCatalogue, hasValidatedPassport } from '@/views/catalogue-guide';
 import { localizePoll, POLLS } from '@/views/poll-model';
@@ -66,19 +67,30 @@ describe('catalogue guide boundaries', () => {
     expect(hasValidatedPassport({ ...c, kind: 'synthetic-demo-credential' }, now)).toBe(false);
     expect(hasValidatedPassport({ ...c, validUntil: '2026-01-01' }, now)).toBe(false);
   });
-  it('changes the centre action when dialogue access is ready', () => {
+  it('reaches the guide from the bar, with or without a pass', () => {
     const change = vi.fn();
-    const props = {
-      tab: 'discover' as const,
-      onChange: change,
-      onVerify: vi.fn(),
-      locale: 'en' as const,
-    };
-    const view = render(<BottomNav {...props} />);
-    expect(screen.getByRole('button', { name: /Verify ·/ })).toBeTruthy();
-    view.rerender(<BottomNav {...props} dialogueReady />);
-    screen.getByRole('button', { name: 'Ask Midnight' }).click();
-    expect(change).toHaveBeenCalledWith('assistant');
-    expect(screen.queryByRole('button', { name: /Verify ·/ })).toBeNull();
+    render(<BottomNav tab="consultations" onChange={change} locale="en" />);
+    screen.getByRole('button', { name: 'Cleisthenes' }).click();
+    expect(change).toHaveBeenCalledWith('cleisthenes');
+    expect(screen.queryByRole('button', { name: /Verify/ })).toBeNull();
+  });
+  it('lists the consultations that have a reviewed brief, and opens one', async () => {
+    const open = vi.fn();
+    const [first, second] = POLLS;
+    if (!first || !second) throw new Error('The catalogue is empty');
+    render(<CatalogueChat polls={POLLS} locale="en" onOpenPolicy={open} briefIds={[second.id]} />);
+
+    const briefs = screen.getByRole('region', { name: 'Briefs from the official record' });
+    expect(within(briefs).getAllByRole('button')).toHaveLength(1);
+    within(briefs)
+      .getByRole('button', { name: localizePoll(second, 'en').title })
+      .click();
+    expect(open).toHaveBeenCalledWith(second.id);
+    // The chat itself stays what it is, and says so.
+    expect(screen.getByText(/Generative AI is not connected/)).toBeTruthy();
+  });
+  it('shows no list of briefs when no consultation has one', () => {
+    render(<CatalogueChat polls={POLLS} locale="en" onOpenPolicy={vi.fn()} />);
+    expect(screen.queryByRole('region', { name: 'Briefs from the official record' })).toBeNull();
   });
 });

@@ -10,6 +10,18 @@ answers at `/Switzerland`: one face for the companion in the app and for the
 research desk behind it. He explains a consultation from the record. He never
 says how to answer.
 
+## Where he is
+
+| Place | What he does there |
+| --- | --- |
+| The middle of the bar | He is one of the three destinations: Consultations, Cleisthenes, You |
+| His own page | He finds consultations in the catalogue and lists the ones that have a reviewed brief |
+| A consultation page | The brief: what is asked, what was argued, each sentence tied to its source |
+| Onboarding and the landing page | He welcomes and explains |
+
+In his chat he answers from the authored catalogue, and the chat says so.
+Generated answers exist only in a brief, which a named person has reviewed.
+
 ## The figure
 
 | Rule | Reason |

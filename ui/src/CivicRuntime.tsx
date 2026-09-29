@@ -57,13 +57,16 @@ import { ActivityView } from '@/views/ActivityView';
 import {
   APP_MODE,
   APP_NETWORK_LABEL,
+  APP_ROUTE,
   CHAIN_RUNTIME_ENABLED,
   type FlowStage,
   ONBOARDING_SESSION_KEY,
   PASSPORT_ACCOUNT_NETWORK,
   PASSPORT_ORIGIN,
+  PULSE_ROUTE,
   shouldShowFirstRunOnboarding,
   type Tab,
+  type YouSection,
 } from '@/views/app-runtime';
 import { CatalogueChat, type CatalogueMessage } from '@/views/CatalogueChat';
 import { AppHeader, BottomNav } from '@/views/Chrome';
@@ -82,6 +85,7 @@ import {
 import { SettingsView } from '@/views/SettingsView';
 import { VoteFlow } from '@/views/VoteFlow';
 import { VotesView } from '@/views/VotesView';
+import { BackToYou, YouView } from '@/views/YouView';
 import '@/views/dashboard.css';
 
 /** Re-exported so the runtime-catalog conversion keeps its existing test entry point. */
@@ -131,12 +135,27 @@ function CivicApp() {
   // Spanish is the product's default; an explicit persisted choice still wins.
   const [locale, setLocale] = useState<CicoLocale>(() => detectLocale('es-AR'));
   const [theme, setTheme] = useState<ThemePreference>(detectThemePreference);
-  const [tab, setTab] = useState<Tab>('discover');
+  const [tab, setTab] = useState<Tab>('consultations');
+  const [youSection, setYouSection] = useState<YouSection>('hub');
   const [guideMessages, setGuideMessages] = useState<CatalogueMessage[]>([]);
   const [reflectionContext, setReflectionContext] = useState<string | null>(null);
   const [flowStage, setFlowStage] = useState<FlowStage | null>(null);
   const [passportJourneyOpen, setPassportJourneyOpen] = useState(initialOnboardingRequired);
-  const [pulseOpen, setPulseOpen] = useState(false);
+  // The civic pulse is outside the three steps, so no screen links to it. It
+  // is kept, and its own address opens it.
+  const [pulseOpen, setPulseOpen] = useState(() => window.location.hash === PULSE_ROUTE);
+  useEffect(() => {
+    const openFromAddress = () => {
+      if (window.location.hash === PULSE_ROUTE) setPulseOpen(true);
+    };
+    window.addEventListener('hashchange', openFromAddress);
+    return () => window.removeEventListener('hashchange', openFromAddress);
+  }, []);
+  const closePulse = () => {
+    setPulseOpen(false);
+    // Leave the address too, or a reload would open the pulse again.
+    if (window.location.hash === PULSE_ROUTE) window.history.replaceState(null, '', APP_ROUTE);
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialPanel, setSettingsInitialPanel] = useState<'root' | 'feedback' | 'help'>(
     'root',
@@ -191,7 +210,7 @@ function CivicApp() {
     window.sessionStorage.setItem(ONBOARDING_SESSION_KEY, '1');
     setOnboardingRequired(false);
     setPassportJourneyOpen(false);
-    setTab('discover');
+    setTab('consultations');
   };
   const replayOnboarding = () => {
     setPulseOpen(false);
@@ -693,14 +712,20 @@ function CivicApp() {
     setReceiptProfileKey('');
   };
 
+  const openAnswers = () => {
+    setTab('you');
+    setYouSection('answers');
+  };
+  const backToYou = <BackToYou onBack={() => setYouSection('hub')} locale={locale} />;
   const currentTabContent =
-    tab === 'assistant' ? (
+    tab === 'cleisthenes' ? (
       <CatalogueChat
         reflectionContext={reflectionContext}
         onClearReflection={() => setReflectionContext(null)}
         initialMessages={guideMessages}
         onMessagesChange={setGuideMessages}
         polls={polls}
+        briefIds={assistant ? polls.map((poll) => poll.id).filter(assistant.covers) : []}
         locale={locale}
         country={
           canUseCatalogueDialogue(credential, !CHAIN_RUNTIME_ENABLED)
@@ -709,37 +734,58 @@ function CivicApp() {
         }
         onOpenPolicy={setPolicyDetailId}
       />
-    ) : tab === 'credentials' ? (
-      <CredentialsView
-        credentials={credential ? [credential] : []}
-        onVerify={openVerification}
-        locale={locale}
-      />
-    ) : tab === 'activity' ? (
-      <ActivityView
-        polls={polls}
-        receipts={receipts}
-        sealedAnswers={sealedAnswers}
-        countingId={countingId}
-        countNotices={countNotices}
-        onCount={(referendumId) => void countAnswer(referendumId)}
-        walletlessProving={walletlessProving}
-        deviceProofStartedAt={deviceProofStartedAt}
-        locale={locale}
-      />
-    ) : tab === 'passport' ? (
-      <ProfileView
+    ) : tab === 'you' && youSection === 'pass' ? (
+      <>
+        {backToYou}
+        <CredentialsView
+          credentials={credential ? [credential] : []}
+          onVerify={openVerification}
+          locale={locale}
+        />
+      </>
+    ) : tab === 'you' && youSection === 'answers' ? (
+      <>
+        {backToYou}
+        <ActivityView
+          polls={polls}
+          receipts={receipts}
+          sealedAnswers={sealedAnswers}
+          countingId={countingId}
+          countNotices={countNotices}
+          onCount={(referendumId) => void countAnswer(referendumId)}
+          walletlessProving={walletlessProving}
+          deviceProofStartedAt={deviceProofStartedAt}
+          locale={locale}
+        />
+      </>
+    ) : tab === 'you' && youSection === 'account' ? (
+      <>
+        {backToYou}
+        <ProfileView
+          passportSession={passportSession}
+          profileId={profileId}
+          walletStatus={walletStatus}
+          onConnectPassport={() => void connectPassport()}
+          onOpenHelp={() => openSettings('help')}
+          onLockAndDisconnect={() => void lockAndDisconnect()}
+          onRemoveLocalData={removeLocalData}
+          locale={locale}
+          onLocaleChange={changeLocale}
+          theme={theme}
+          onThemeChange={changeTheme}
+        />
+      </>
+    ) : tab === 'you' ? (
+      <YouView
+        credential={credential}
         passportSession={passportSession}
-        profileId={profileId}
-        walletStatus={walletStatus}
-        onConnectPassport={() => void connectPassport()}
-        onOpenHelp={() => openSettings('help')}
-        onLockAndDisconnect={() => void lockAndDisconnect()}
-        onRemoveLocalData={removeLocalData}
+        sealedAnswers={sealedAnswers}
+        receipts={receipts}
+        onVerify={openVerification}
+        onOpen={setYouSection}
+        onOpenSettings={() => openSettings('root')}
+        onOpenFeedback={() => openSettings('feedback')}
         locale={locale}
-        onLocaleChange={changeLocale}
-        theme={theme}
-        onThemeChange={changeTheme}
       />
     ) : (
       <VotesView
@@ -749,8 +795,6 @@ function CivicApp() {
         onStartVote={startVote}
         onOpenPolicy={setPolicyDetailId}
         onOpenPassportJourney={openVerification}
-        onOpenPulse={() => setPulseOpen(true)}
-        onOpenGuide={() => setTab('assistant')}
         locale={locale}
       />
     );
@@ -762,6 +806,8 @@ function CivicApp() {
     setSettingsOpen(false);
     setSettingsInitialPanel('root');
     setTab(nextTab);
+    // Choosing a destination opens it at its start, `You` at its summary.
+    setYouSection('hub');
     setFlowStage(null);
     setPolicyDetailId(null);
     setReceiptToastVisible(false);
@@ -779,8 +825,6 @@ function CivicApp() {
           passportError={passportError}
           onConnectPassport={() => void connectPassport()}
           onDismissPassportError={() => setPassportError(null)}
-          onOpenFeedback={() => openSettings('feedback')}
-          onOpenSettings={() => openSettings('root')}
           locale={locale}
           onLocaleChange={changeLocale}
         />
@@ -816,13 +860,13 @@ function CivicApp() {
           <PulseExperience
             onDiscuss={(summary) => {
               setReflectionContext(summary);
-              setPulseOpen(false);
-              setTab('assistant');
+              closePulse();
+              setTab('cleisthenes');
             }}
             locale={locale}
             embedded
-            onExit={() => setPulseOpen(false)}
-            onExploreReferenda={() => setPulseOpen(false)}
+            onExit={closePulse}
+            onExploreReferenda={closePulse}
           />
         </Suspense>
       ) : settingsOpen ? (
@@ -870,7 +914,7 @@ function CivicApp() {
               onConfirm={() => void confirmVote()}
               onViewReceipt={() => {
                 setFlowStage(null);
-                setTab('activity');
+                openAnswers();
               }}
               walletStatus={walletStatus}
               executionMode={executionMode}
@@ -902,9 +946,7 @@ function CivicApp() {
       )}
       {!passportJourneyOpen && !pulseOpen && !settingsOpen && !flowStage && !selectedPolicy ? (
         <BottomNav
-          dialogueReady={canUseCatalogueDialogue(credential, !CHAIN_RUNTIME_ENABLED)}
           tab={tab}
-          onVerify={openVerification}
           onChange={(nextTab) => {
             setPassportJourneyOpen(false);
             navigate(nextTab);
@@ -924,7 +966,7 @@ function CivicApp() {
             onClick={() => {
               setReceiptToastVisible(false);
               setFlowStage(null);
-              setTab('activity');
+              openAnswers();
             }}
           >
             <CheckCircle size={18} />{' '}

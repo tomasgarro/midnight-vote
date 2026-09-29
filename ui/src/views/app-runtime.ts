@@ -10,7 +10,13 @@ import type { PassportNetwork } from 'midnight-referendum-api';
 import { resolveAppMode } from '@/integration/app-mode';
 import type { CicoLocale } from '@/integration/locale';
 
-export type Tab = 'discover' | 'credentials' | 'activity' | 'passport' | 'assistant';
+/**
+ * Three destinations. Five used to share the bar, and two of them, the pass
+ * and the Passport account, were the same person seen from two sides.
+ */
+export type Tab = 'consultations' | 'cleisthenes' | 'you';
+/** What the `you` destination is showing: its summary, or one part of it in full. */
+export type YouSection = 'hub' | 'pass' | 'answers' | 'account';
 /**
  * `verify` and `eligible` are gone. Nothing ever set them: `startVote` sends a
  * credentialled user straight to `choose` and everyone else into the Passport
@@ -24,35 +30,17 @@ export type FlowStage = 'choose' | 'review' | 'processing' | 'receipt';
 export const APP_COPY = {
   es: {
     language: 'Idioma',
-    nav: {
-      discover: 'Descubrir',
-      credentials: 'Credenciales',
-      verify: 'Verificar',
-      activity: 'Actividad',
-      passport: 'Passport',
-    },
+    nav: { consultations: 'Consultas', cleisthenes: 'Cleisthenes', you: 'Vos' },
     network: { undeployed: 'Local no desplegado', preview: 'Preview', demo: 'Demo local' },
   },
   en: {
     language: 'Language',
-    nav: {
-      discover: 'Discover',
-      credentials: 'Credentials',
-      verify: 'Verify',
-      activity: 'Activity',
-      passport: 'Passport',
-    },
+    nav: { consultations: 'Consultations', cleisthenes: 'Cleisthenes', you: 'You' },
     network: { undeployed: 'Undeployed local', preview: 'Preview', demo: 'Local demo' },
   },
   fr: {
     language: 'Langue',
-    nav: {
-      discover: 'Découvrir',
-      credentials: 'Justificatifs',
-      verify: 'Vérifier',
-      activity: 'Activité',
-      passport: 'Passport',
-    },
+    nav: { consultations: 'Consultations', cleisthenes: 'Cleisthenes', you: 'Vous' },
     network: { undeployed: 'Local non déployé', preview: 'Preview', demo: 'Démo locale' },
   },
 } as const;
@@ -95,6 +83,9 @@ export function passportNetworkLabel(network: PassportNetwork, locale: CicoLocal
       : 'Local development';
 }
 export const ONBOARDING_SESSION_KEY = 'cico-wave1-onboarding-complete';
+/** The app, and the one screen inside it that has an address of its own. */
+export const APP_ROUTE = '#app';
+export const PULSE_ROUTE = '#app/pulse';
 
 export function shouldShowFirstRunOnboarding(): boolean {
   if (typeof window === 'undefined') return true;

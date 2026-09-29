@@ -189,15 +189,66 @@
   font-size: 15px;
   line-height: 1.5;
 }
+/* The guide's face, in the round frame he has everywhere. */
 .catalogue-chat__robot {
   height: 92px;
   width: 92px;
-  display: grid;
-  place-items: center;
-  background: var(--surface-sunken);
-  border-radius: 32px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  /* The paper the bust was painted on. */
+  background: #f7ecd9;
   margin: 8px auto 22px;
-  color: var(--accent);
+}
+.catalogue-chat__robot img,
+.catalogue-chat__face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.catalogue-chat__face {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #f7ecd9;
+}
+.catalogue-chat__briefs {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin: 0 auto 24px;
+}
+.catalogue-chat__briefs[hidden] {
+  display: none;
+}
+.catalogue-chat__briefs h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+.catalogue-chat__briefs p {
+  margin: 0 0 4px;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.catalogue-chat__briefs button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
 }
 .catalogue-chat__suggestions {
   display: flex;

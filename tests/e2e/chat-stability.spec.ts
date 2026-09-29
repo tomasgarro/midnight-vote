@@ -16,16 +16,17 @@ for (const viewport of [
     });
     await page.goto('/#app');
     await expect(page.locator('.votes__results').first()).toBeVisible();
+    // The page says what it is before it lists anything.
     expect(
       await page.locator('.votes').evaluate((el) => {
         const sections = [...el.children];
         return (
-          sections.indexOf(el.querySelector('.votes__results')!) <
-          sections.indexOf(el.querySelector('.votes__head')!)
+          sections.indexOf(el.querySelector('.votes__head')!) <
+          sections.indexOf(el.querySelector('.votes__results')!)
         );
       }),
     ).toBe(true);
-    await page.locator('.dashboard-guide-entry').click();
+    await page.getByRole('button', { name: 'Cleisthenes', exact: true }).click();
     const composer = page.locator('.catalogue-chat__composer');
     const before = await composer.boundingBox();
     const pageTop = await page.evaluate(() => window.scrollY);

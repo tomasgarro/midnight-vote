@@ -78,9 +78,7 @@ for (const width of [320, 390]) {
     await noOverflow();
     await page.screenshot({ path: test.info().outputPath(`success-${width}.png`), fullPage: true });
     await page.getByRole('button', { name: 'See the consultations', exact: true }).click();
-    await expect(
-      page.getByRole('button', { name: 'Try the civic pulse', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Consultations', exact: true })).toBeVisible();
     await page.reload();
     await expect(
       page.getByRole('heading', {
@@ -88,9 +86,7 @@ for (const width of [320, 390]) {
         exact: true,
       }),
     ).toHaveCount(0);
-    await expect(
-      page.getByRole('button', { name: 'Try the civic pulse', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Consultations', exact: true })).toBeVisible();
     await noOverflow();
   });
 }

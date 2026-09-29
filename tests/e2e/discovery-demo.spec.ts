@@ -11,19 +11,27 @@ async function openDemo(page: import('@playwright/test').Page) {
     localStorage.setItem('cico-locale', 'en');
   });
   await page.goto('/#app');
-  await page.getByRole('button', { name: 'Verify · physical document', exact: true }).click();
+  await page.getByRole('button', { name: 'You', exact: true }).click();
+  await page.getByRole('button', { name: 'Add eligibility', exact: true }).click();
   await page.getByRole('button', { name: /Try with a simulated pass/ }).click();
   await expect(page.getByLabel('Test age')).toBeVisible();
   await page.getByRole('radio', { name: 'Switzerland', exact: true }).check();
 }
-test('Swiss simulated pass, regional carousel, filters and dialogue', async ({ page }) => {
+test('Swiss simulated pass, place chips, carousel, filters and dialogue', async ({ page }) => {
   await openDemo(page);
   await page.getByLabel('Test age').fill('35');
   await page.screenshot({ path: 'outputs/demo-pass-390.png' });
   await page.getByRole('button', { name: 'Create my simulated pass' }).click();
   await page.getByRole('button', { name: 'See the consultations', exact: true }).click();
-  await expect(page.getByRole('button', { name: /Browse by place Switzerland/ })).toBeVisible();
-  await expect(page.locator('.discovery-rail > li')).toHaveCount(6);
+  const places = page.getByRole('group', { name: 'Consultation scope' });
+  await expect(places.getByRole('button', { name: 'Switzerland' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  // One place at a time: the four Swiss consultations, and no filter for four.
+  await expect(page.locator('.votes__results h2')).toHaveText(['Switzerland']);
+  await expect(page.locator('.discovery-rail > li')).toHaveCount(4);
+  await expect(page.locator('.discovery-subjects')).toBeHidden();
   expect(
     await page
       .locator('.poll')
@@ -72,10 +80,24 @@ test('Swiss simulated pass, regional carousel, filters and dialogue', async ({ p
     )
     .toBeGreaterThan(100);
   await cdp.detach();
-  await page.getByRole('button', { name: 'Housing', exact: true }).click();
+  // Argentina has five, so its list can be shortened by subject.
+  await places.getByRole('button', { name: 'Argentina' }).click();
+  await expect(page.locator('.discovery-rail > li')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Nature & climate', exact: true }).click();
   await expect(page.locator('.discovery-rail > li')).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: 'More room to call home' })).toBeVisible();
-  await page.getByRole('button', { name: 'Ask Midnight', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Energy, tariffs, and the renewable transition' }),
+  ).toBeVisible();
+  // A place without consultations is in the sheet, and gets a chip once chosen.
+  await places.getByRole('button', { name: 'More places' }).click();
+  await page.getByRole('searchbox', { name: 'Consultation scope' }).fill('Japan');
+  await page.getByRole('radio', { name: /Japan/ }).click();
+  await expect(places.getByRole('button', { name: 'Japan' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByText('No consultations are published in this scope yet.')).toBeVisible();
+  await page.getByRole('button', { name: 'Cleisthenes', exact: true }).click();
   await page
     .getByRole('button', { name: 'What consultations are open for me?', exact: true })
     .click();
@@ -122,7 +144,8 @@ test('French Swiss cards and demo form fit a 320px dark phone', async ({ page })
     localStorage.setItem('cico-theme', 'dark');
   });
   await page.goto('/#app');
-  await page.getByRole('button', { name: /^Vérifier ·/ }).click();
+  await page.getByRole('button', { name: 'Vous', exact: true }).click();
+  await page.getByRole('button', { name: 'Ajouter une éligibilité', exact: true }).click();
   await page.getByRole('button', { name: /Essayer un laissez-passer simulé/ }).click();
   await page.getByRole('radio', { name: 'Suisse', exact: true }).check();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

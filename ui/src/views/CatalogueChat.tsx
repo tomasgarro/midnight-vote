@@ -1,5 +1,6 @@
-import { ArrowRight, ArrowUp, Robot, Trash } from '@phosphor-icons/react';
+import { ArrowRight, ArrowUp, Trash } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
+import bust from '@/assets/companion/cleisthenes-bust.webp';
 import { countryName } from '@/integration/country-catalog';
 import type { CicoLocale } from '@/integration/locale';
 import { REFLECTION_COPY } from '@/pulse/local-reflection';
@@ -22,11 +23,14 @@ export function CatalogueChat({
   onMessagesChange,
   reflectionContext,
   onClearReflection,
+  briefIds = [],
 }: {
   polls: readonly Poll[];
   locale: CicoLocale;
   country?: string;
   onOpenPolicy: (id: string) => void;
+  /** Consultations that have a reviewed brief. Each one opens on its own page. */
+  briefIds?: readonly string[];
   initialMessages?: CatalogueMessage[];
   onMessagesChange?: (messages: CatalogueMessage[]) => void;
   reflectionContext?: string | null;
@@ -51,6 +55,9 @@ export function CatalogueChat({
   const scroll = useRef<HTMLDivElement>(null);
   const id = useRef(initialMessages[initialMessages.length - 1]?.id ?? 0);
   const countries = [...new Set(polls.map(pollCountryCode).filter((c): c is string => Boolean(c)))];
+  const briefs = polls
+    .filter((poll) => briefIds.includes(poll.id))
+    .map((poll) => localizePoll(poll, locale));
   useEffect(() => {
     const pane = scroll.current;
     if (!messages.length && !pending?.id) {
@@ -87,7 +94,7 @@ export function CatalogueChat({
     <main className="catalogue-chat">
       <header className="catalogue-chat__header">
         <span>
-          <Robot size={21} />
+          <img className="catalogue-chat__face" src={bust} alt="" width="28" height="28" />
           {t.name}
         </span>
         <button
@@ -124,12 +131,28 @@ export function CatalogueChat({
         {messages.length > 0 && <h1 className="sr-only">{t.name}</h1>}
         <section className="catalogue-chat__intro" hidden={messages.length > 0 || Boolean(pending)}>
           <div className="catalogue-chat__robot">
-            <Robot size={50} weight="duotone" />
+            <img src={bust} alt="" width="88" height="88" />
           </div>
           <p className="sys-eyebrow">{t.badge}</p>
           <h1>{t.title}</h1>
           <p>{t.intro}</p>
         </section>
+        {briefs.length > 0 && (
+          <section
+            className="catalogue-chat__briefs"
+            aria-labelledby="catalogue-briefs-title"
+            hidden={messages.length > 0 || Boolean(pending)}
+          >
+            <h2 id="catalogue-briefs-title">{t.briefs}</h2>
+            <p>{t.briefsBody}</p>
+            {briefs.map((poll) => (
+              <button type="button" key={poll.id} onClick={() => onOpenPolicy(poll.id)}>
+                {poll.title}
+                <ArrowRight size={16} />
+              </button>
+            ))}
+          </section>
+        )}
         <div
           className="catalogue-chat__suggestions"
           hidden={messages.length > 0 || Boolean(pending)}

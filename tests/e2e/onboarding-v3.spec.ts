@@ -63,7 +63,12 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByRole('button', { name: t.later, exact: true }).click();
       await expect(page.locator('.onboarding-v3')).toHaveCount(0);
       await expect(page.getByRole('navigation')).toBeVisible();
-      await page.getByRole('button', { name: /^(Verify ·|Verificar ·|Vérifier ·)/ }).click();
+      await page.getByRole('button', { name: /^(You|Vos|Vous)$/ }).click();
+      await page
+        .getByRole('button', {
+          name: /^(Add eligibility|Añadir elegibilidad|Ajouter une éligibilité)$/,
+        })
+        .click();
       await expect(page.getByRole('button', { name: t.later, exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: t.start, exact: true })).toHaveCount(0);
     });
@@ -93,8 +98,8 @@ test('skip creates no pass; browser Back follows the actual path; reduced motion
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
   await expect(page.getByRole('navigation')).toBeVisible();
-  await page.getByRole('button', { name: 'Credentials', exact: true }).click();
-  await expect(page.getByText(/No pass yet/i)).toBeVisible();
+  await page.getByRole('button', { name: 'You', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No pass yet' })).toBeVisible();
 });
 
 test('nested document Back and enlarged text keep controls reachable', async ({ page }) => {
