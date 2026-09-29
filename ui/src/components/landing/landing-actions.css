@@ -14,14 +14,14 @@
 }
 .civic-landing .midnight-hero__learn:is(:hover, :focus-visible) {
   gap: 20px;
-  color: #3535ca;
+  color: var(--accent);
 }
 .civic-landing .how-action:focus-visible {
   gap: 36px;
-  color: #3535ca;
+  color: var(--accent);
 }
 .civic-landing :where(a, button):focus-visible {
-  outline: 2px solid #8b7bb6;
+  outline: 2px solid var(--line-strong);
   outline-offset: 5px;
 }
 @media (prefers-reduced-motion: reduce) {

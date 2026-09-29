@@ -102,12 +102,7 @@ test('reduced motion keeps the proof interaction and landing navigation function
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  expect(
-    await page
-      .locator('.passport-art__pose')
-      .first()
-      .evaluate((el) => getComputedStyle(el).transform),
-  ).toBe('none');
+  await expect(page.locator('.civic-art__view')).toHaveCSS('animation-name', 'none');
   await expect(page.getByRole('button', { name: 'Pause background animation' })).toBeHidden();
   await page.screenshot({ path: test.info().outputPath('landing-desktop.png'), fullPage: true });
   await page

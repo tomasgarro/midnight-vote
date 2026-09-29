@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const width of [390, 1440]) {
-  test(`mountain finish keeps navigation and arrow interactions usable at ${width}px`, async ({
+  test(`lakefront finish keeps navigation and arrow interactions usable at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 960 });
@@ -32,12 +32,12 @@ for (const width of [390, 1440]) {
     }
     const landscape = page.locator('.finale-landscape img');
     await landscape.scrollIntoViewIfNeeded();
-    await expect(landscape).toHaveJSProperty('naturalWidth', 1536);
+    await expect(landscape).toHaveJSProperty('naturalWidth', 1600);
     await expect(page.locator('.finale-guide-symbol')).toHaveCount(0);
-    await page.screenshot({ path: test.info().outputPath(`mountains-${width}.png`) });
+    await page.screenshot({ path: test.info().outputPath(`lakefront-${width}.png`) });
     const footer = page.locator('.finale-footer');
     await footer.scrollIntoViewIfNeeded();
-    await expect(footer).toHaveCSS('background-color', 'rgb(37, 36, 53)');
+    await expect(footer).toHaveCSS('background-color', 'rgb(37, 40, 35)');
     await expect(footer.getByRole('link', { name: 'Humans & agents' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

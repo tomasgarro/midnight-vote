@@ -1,14 +1,7 @@
-@font-face {
-  font-family: "Landing Editorial";
-  src: url("/fonts/fraunces-latin.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
 .how-section {
-  background: #f4f0e8;
-  color: #1c2030;
-  font-family: Outfit, sans-serif;
+  background: var(--ground);
+  color: #1f211d;
+  font-family: var(--font-body);
   padding: 100px 0 0;
 }
 .how-intro {
@@ -18,10 +11,8 @@
   text-align: center;
 }
 .civic-landing .how-intro h2 {
-  font:
-    450 clamp(42px, 6.5vw, 96px) / 1.07 Outfit,
-    sans-serif;
-  letter-spacing: -0.045em;
+  font: 400 clamp(42px, 6.5vw, 96px) / 1.07 var(--font-display);
+  letter-spacing: -0.025em;
   margin: 0;
 }
 .how-intro :where(h2) span {
@@ -75,7 +66,7 @@
   max-width: 455px;
 }
 .how-number {
-  color: #24273d;
+  color: var(--ink);
   font-size: 16px;
   display: flex;
   gap: 16px;
@@ -83,14 +74,12 @@
   margin: 0 0 22px;
 }
 .how-number span {
-  color: #827971;
+  color: var(--ink-muted);
   font-size: 14px;
 }
 .civic-landing .how-copy h3 {
-  font:
-    450 clamp(34px, 3.4vw, 48px) / 1.12 Outfit,
-    sans-serif;
-  letter-spacing: -0.045em;
+  font: 400 clamp(34px, 3.4vw, 48px) / 1.12 var(--font-display);
+  letter-spacing: -0.02em;
   margin: 0 0 28px;
 }
 .how-copy h3 > span {
@@ -104,12 +93,12 @@
 .how-copy > p:not(.how-number) {
   font-size: 17px;
   line-height: 1.65;
-  color: #5d5956;
+  color: var(--ink-muted);
   margin: 0 0 20px;
 }
 .how-copy > p.how-detail {
   font-size: 14px;
-  color: #787169;
+  color: var(--ink-muted);
   line-height: 1.6;
 }
 .how-action {
@@ -121,17 +110,15 @@
   border-bottom: 1px solid #a8a19a;
   padding: 10px 0;
   background: none;
-  color: #222433;
-  font:
-    500 16px Outfit,
-    sans-serif;
+  color: var(--ink);
+  font: 500 16px var(--font-body);
   transition:
     gap 200ms,
     color 200ms;
 }
 .how-action:hover {
   gap: 36px;
-  color: #3535ca;
+  color: var(--accent);
 }
 .how-art {
   position: relative;
@@ -139,48 +126,22 @@
   aspect-ratio: 1.08;
   isolation: isolate;
   border-radius: 30px;
-  background: radial-gradient(ellipse at 48% 46%, #ebe3fa, #ece7e000 72%), #eee9e0;
+  background:
+    radial-gradient(ellipse at 48% 46%, var(--surface-sunken), #ece7e000 72%), var(--ground);
   overflow: hidden;
 }
 .how-art__orbit {
   position: absolute;
   width: 86%;
   aspect-ratio: 1;
-  border: 1px solid #c4bfcc70;
+  border: 1px solid #c4c1b770;
   border-radius: 50%;
   top: 4%;
   left: 7%;
   z-index: -1;
   box-shadow:
-    0 0 0 30px #ded8db25,
-    0 0 0 60px #ded8db15;
-}
-.how-passport {
-  position: absolute;
-  left: 8%;
-  top: 14%;
-  width: 40%;
-  height: 60%;
-  transform: rotate(-14deg);
-  border-radius: 6px 16px 16px 6px;
-  border: 1px solid #666886;
-  background: linear-gradient(125deg, #36384c, #131520);
-  color: #e4d4b6;
-  box-shadow:
-    8px 20px 24px #25252e26,
-    inset 5px 0 #ffffff10;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  padding: 22px 12px;
-  gap: 14px;
-}
-.how-passport > span {
-  font-size: 11px;
-  letter-spacing: 0.18em;
-}
-.how-passport i {
-  flex: 1;
+    0 0 0 30px #e0d9cd25,
+    0 0 0 60px #e0d9cd15;
 }
 .how-consent {
   position: absolute;
@@ -188,10 +149,10 @@
   left: 27%;
   width: 65%;
   padding: 20px;
-  background: #fdfbf7;
+  background: var(--surface);
   border: 1px solid #ffffff;
   border-radius: 16px;
-  box-shadow: 0 24px 50px #24204025;
+  box-shadow: 0 24px 50px #22252025;
   transform: rotate(4deg);
 }
 .how-ui-top {
@@ -201,19 +162,19 @@
   font-size: 11px;
 }
 .how-ui-top img {
-  background: #191b28;
+  background: #1a1c19;
   border-radius: 50%;
   padding: 4px;
 }
 .how-ui-top > span:last-child {
   margin-left: auto;
-  color: #898580;
+  color: var(--ink-muted);
   font-size: 10px;
 }
 .how-consent > p {
   margin: 22px 0 4px;
   font-size: 12px;
-  color: #77716b;
+  color: var(--ink-muted);
 }
 .how-consent > strong {
   font-size: clamp(14px, 1.35vw, 19px);
@@ -231,14 +192,14 @@
 }
 .how-field > span:nth-child(2) {
   margin-left: auto;
-  color: #857e75;
+  color: var(--ink-muted);
 }
 .how-field > svg {
-  color: #5554c2;
+  color: var(--accent);
 }
 .how-toggle {
   border: 1px solid #c9c2b7;
-  background: #ede8e0;
+  background: var(--ground);
   border-radius: 10px;
   width: 24px;
   height: 14px;
@@ -258,12 +219,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #726b61;
+  color: var(--ink-muted);
   font-size: 10px;
   padding: 10px 0 16px;
 }
 .how-ui-button {
-  background: #292a41;
+  background: var(--ink);
   color: white;
   display: flex;
   align-items: center;
@@ -285,45 +246,11 @@
   gap: 8px;
   padding: 12px 16px;
   border-radius: 30px;
-  box-shadow: 0 8px 20px #4a38400a;
+  box-shadow: 0 8px 20px #3a3e360a;
   font-size: 11px;
 }
 .how-art__badge svg {
-  color: #676194;
-}
-.how-document {
-  position: absolute;
-  top: 21%;
-  left: 6%;
-  width: 38%;
-  height: 54%;
-  border-radius: 14px;
-  transform: rotate(-9deg);
-  background: #fcf9f2;
-  box-shadow: 0 15px 35px #31234c20;
-  border: 1px solid #fff;
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 13px;
-  color: #79707c;
-}
-.how-document > span {
-  font-size: 8px;
-  letter-spacing: 0.1em;
-}
-.how-document > i {
-  height: 7px;
-  background: #d1cbd3;
-  border-radius: 4px;
-  width: 80%;
-}
-.how-document > i:nth-of-type(2) {
-  width: 60%;
-}
-.how-document > svg:last-child {
-  margin-top: auto;
+  color: #6b6758;
 }
 .how-proof-path {
   position: absolute;
@@ -339,7 +266,7 @@
 .how-proof-path span {
   width: 6px;
   height: 6px;
-  background: #8174cc;
+  background: #bd6859;
   border-radius: 50%;
 }
 .how-proof-seal {
@@ -348,13 +275,13 @@
   right: 5%;
   width: 44%;
   aspect-ratio: 1;
-  border: 1px solid #9e9abd;
+  border: 1px solid #a29e8d;
   border-radius: 50%;
-  background: linear-gradient(130deg, #42425d, #171923);
+  background: linear-gradient(130deg, #47453a, #181a17);
   color: #e8ddc8;
   box-shadow:
-    0 20px 40px #30255020,
-    0 0 0 8px #d3cadc60;
+    0 20px 40px #2a2d2720,
+    0 0 0 8px #d7ccbb60;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -368,7 +295,7 @@
 .how-proof-seal > strong {
   font-size: 11px;
   font-weight: 400;
-  color: #b7b4cd;
+  color: #bab7aa;
 }
 .how-proof-result {
   position: absolute;
@@ -383,14 +310,14 @@
   align-items: center;
   gap: 7px;
   font-size: 13px;
-  color: #4e4969;
+  color: #504d41;
 }
 .how-proof-result small {
   font-size: 9px;
-  color: #827885;
+  color: var(--ink-muted);
 }
 .how-art--proof {
-  background: radial-gradient(ellipse at 65% 40%, #d5ccf1, transparent 72%), #eee9e0;
+  background: radial-gradient(ellipse at 65% 40%, var(--line), transparent 72%), var(--ground);
 }
 .how-art--proof .how-art__badge {
   bottom: 4%;
@@ -402,15 +329,15 @@
   width: 73%;
   padding: 22px;
   border: 1px solid #fff;
-  background: #fdfbf7;
+  background: var(--surface);
   border-radius: 16px;
-  box-shadow: 0 22px 40px #2c26371c;
+  box-shadow: 0 22px 40px #272a241c;
   transform: rotate(-4deg);
 }
 .how-live-dot {
   width: 6px;
   height: 6px;
-  background: #8277b5;
+  background: #847f6c;
   border-radius: 50%;
 }
 .how-vote-card > p {
@@ -426,11 +353,11 @@
   justify-content: space-between;
   gap: 8px;
   font-size: 11px;
-  border: 1px solid #e6e1d9;
+  border: 1px solid var(--surface-sunken);
   border-radius: 7px;
   padding: 11px 10px;
   margin-bottom: 8px;
-  color: #645e58;
+  color: var(--ink-muted);
 }
 .how-vote-option > span {
   width: 13px;
@@ -439,9 +366,9 @@
   border: 1px solid #cdc6bc;
 }
 .how-vote-option--selected {
-  background: #eeebf7;
-  border-color: #bdb4d6;
-  color: #4f4673;
+  background: var(--ground);
+  border-color: #bcb9ad;
+  color: #4f4c41;
 }
 .how-vote-card .how-ui-button {
   margin-top: 14px;
@@ -450,21 +377,21 @@
   position: absolute;
   bottom: 18%;
   right: 5%;
-  background: #26283c;
+  background: var(--ink);
   color: #f2e8d5;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 15px 20px;
-  border: 1px solid #676680;
+  border: 1px solid #6c6959;
   border-radius: 12px;
-  box-shadow: 0 10px 20px #1a1b3729;
+  box-shadow: 0 10px 20px #1c1f1b29;
   transform: rotate(6deg);
   font-size: 13px;
 }
 .how-receipt small {
   display: block;
-  color: #bfbad3;
+  color: #c0bdb2;
   font-size: 10px;
   margin-top: 4px;
 }
@@ -484,10 +411,8 @@
   padding: 16px 0;
   border: 0;
   background: none;
-  color: #92887a;
-  font:
-    16px Outfit,
-    sans-serif;
+  color: var(--ink-muted);
+  font: 16px var(--font-body);
 }
 .how-progress button > span {
   font-size: 12px;
@@ -498,13 +423,13 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #656098;
+  background: #6a6757;
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 400ms;
 }
 .how-progress button[aria-current] {
-  color: #29243d;
+  color: var(--ink);
 }
 .how-progress button[aria-current] > i {
   transform: scaleX(1);
@@ -515,11 +440,9 @@
   justify-content: center;
   gap: 12px;
   padding: 32px 24px;
-  color: #726a60;
-  font:
-    italic 350 clamp(21px, 2vw, 26px) / 1.5 "Landing Editorial",
-    serif;
-  letter-spacing: -0.025em;
+  color: var(--ink-muted);
+  font: italic 400 clamp(21px, 2vw, 26px) / 1.5 var(--font-display);
+  letter-spacing: -0.01em;
   transform: translateY(-6px);
   text-align: center;
 }
@@ -528,7 +451,7 @@
 }
 .how-outro strong {
   font-weight: 500;
-  color: #38333f;
+  color: #32362f;
 }
 .how-track[data-pinned="true"] {
   height: 330svh;
@@ -689,13 +612,6 @@
     padding: 10px 14px;
     font-size: 11px;
     bottom: 17%;
-  }
-  .how-document {
-    padding: 15px;
-    gap: 10px;
-  }
-  .how-document > span {
-    font-size: 7px;
   }
   .how-proof-seal svg {
     width: 42px;

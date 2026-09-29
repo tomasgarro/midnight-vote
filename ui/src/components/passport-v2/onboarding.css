@@ -48,9 +48,7 @@
 .onboarding-screen h1,
 .onboarding-v3 h2 {
   color: var(--onboarding-ink);
-  font:
-    500 clamp(28px, 7vw, 40px) / 1.13 Outfit,
-    sans-serif;
+  font: 400 clamp(28px, 7vw, 40px) / 1.13 var(--font-display);
   letter-spacing: -0.035em;
   white-space: pre-line;
   margin: 0;
@@ -92,9 +90,7 @@
 .onboarding-primary,
 .onboarding-secondary,
 .onboarding-demo-link {
-  font:
-    500 15px / 1.4 Outfit,
-    sans-serif;
+  font: 500 15px / 1.4 var(--font-body);
   min-height: 52px;
   border-radius: 999px;
   cursor: pointer;

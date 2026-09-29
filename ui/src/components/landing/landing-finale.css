@@ -1,8 +1,8 @@
 /* The navigation is a sibling of the hero, outside its isolated stacking context. */
 .civic-landing > main > .midnight-nav {
   z-index: 100;
-  font-family: Outfit, sans-serif;
-  background: #f7f3eb;
+  font-family: var(--font-body);
+  background: var(--surface);
   backdrop-filter: none;
 }
 .civic-landing .landing-skip {
@@ -16,12 +16,12 @@
 .finale-quote,
 .finale-invitation,
 .finale-footer {
-  font-family: Outfit, sans-serif;
-  color: #302b3b;
+  font-family: var(--font-body);
+  color: #2b2f29;
 }
 .future-section {
   padding: 64px max(6vw, calc((100% - 1160px) / 2));
-  background: #faf7f1;
+  background: var(--surface);
 }
 .future-header,
 .future-panel {
@@ -37,19 +37,17 @@
 }
 .civic-landing .future-heading h2,
 .civic-landing .finale-invitation h2 {
-  font:
-    450 clamp(40px, 4.4vw, 64px) / 1.1 Outfit,
-    sans-serif;
-  letter-spacing: -0.045em;
+  font: 400 clamp(40px, 4.4vw, 64px) / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
   margin: 0;
 }
 .future-heading :where(h2) span,
 .finale-invitation :where(h2) span {
-  color: #87748d;
+  color: #7f7b68;
 }
 .future-heading > p:last-child {
   font-size: 18px;
-  color: #817568;
+  color: var(--ink-muted);
   margin: 18px 0 0;
 }
 .future-switch {
@@ -69,20 +67,18 @@
   padding: 13px 24px;
   border: 0;
   border-radius: 999px;
-  font:
-    15px Outfit,
-    sans-serif;
+  font: 15px var(--font-body);
   background: transparent;
-  color: #7b7064;
+  color: var(--ink-muted);
   transition:
     background 180ms,
     color 180ms;
   min-height: 48px;
 }
 .future-switch button[aria-pressed="true"] {
-  background: #302b3d;
-  color: #fff9ed;
-  box-shadow: 0 3px 8px #30233818;
+  background: #2b2f29;
+  color: var(--surface);
+  box-shadow: 0 3px 8px #26292418;
 }
 .future-switch small {
   font-size: 10px;
@@ -99,13 +95,13 @@
   min-width: 0;
   border-radius: 28px;
   overflow: hidden;
-  background: #eee7ee;
+  background: var(--ground);
   width: 100%;
   max-width: 380px;
   margin-inline: auto;
 }
 .future-art--agents {
-  background: #272130;
+  background: var(--ink);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -117,20 +113,18 @@
   object-fit: contain;
 }
 .future-label {
-  color: #95868f;
+  color: var(--ink-muted);
   font-size: 11px;
   letter-spacing: 0.08em;
   margin: 0 0 12px;
 }
 .civic-landing .future-copy h3 {
-  font:
-    450 clamp(30px, 2.8vw, 40px) / 1.12 Outfit,
-    sans-serif;
-  letter-spacing: -0.035em;
+  font: 400 clamp(30px, 2.8vw, 40px) / 1.12 var(--font-display);
+  letter-spacing: -0.015em;
   margin: 0 0 16px;
 }
 .future-copy > p:not(.future-label) {
-  color: #7a6f65;
+  color: var(--ink-muted);
   font-size: 16px;
   line-height: 1.5;
 }
@@ -144,18 +138,18 @@
 .future-copy li {
   display: flex;
   gap: 12px;
-  color: #8a7d70;
+  color: var(--ink-muted);
   font-size: 14px;
   line-height: 1.6;
 }
 .future-copy li svg {
   flex-shrink: 0;
-  color: #93809e;
+  color: #8c8773;
   margin-top: 3px;
 }
 .future-copy li strong {
   display: block;
-  color: #4f4458;
+  color: #4b483d;
   font-size: 15px;
   font-weight: 500;
   margin-bottom: 4px;
@@ -163,32 +157,30 @@
 .finale-quote {
   text-align: center;
   padding: 80px max(6vw, 24px) 100px;
-  background: #f4f0e7;
-  border-top: 1px solid #e7dfd2;
+  background: var(--ground);
+  border-top: 1px solid var(--surface-sunken);
 }
 .finale-quote-mark {
   display: block;
   font-size: 90px;
   line-height: 0.85;
   font-family: Georgia, serif;
-  color: #bcacbd;
+  color: #b4b1a4;
 }
 .finale-quote blockquote {
   max-width: 980px;
   margin: 20px auto 30px;
-  font:
-    400 clamp(26px, 3.15vw, 45px) / 1.32 Outfit,
-    sans-serif;
-  letter-spacing: -0.025em;
-  color: #54465b;
+  font: 400 clamp(26px, 3.15vw, 45px) / 1.32 var(--font-display);
+  letter-spacing: -0.01em;
+  color: #4e4b40;
 }
 .finale-quote > p {
-  color: #978977;
+  color: var(--ink-muted);
   font-size: 13px;
 }
 .finale-invitation {
   position: relative;
-  background: #f4f0e8;
+  background: var(--ground);
   text-align: center;
   overflow: clip;
 }
@@ -200,24 +192,26 @@
 }
 .finale-invitation .midnight-cta {
   margin: 32px auto 0;
-  background: #2d2638;
-  color: #fff8ed;
+  background: var(--ink);
+  color: var(--surface);
 }
 .finale-invitation .midnight-cta > span {
-  background: #d8cce8;
-  color: #4a3a63;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .finale-invitation small {
   display: block;
-  color: #756b7e;
+  color: var(--ink-muted);
   margin-top: 17px;
   font-size: 12px;
 }
+/* The engraving was drawn on paper of nearly the ground colour. Multiplying
+   it onto the ground removes the last difference, so the sky has no edge. */
 .finale-landscape {
   position: relative;
-  aspect-ratio: 2.1;
-  min-height: 320px;
-  background: linear-gradient(#f4f0e8, #aaa3bd 55%, #252435);
+  aspect-ratio: 2.5;
+  min-height: 300px;
+  background: var(--ground);
 }
 .finale-landscape img {
   display: block;
@@ -227,32 +221,19 @@
   inset: 0;
   object-fit: cover;
   object-position: center bottom;
-  mask-image: linear-gradient(transparent, #000 22%, #000 85%, transparent);
-}
-.finale-landscape::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(transparent 78%, #252435);
-  pointer-events: none;
-}
-.finale-guide-space {
-  position: absolute;
-  right: 12%;
-  bottom: 10%;
-  width: 160px;
-  height: 200px;
+  mix-blend-mode: multiply;
+  mask-image: linear-gradient(transparent, #000 34%);
 }
 .finale-footer {
-  background: #252435;
-  color: #f4f0e8;
+  background: var(--ink);
+  color: var(--ground);
   padding: 64px 8vw 28px;
 }
 .finale-footer .midnight-brand {
-  color: #fff9f0;
+  color: var(--surface);
 }
 .finale-footer .midnight-brand__suffix {
-  color: #c2bbce;
+  color: #c1beb3;
 }
 .finale-footer__top {
   display: flex;
@@ -261,7 +242,7 @@
   padding-bottom: 56px;
 }
 .finale-footer__top > div > p {
-  color: #c2bbce;
+  color: #c1beb3;
   font-size: 16px;
   line-height: 1.6;
   margin: 22px 0 0;
@@ -276,7 +257,7 @@
   gap: 15px;
 }
 .finale-footer nav strong {
-  color: #fff9f0;
+  color: var(--surface);
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 6px;
@@ -286,7 +267,7 @@
   align-items: center;
   gap: 5px;
   font-size: 14px;
-  color: #d2ccdc;
+  color: var(--line);
   min-height: 26px;
 }
 .finale-footer a:hover {
@@ -301,7 +282,7 @@
   align-items: center;
   gap: 30px;
   padding-top: 24px;
-  color: #bdb5c9;
+  color: #bbb8ac;
   font-size: 12px;
   line-height: 1.65;
 }
@@ -322,17 +303,17 @@
   justify-content: center;
   flex-direction: column;
   gap: 16px;
-  background: #f4f0e7;
-  color: #76677f;
-  font-family: Outfit, sans-serif;
+  background: var(--ground);
+  color: var(--ink-muted);
+  font-family: var(--font-body);
   text-align: center;
   padding: 30px;
 }
 .runtime-loading__symbol {
-  border: 1px solid #c9bed5;
+  border: 1px solid #c5c2b8;
   border-radius: 50%;
   padding: 24px;
-  box-shadow: 0 0 0 14px #e6ddec55;
+  box-shadow: 0 0 0 14px #e6dfd455;
   animation: future-reveal 700ms ease-out;
 }
 .runtime-loading__symbol img {
@@ -345,7 +326,7 @@
   margin: 12px 0 0;
 }
 .runtime-loading small {
-  color: #9a8c7e;
+  color: var(--ink-muted);
   font-size: 14px;
 }
 @keyframes future-reveal {
@@ -391,10 +372,6 @@
   }
   .finale-landscape {
     min-height: 280px;
-  }
-  .finale-guide-space {
-    width: 100px;
-    height: 130px;
   }
   .finale-footer {
     padding: 44px 6vw 24px;

@@ -1,6 +1,6 @@
 # Cleisthenes, the companion, and the brand he shares
 
-- Status: in the app since 2026-09-29. The pose sheet is not drawn yet.
+- Status: in the app since 2026-09-29, on the landing page since 2026-09-30. The pose sheet is not drawn yet.
 - Replaces: the capybara mascot ([MASCOT-AND-AVATARS.md](MASCOT-AND-AVATARS.md))
 
 ## Who he is
@@ -56,7 +56,9 @@ references, Swiss in its restraint.
 | `--brand-lake`, `--brand-sage`, `--brand-limestone` | | | Art and charts. Never text |
 
 Type: Source Serif 4 for display, IBM Plex Sans for everything else. Both are
-under the SIL Open Font License and are served from this origin.
+under the SIL Open Font License and are served from this origin. Display type
+is set in the regular weight on the landing page and in the semibold weight in
+the app, where headings are small.
 
 ### Checked contrast
 
@@ -78,13 +80,28 @@ under the SIL Open Font License and are served from this origin.
 3. The two sides of a consultation are set in the same ink. Colour never says
    which answer is the agreeable one.
 
-## What is not rebranded yet
+## The pictures
+
+| Picture | Where | File |
+| --- | --- | --- |
+| Cleisthenes before an alpine lake, in an arched frame | Landing page, first screen | `ui/public/art/civic/alpine-lake.webp`, `cleisthenes-bust.webp` |
+| The Geneva lakefront, engraved | Landing page, last screen | `ui/public/art/civic/geneva-lakefront.webp` |
+
+The pictures are the ones Cleisthenes uses at `/Switzerland`. They were painted
+on rag paper, so the landing page and the documentation page stay in the light
+palette when the app is in the dark theme.
+
+The hand holding a passport, which was the first picture of the landing page
+until 2026-09-30, is kept in `ui/public/art/passport/`. No page shows it now.
+
+## What is on the brand
 
 | Surface | State |
 | --- | --- |
 | App shell, consultation page, vote flow, activity, settings | On the tokens |
 | Onboarding | On the tokens, with the companion |
-| Landing page | Still in its own palette and in Outfit |
-| Documentation page (`/docs`) | Still in its own palette and in Outfit |
+| Landing page | On the tokens, in the two faces, with the pictures above |
+| Documentation page (`/docs`) | On the tokens, in the two faces |
 | Consultation card art | Placeholder tints, not yet on the brand |
+| The Midnight City poster, in the "Agents" panel of the landing page | Kept as it is. It is another project's picture |
 | German and Italian | Not in the app yet. The assistant already writes both |

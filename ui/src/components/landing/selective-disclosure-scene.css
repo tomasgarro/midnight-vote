@@ -1,7 +1,8 @@
 .disclosure-scene {
   padding: 22px 22px 16px;
-  color: #40364e;
-  background: radial-gradient(ellipse at 75% 35%, #ded9ed, transparent 65%), #eee8df;
+  color: #373c34;
+  background:
+    radial-gradient(ellipse at 75% 35%, var(--surface-sunken), transparent 65%), var(--ground);
 }
 .disclosure-scene__heading {
   margin-bottom: 12px;
@@ -15,14 +16,14 @@
   font-weight: 450;
 }
 .disclosure-scene__heading span {
-  color: #81718c;
+  color: var(--ink-muted);
 }
 .disclosure-vault {
-  background: #fffdf8;
+  background: var(--surface);
   padding: 16px;
   border-radius: 16px;
   border: 1px solid #ffffff;
-  box-shadow: 0 12px 28px #40334c0c;
+  box-shadow: 0 12px 28px #353a320c;
   transform: rotate(-3deg);
 }
 .disclosure-card-label {
@@ -38,21 +39,21 @@
   justify-content: space-between;
   gap: 16px;
   font-size: 12px;
-  color: #82758a;
+  color: var(--ink-muted);
   margin-top: 8px;
 }
 .disclosure-private-row i {
   width: 44%;
   height: 5px;
   border-radius: 9px;
-  background: repeating-linear-gradient(90deg, #c6bdcf 0 9px, transparent 9px 13px);
+  background: repeating-linear-gradient(90deg, #c3c0b6 0 9px, transparent 9px 13px);
 }
 .disclosure-vault small {
   display: flex;
   align-items: center;
   gap: 5px;
   margin-top: 12px;
-  color: #82758a;
+  color: var(--ink-muted);
   font-size: 10px;
 }
 .disclosure-transfer {
@@ -61,12 +62,12 @@
   justify-content: center;
   gap: 9px;
   height: 34px;
-  color: #9785ad;
+  color: var(--ink-muted);
 }
 .disclosure-transfer span {
   width: 1px;
   height: 17px;
-  background: #c5b9d4;
+  background: #c1beb3;
 }
 .disclosure-proof {
   display: flex;
@@ -74,18 +75,18 @@
   gap: 12px;
   padding: 14px 12px;
   border-radius: 16px;
-  background: #332c42;
-  color: #faf5ea;
-  box-shadow: 0 12px 24px #30273b19;
+  background: #2d312a;
+  color: var(--surface);
+  box-shadow: 0 12px 24px #282c2619;
 }
 .disclosure-proof__icon {
   flex-shrink: 0;
-  color: #c7b8e0;
+  color: #dfb5ae;
 }
 .disclosure-proof small {
   display: block;
   font-size: 10px;
-  color: #c9bdd7;
+  color: #c4c2b7;
   margin-bottom: 5px;
 }
 .disclosure-proof strong {
@@ -96,7 +97,7 @@
 .disclosure-proof__check {
   margin-left: auto;
   flex-shrink: 0;
-  color: #cfbcf0;
+  color: #d3c3a7;
 }
 .disclosure-outcomes {
   display: grid;
@@ -109,10 +110,10 @@
   flex-direction: column;
   gap: 5px;
   padding: 12px 4px;
-  border-top: 1px solid #cfc4d7;
+  border-top: 1px solid var(--line);
 }
 .disclosure-outcomes svg {
-  color: #8d78a4;
+  color: var(--line-strong);
   margin-bottom: 5px;
 }
 .disclosure-outcomes strong {
@@ -120,13 +121,13 @@
   font-size: 13px;
 }
 .disclosure-outcomes span {
-  color: #82758a;
+  color: var(--ink-muted);
   font-size: 11px;
 }
 .disclosure-caption {
   margin: 12px 0 0;
   text-align: center;
-  color: #85758f;
+  color: var(--ink-muted);
   font-size: 10px;
 }
 @media (prefers-reduced-motion: no-preference) {

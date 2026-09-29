@@ -1,5 +1,9 @@
 # Interactive Passport hero — 15 September 2026
 
+> Superseded on 2026-09-30. The landing page now opens with Cleisthenes before an
+> alpine lake ([COMPANION.md](COMPANION.md)). The two hand pictures are kept in
+> `ui/public/art/passport/`, and the component and its test are in the git history.
+
 ## Review scope
 
 Local follow-up to merged PR #29 on `feat/landing-and-passport-ui`.
