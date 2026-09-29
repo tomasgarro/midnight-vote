@@ -17,6 +17,8 @@
       "!**/coverage",
       "!**/playwright-report",
       "!**/test-results",
+      "!outputs",
+      "!output",
       "!**/*.compact",
       "!**/tsconfig*.json",
       "!docs/evidence"
