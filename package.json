@@ -52,7 +52,7 @@
     "deploy:v1:preview": "node --env-file-if-exists=relayer/.env scripts/deploy-referendum.mjs",
     "deploy:v1:undeployed": "node --env-file-if-exists=relayer/.env.undeployed scripts/deploy-referendum.mjs",
     "build": "npm run sync:contract && npm run build --workspace midnight-referendum-api && npm run build --workspace midnight-referendum-cico-service && npm run build --workspace midnight-referendum-relayer && npm run build --workspace midnight-referendum-ui",
-    "test": "npm run test:sim && npm run test:sim:v2:compiled && npm run build --workspace midnight-referendum-relayer && npx vitest run scripts/undeployed-fixture-capability-issuer.test.mjs && npm run test --workspace midnight-referendum-api && npm run test --workspace midnight-referendum-cico-service && npm run test --workspace midnight-referendum-relayer && npm run test --workspace midnight-referendum-ui",
+    "test": "npm run test:sim && npm run test:sim:v2:compiled && npm run build --workspace midnight-referendum-relayer && npx vitest run scripts && npm run test --workspace midnight-referendum-api && npm run test --workspace midnight-referendum-cico-service && npm run test --workspace midnight-referendum-relayer && npm run test --workspace midnight-referendum-ui",
     "test:e2e": "playwright test",
     "format": "biome format --write .",
     "lint": "biome lint .",

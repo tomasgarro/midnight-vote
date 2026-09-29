@@ -1,22 +1,21 @@
 /**
- * Organizer-side counting for a referendum: closeVote, then revealVote for each
- * ballot, then finalizeVote. This is the ending the referendum otherwise does
- * not have — the contract and executor already support it, but nothing drives
- * it.
+ * The organizer's part of the ending of a legacy (v1) referendum: closeVote,
+ * then finalizeVote.
  *
  * Usage (from the repository root, inside WSL/Linux, with the relayer running):
  *
  *   CONTRACT_ADDRESS=<hex> node --env-file-if-exists=relayer/.env \
- *     scripts/count-referendum.mjs --ballot YES:<salt-hex> --ballot NO:<salt-hex>
+ *     scripts/count-referendum.mjs
  *
  *   --close-only     close the commit phase and stop
- *   --no-finalize    reveal without finalizing, so more reveals can follow
  *
- * A ballot is a (choice, salt) pair retained privately by the voter/caller.
- * cast-vote-e2e.mjs never logs this opening. It is the only way to reveal the
- * ballot: the contract stores just persistentCommit(choice, salt), so a lost salt is an uncountable
- * vote. Revealing publishes the choice and the commitment, never the voter's
- * eligibility commitment or nullifier, so the tally never becomes a roster.
+ * This script used to count too: it took each answer and its salt on the
+ * command line. That made the organizer the holder of a list of who answered
+ * what, before publication. ADR-009 moved the count to the device that sealed
+ * the answer, so this script takes no answer and no salt, and refuses them.
+ *
+ * A Referendum V2 consultation is closed and finalized by running
+ * deploy-passport-v2.mjs again after each deadline.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -29,15 +28,17 @@ globalThis.WebSocket ??= WebSocket;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 
-const ballots = [];
-for (let i = 0; i < argv.length; i += 1) {
-  if (argv[i] !== '--ballot') continue;
-  const [choice, salt] = String(argv[i + 1] ?? '').split(':');
-  if (!['YES', 'NO', 'ABSTAIN'].includes(choice) || !/^[0-9a-f]{64}$/i.test(salt ?? '')) {
-    console.error('--ballot expects a valid private ballot opening.');
-    process.exit(1);
-  }
-  ballots.push({ choice, salt: Uint8Array.from(Buffer.from(salt, 'hex')) });
+const known = new Set(['--close-only']);
+const unknown = argv.filter((argument) => !known.has(argument));
+if (unknown.length > 0) {
+  // The arguments are not echoed: an old command line holds answers and salts.
+  console.error(
+    argv.includes('--ballot')
+      ? 'This script no longer counts answers, and takes no answer and no salt (ADR-009). ' +
+          'Remove --ballot and what follows it.'
+      : 'Unknown arguments. The only option is --close-only.',
+  );
+  process.exit(1);
 }
 
 const seedHex = (process.env.RELAYER_SEED ?? '').trim().toLowerCase().replace(/^0x/, '');
@@ -69,7 +70,6 @@ const { loadConfig } = await import(`${ROOT}/relayer/dist/config.js`);
 const { NodeZkConfigProvider } = await import(
   '@midnight-ntwrk/midnight-js-node-zk-config-provider'
 );
-const runtime = await import('@midnight-ntwrk/compact-runtime');
 const generated = await import(`${ROOT}/api/dist/generated/referendum/index.js`);
 
 const config = loadConfig();
@@ -105,12 +105,6 @@ const showTally = async (label) => {
   );
 };
 
-// The Choice enum is a 2-value, 1-byte Compact enum; this must match the
-// contract's persistentCommit<Choice> exactly or no reveal will ever match.
-const choiceType = new runtime.CompactTypeEnum(2, 1);
-const commitmentFor = ({ choice, salt }) =>
-  runtime.persistentCommit(choiceType, generated.Choice[choice], salt);
-
 const relayerHealth = () =>
   fetch(`http://${config.host}:${config.port}/health`)
     .then((r) => r.json())
@@ -121,8 +115,8 @@ const relayerHealth = () =>
  * change, but the wallet cannot spend that change until it observes the block,
  * and submitting in the meantime is rejected by the node as
  * InvalidDustSpendProof (custom error 170) — which also leaves the wallet
- * convinced its coin is gone. Counting submits several transactions in a row,
- * so it has to wait for the change to land between them.
+ * convinced its coin is gone. Closing and finalizing are two transactions in a
+ * row, so the second has to wait for the change of the first to land.
  */
 const waitForRelayerChange = async (previousDust, timeoutMs = 180_000) => {
   const deadline = Date.now() + timeoutMs;
@@ -146,14 +140,14 @@ const waitForRelayerChange = async (previousDust, timeoutMs = 180_000) => {
 await executor.join(contractAddress, basePrivateState);
 await showTally('before');
 
-let dust = (await relayerHealth())?.dustBalance ?? '0';
+const dustBefore = (await relayerHealth())?.dustBalance ?? '0';
 
 const ledgerNow = await readLedger();
 if (ledgerNow.phase === 'COMMIT' || Number(ledgerNow.phase) === 0) {
   console.log('\nclosing the commit phase…');
   const receipt = await executor.closeVote();
   console.log(`closed. tx ${receipt.txHash}`);
-  if (ballots.length > 0) dust = await waitForRelayerChange(dust);
+  if (!argv.includes('--close-only')) await waitForRelayerChange(dustBefore);
 } else {
   console.log('\nalready past the commit phase; skipping closeVote');
 }
@@ -162,30 +156,9 @@ if (argv.includes('--close-only')) {
   process.exit(0);
 }
 
-for (const ballot of ballots) {
-  const commitment = commitmentFor(ballot);
-  const ledger = await readLedger();
-  const revealPath = ledger.ballotCommitments.findPathForLeaf(commitment);
-  if (!revealPath) {
-    console.error(
-      '\nNo ballot matches the supplied private opening. Verify it locally; ' +
-        'the choice, salt, and commitment were not logged.',
-    );
-    process.exit(1);
-  }
-  // The witness is read at proving time, so the path has to be in private state
-  // before the call; re-joining is how the executor picks up the new value.
-  await executor.join(contractAddress, { ...basePrivateState, revealPath });
-  const receipt = await executor.revealVote(ballot.choice, ballot.salt);
-  console.log(`revealed one ballot. tx ${receipt.txHash}`);
-  dust = await waitForRelayerChange(dust);
-}
-
-if (!argv.includes('--no-finalize')) {
-  console.log('\nfinalizing…');
-  const receipt = await executor.finalizeVote();
-  console.log(`finalized. tx ${receipt.txHash}`);
-}
+console.log('\nfinalizing…');
+const receipt = await executor.finalizeVote();
+console.log(`finalized. tx ${receipt.txHash}`);
 
 await showTally('after');
 process.exit(0);
