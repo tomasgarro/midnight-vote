@@ -1,5 +1,6 @@
 import { Check, X } from '@phosphor-icons/react';
 import type { ExecutionMode } from 'midnight-referendum-api';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Callout,
@@ -18,7 +19,12 @@ import { formatDate } from '@/integration/format';
 import { HOSTED_PROVING_COPY } from '@/integration/hosted-proving';
 import type { CicoLocale } from '@/integration/locale';
 import { SEALED_ANSWER_COPY } from '@/integration/sealed-answers';
-import type { HostedProvingState } from '@/providers/midnight-providers';
+import {
+  formatElapsed,
+  needsHostedConsent,
+  WALLETLESS_PROVING_COPY,
+  type WalletlessProvingState,
+} from '@/integration/walletless-proving';
 import { CHAIN_RUNTIME_ENABLED, type FlowStage, networkLabel } from '@/views/app-runtime';
 import { CopyReceiptButton } from '@/views/CopyReceiptButton';
 import { type Choice, localizePoll, type Poll, type VoteReceipt } from '@/views/poll-model';
@@ -276,6 +282,18 @@ const COPY = {
   },
 } as const;
 
+/** Milliseconds since `startedAt`, refreshed every second; null when idle. */
+function useElapsed(startedAt: number | null): number | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (startedAt === null) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+  return startedAt === null ? null : Math.max(0, now - startedAt);
+}
+
 /**
  * The three screens a vote actually has. Review is a sheet over `choose`, not
  * a screen, so it does not get a stop on the bar.
@@ -301,9 +319,11 @@ export interface VoteFlowProps {
   readonly onExecutionModeChange: (mode: ExecutionMode) => void;
   readonly sponsoredAvailable: boolean;
   readonly sponsoredError?: string | null;
-  /** Hosted proving for a browser without a wallet (ADR-010). */
-  readonly hostedProving?: HostedProvingState;
-  readonly provingParty?: 'wallet' | 'hosted-server' | null;
+  /** Proving without a wallet: on this device, or on the disclosed server. */
+  readonly walletlessProving?: WalletlessProvingState;
+  readonly provingParty?: 'wallet' | 'device' | 'hosted-server' | null;
+  /** When this device started the proof it is building now. */
+  readonly deviceProofStartedAt?: number | null;
   readonly previewError: string | null;
   readonly receipt: VoteReceipt | null;
   readonly dustBalance?: bigint | null;
@@ -324,8 +344,9 @@ export function VoteFlow({
   onExecutionModeChange,
   sponsoredAvailable,
   sponsoredError = null,
-  hostedProving,
+  walletlessProving,
   provingParty = null,
+  deviceProofStartedAt = null,
   previewError,
   receipt,
   dustBalance = null,
@@ -333,15 +354,21 @@ export function VoteFlow({
 }: VoteFlowProps) {
   const copy = COPY[locale];
   const hostedCopy = HOSTED_PROVING_COPY[locale];
+  const proverCopy = WALLETLESS_PROVING_COPY[locale];
   const displayPoll = localizePoll(poll, locale);
   const live = CHAIN_RUNTIME_ENABLED;
   const relayerMode = executionMode !== 'direct-wallet';
+  const deviceActive = executionMode === 'sponsored-device-proving';
   const hostedActive = executionMode === 'sponsored-hosted-proving';
-  /* Offered means: no wallet here, and this build has a proving server. The
-     person is asked before anything is sent to it. */
-  const hostedOffered = live && walletStatus !== 'connected' && Boolean(hostedProving?.offered);
-  const hostedNeedsConsent = hostedOffered && !hostedProving?.accepted;
-  const hostedWaiting = hostedOffered && !hostedNeedsConsent && !hostedActive;
+  /* Offered means: no wallet here, and this build can prove without one. The
+     device is the default. The server is used only after its disclosure. */
+  const walletless =
+    live && walletStatus !== 'connected' && walletlessProving?.offered ? walletlessProving : null;
+  const hostedChosen = walletless?.selected === 'hosted-server';
+  const hostedNeedsConsent = needsHostedConsent(walletless ?? undefined);
+  const walletlessWaiting =
+    walletless !== null && !hostedNeedsConsent && !(hostedChosen ? hostedActive : deviceActive);
+  const elapsed = useElapsed(deviceProofStartedAt);
   const choiceLabel = (value: Choice) =>
     value === 'YES' ? copy.yes : value === 'NO' ? copy.no : copy.abstain;
   const screenIndex = Math.max(VOTE_SCREENS.indexOf(stage === 'review' ? 'choose' : stage), 0);
@@ -370,11 +397,13 @@ export function VoteFlow({
       <Screen header={header(false)}>
         <Display>{copy.processingTitle}</Display>
         <p className="flow__body">
-          {hostedActive
-            ? copy.processingHosted
-            : relayerMode
-              ? copy.processingRelayer
-              : copy.processingWallet}
+          {deviceActive
+            ? proverCopy.deviceProcessing
+            : hostedActive
+              ? copy.processingHosted
+              : relayerMode
+                ? copy.processingRelayer
+                : copy.processingWallet}
         </p>
         {/* Indeterminate: the pipeline reports no percentage, so the bar must
             not imply one. What it can honestly report is how long this
@@ -384,8 +413,19 @@ export function VoteFlow({
           <span />
         </div>
         <p className="flow__wait-note" role="status">
-          {live ? copy.processingDuration : copy.processingDurationDemo}
+          {!live
+            ? copy.processingDurationDemo
+            : deviceActive
+              ? proverCopy.deviceWait
+              : copy.processingDuration}
         </p>
+        {/* A proof built here runs for minutes. The running time is what tells
+            the person that the device is working and has not stopped. */}
+        {deviceActive && elapsed !== null ? (
+          <p className="flow__wait-note">
+            {proverCopy.elapsed}: <span className="flow__elapsed">{formatElapsed(elapsed)}</span>
+          </p>
+        ) : null}
         {live ? <Callout>{copy.processingNoCancel}</Callout> : null}
       </Screen>
     );
@@ -419,7 +459,9 @@ export function VoteFlow({
               value={
                 receipt.sealed.provingParty === 'hosted-server'
                   ? hostedCopy.byServer
-                  : hostedCopy.byWallet
+                  : receipt.sealed.provingParty === 'device'
+                    ? proverCopy.byDevice
+                    : hostedCopy.byWallet
               }
             />
           </StatGroup>
@@ -531,12 +573,12 @@ export function VoteFlow({
             {/* One primary action at a time: first the disclosure is accepted,
                 then the answer is confirmed. */}
             {hostedNeedsConsent ? (
-              <Button block onClick={() => hostedProving?.accept()}>
+              <Button block onClick={() => walletless?.acceptHosted()}>
                 {hostedCopy.accept}
               </Button>
             ) : (
-              <Button block disabled={hostedWaiting} onClick={onConfirm}>
-                {hostedWaiting && !hostedProving?.error
+              <Button block disabled={walletlessWaiting} onClick={onConfirm}>
+                {walletlessWaiting && !walletless?.error
                   ? hostedCopy.preparing
                   : live
                     ? copy.confirmReal
@@ -549,21 +591,58 @@ export function VoteFlow({
           </>
         }
       >
-        {hostedOffered ? (
+        {walletless ? (
           <div className="flow__sheet-group">
-            <Callout tone="warning" role="status" title={hostedCopy.title}>
-              {hostedCopy.body} {hostedCopy.alternative}
-            </Callout>
-            {hostedProving?.error ? (
+            {walletless.deviceAvailable && walletless.hostedAvailable ? (
+              <fieldset className="flow__execution-modes">
+                <legend>{proverCopy.legend}</legend>
+                <label className="flow__execution-mode">
+                  <input
+                    type="radio"
+                    name="walletless-prover"
+                    value="device"
+                    checked={!hostedChosen}
+                    onChange={() => walletless.chooseDevice()}
+                  />
+                  <span>
+                    <strong>{proverCopy.deviceTitle}</strong>
+                    <small>{proverCopy.deviceBody}</small>
+                  </span>
+                </label>
+                <label className="flow__execution-mode">
+                  <input
+                    type="radio"
+                    name="walletless-prover"
+                    value="hosted-server"
+                    checked={hostedChosen}
+                    onChange={() => walletless.chooseHosted()}
+                  />
+                  <span>
+                    <strong>{proverCopy.hostedTitle}</strong>
+                    <small>{proverCopy.hostedBody}</small>
+                  </span>
+                </label>
+              </fieldset>
+            ) : hostedChosen ? null : (
+              <Callout role="status" title={proverCopy.deviceTitle}>
+                {proverCopy.deviceBody}
+              </Callout>
+            )}
+            {hostedChosen ? (
+              <Callout tone="warning" role="status" title={hostedCopy.title}>
+                {hostedCopy.body} {hostedCopy.alternative}
+              </Callout>
+            ) : null}
+            {walletless.error ? (
               <Callout tone="danger" role="alert">
                 {hostedCopy.unavailable}
               </Callout>
             ) : null}
-            {hostedNeedsConsent ? null : (
-              <Button variant="link" onClick={() => hostedProving?.withdraw()}>
+            {hostedChosen && walletless.hostedAccepted ? (
+              <Button variant="link" onClick={() => walletless.withdrawHosted()}>
                 {hostedCopy.withdraw}
               </Button>
-            )}
+            ) : null}
           </div>
         ) : live ? (
           <fieldset className="flow__execution-modes">
@@ -619,9 +698,12 @@ export function VoteFlow({
                 The demo says what actually happens instead. */}
             {!live ? (
               <StatRow label={copy.signer} value={copy.signerDemo} />
-            ) : hostedOffered ? (
+            ) : walletless ? (
               <>
-                <StatRow label={hostedCopy.provedBy} value={hostedCopy.byServer} />
+                <StatRow
+                  label={hostedCopy.provedBy}
+                  value={hostedChosen ? hostedCopy.byServer : proverCopy.byDevice}
+                />
                 <StatRow label={copy.signer} value={copy.relayer} />
               </>
             ) : relayerMode ? (
@@ -629,7 +711,11 @@ export function VoteFlow({
                 <StatRow
                   label={hostedCopy.provedBy}
                   value={
-                    provingParty === 'hosted-server' ? hostedCopy.byServer : hostedCopy.byWallet
+                    provingParty === 'hosted-server'
+                      ? hostedCopy.byServer
+                      : provingParty === 'device'
+                        ? proverCopy.byDevice
+                        : hostedCopy.byWallet
                   }
                 />
                 <StatRow label={copy.signer} value={copy.relayer} />
@@ -652,9 +738,7 @@ export function VoteFlow({
             )}
           </StatGroup>
         </div>
-        {/* With hosted proving on offer the wallet stays reachable: connecting
-            Lace is the way to keep the proof on the device. */}
-        {live && !relayerMode ? <WalletWidget /> : null}
+        {live && !relayerMode && !walletless ? <WalletWidget /> : null}
         {previewError ? (
           <div className="flow__sheet-group">
             <Callout

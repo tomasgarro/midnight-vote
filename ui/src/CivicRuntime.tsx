@@ -49,6 +49,7 @@ import {
   type ThemePreference,
   watchSystemTheme,
 } from '@/integration/theme';
+import { needsHostedConsent } from '@/integration/walletless-proving';
 import { MidnightProvidersProvider, useMidnightProviders } from '@/providers/midnight-providers';
 import { WalletProvider } from '@/providers/wallet-context';
 import { ActivityView } from '@/views/ActivityView';
@@ -215,8 +216,9 @@ function CivicApp() {
     setExecutionMode,
     sponsoredAvailable,
     sponsoredError,
-    hostedProving,
+    walletlessProving,
     provingParty,
+    deviceProofStartedAt,
     isReady,
     error: providersError,
   } = useMidnightProviders();
@@ -398,9 +400,9 @@ function CivicApp() {
     ],
   );
   useEffect(() => {
-    // A wallet asks for approval, so the person starts that count. With hosted
-    // proving the returning device counts on its own, once per visit.
-    if (provingParty !== 'hosted-server' || countingId) return;
+    // A wallet asks for approval, so the person starts that count. Without a
+    // wallet the returning device counts on its own, once per visit.
+    if ((provingParty !== 'device' && provingParty !== 'hosted-server') || countingId) return;
     const due = sealedAnswers.find((answer) => {
       if (answer.state !== 'sealed' || autoCounted.current.has(answer.referendumId)) return false;
       const poll = polls.find((item) => item.id === answer.referendumId);
@@ -438,13 +440,13 @@ function CivicApp() {
     providersReady: isReady && (!passportV2Runtime.config || referendumV2Providers !== null),
     providersError: providersError ?? passportV2Runtime.error,
     relayerMode: executionMode !== 'direct-wallet',
-    hostedProving: !hostedProving.offered
+    walletlessProving: !walletlessProving.offered
       ? 'not-offered'
-      : !hostedProving.accepted
+      : needsHostedConsent(walletlessProving)
         ? 'needs-consent'
-        : hostedProving.error
+        : walletlessProving.error
           ? 'failed'
-          : hostedProving.preparing
+          : walletlessProving.preparing
             ? 'preparing'
             : 'ready',
     v2RuntimeConfigured: CHAIN_RUNTIME_ENABLED,
@@ -707,7 +709,8 @@ function CivicApp() {
         countingId={countingId}
         countNotices={countNotices}
         onCount={(referendumId) => void countAnswer(referendumId)}
-        hostedProving={hostedProving}
+        walletlessProving={walletlessProving}
+        deviceProofStartedAt={deviceProofStartedAt}
         locale={locale}
       />
     ) : tab === 'passport' ? (
@@ -860,8 +863,9 @@ function CivicApp() {
               onExecutionModeChange={setExecutionMode}
               sponsoredAvailable={sponsoredAvailable}
               sponsoredError={sponsoredError}
-              hostedProving={hostedProving}
+              walletlessProving={walletlessProving}
               provingParty={provingParty}
+              deviceProofStartedAt={deviceProofStartedAt}
               previewError={previewError}
               receipt={receipt}
               dustBalance={dustBalance}

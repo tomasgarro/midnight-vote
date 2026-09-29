@@ -3,7 +3,10 @@ import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-conf
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
-import type { FinalizedTransaction } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import type {
+  FinalizedTransaction,
+  ProvingProvider,
+} from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import {
   createProofProvider,
   type MidnightProvider,
@@ -17,6 +20,10 @@ import {
   WalletlessActionClient,
   type WalletlessActionJob,
 } from '../receipts/walletless-action-client.js';
+import {
+  createDeviceKeyMaterialProvider,
+  type DeviceKeyMaterialProvider,
+} from './device-proving.js';
 import type { REFERENDUM_V2_PRIVATE_STATE_ID, ReferendumV2PrivateState } from './midnight-v2.js';
 import type { ReferendumV2Providers } from './midnight-v2-executors.js';
 import type { ReferendumV2CircuitKeys } from './midnight-v2-providers.js';
@@ -142,8 +149,17 @@ export interface HostedProvingOptions {
   readonly disclosureAccepted: true;
 }
 
+/**
+ * On-device proving (ADR-011). The prover runs in the person's own browser, so
+ * nothing about the answer is sent to a proving server. It needs no
+ * disclosure, because no other party sees the witness.
+ */
+export interface DeviceProvingOptions {
+  readonly provingProvider: ProvingProvider;
+}
+
 /** Who builds the proof for this runtime. Shown to the person, never inferred. */
-export type ProvingParty = 'wallet' | 'hosted-server' | 'operator';
+export type ProvingParty = 'wallet' | 'device' | 'hosted-server' | 'operator';
 
 export interface ReferendumV2WalletlessProviderOptions {
   readonly relayUrl: string;
@@ -153,6 +169,8 @@ export interface ReferendumV2WalletlessProviderOptions {
   readonly api?: ConnectedAPI;
   /** Disclosed hosted proving for browsers without a wallet. Never combined with `api`. */
   readonly hostedProving?: HostedProvingOptions;
+  /** Proving in this browser, without a wallet. Never combined with another prover. */
+  readonly deviceProving?: DeviceProvingOptions;
   readonly networkId: 'undeployed' | 'preview';
   readonly indexerUri: string;
   readonly indexerWsUri: string;
@@ -175,22 +193,56 @@ export interface ReferendumV2WalletlessRuntime {
 }
 
 /**
- * Builds the primary seedless v2 provider set. Browser callers delegate
- * proving to Lace, then this provider forwards only the serialized proven,
- * unbound transaction to the atomic relay. Balancing and submission never
- * become two browser-visible operations. Node operator scripts may use the
- * explicit proof-server fallback for local/hosted service execution. A browser
- * without a wallet may use hosted proving, and only with its disclosure flag.
+ * Keys and public parameters for the two circuits a citizen's own device
+ * proves: sealing an answer and counting it. Organizer circuits are refused.
+ */
+export function createReferendumV2DeviceKeyMaterial(options: {
+  readonly zkConfigBaseUrl: string;
+  readonly paramsBaseUrl: string;
+  readonly fetchImpl?: typeof fetch;
+}): DeviceKeyMaterialProvider {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  return createDeviceKeyMaterialProvider<ReferendumV2CircuitKeys>({
+    zkConfigProvider: new FetchZkConfigProvider<ReferendumV2CircuitKeys>(
+      options.zkConfigBaseUrl,
+      fetchImpl,
+    ),
+    circuits: ['castVote', 'revealVote'],
+    paramsBaseUrl: options.paramsBaseUrl,
+    fetchImpl,
+  });
+}
+
+/**
+ * Builds the seedless v2 provider set. The proof comes from exactly one place:
+ * Lace, the person's own browser (ADR-011), or the operator's proving server
+ * behind its disclosure flag (ADR-010). This provider then forwards only the
+ * serialized proven, unbound transaction to the atomic relay. Balancing and
+ * submission never become two browser-visible operations. Node operator
+ * scripts may use the explicit proof-server fallback.
  */
 export async function createReferendumV2WalletlessProviders(
   options: ReferendumV2WalletlessProviderOptions,
 ): Promise<ReferendumV2WalletlessRuntime> {
   const hasBrowserWindow = typeof window !== 'undefined';
   const hosted = options.hostedProving;
+  const device = options.deviceProving;
   if (options.api && (options.proofServerUri || hosted)) {
     throw new TypeError(
       'proofServerUri cannot be combined with a Lace API; browser proving must stay in the wallet',
     );
+  }
+  if (device) {
+    // One prover per runtime. A second one would make it unclear who saw the witness.
+    if (options.api || options.proofServerUri || hosted) {
+      throw new TypeError('deviceProving cannot be combined with another prover');
+    }
+    if (
+      typeof device.provingProvider?.prove !== 'function' ||
+      typeof device.provingProvider?.check !== 'function'
+    ) {
+      throw new TypeError('deviceProving requires a proving provider');
+    }
   }
   if (hosted) {
     if (options.proofServerUri) {
@@ -202,17 +254,23 @@ export async function createReferendumV2WalletlessProviders(
     }
     assertLocalOrSecureUrl(hosted.proofServerUri, 'proof server');
   }
-  if (hasBrowserWindow && !options.api && !hosted) {
+  if (hasBrowserWindow && !options.api && !hosted && !device) {
     throw new TypeError('Sponsored browser providers require a connected Lace API for proving');
   }
   assertLocalOrSecureUrl(options.relayUrl, 'relay');
-  if (!options.api && !hosted) {
+  if (!options.api && !hosted && !device) {
     if (!options.proofServerUri) {
       throw new TypeError('proofServerUri is required for Node sponsored providers');
     }
     assertLocalOrSecureUrl(options.proofServerUri, 'proof server');
   }
-  const provingParty: ProvingParty = options.api ? 'wallet' : hosted ? 'hosted-server' : 'operator';
+  const provingParty: ProvingParty = options.api
+    ? 'wallet'
+    : device
+      ? 'device'
+      : hosted
+        ? 'hosted-server'
+        : 'operator';
   setNetworkId(options.networkId);
 
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -270,10 +328,12 @@ export async function createReferendumV2WalletlessProviders(
     ? createProofProvider(
         await options.api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider()),
       )
-    : httpClientProofProvider<ReferendumV2CircuitKeys>(
-        (hosted?.proofServerUri ?? options.proofServerUri) as string,
-        zkConfigProvider,
-      );
+    : device
+      ? createProofProvider(device.provingProvider)
+      : httpClientProofProvider<ReferendumV2CircuitKeys>(
+          (hosted?.proofServerUri ?? options.proofServerUri) as string,
+          zkConfigProvider,
+        );
   const pendingStore = options.pendingStore ?? new InMemoryWalletlessPendingActionStore();
   const pollIntervalMs = boundedDelay(options.pollIntervalMs ?? 500, 'pollIntervalMs');
   const submissionTimeoutMs = boundedDelay(

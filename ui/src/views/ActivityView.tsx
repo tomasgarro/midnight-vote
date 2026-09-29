@@ -5,7 +5,12 @@ import { HOSTED_PROVING_COPY } from '@/integration/hosted-proving';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability, type PollAvailability } from '@/integration/poll-lifecycle';
 import { SEALED_ANSWER_COPY, type SealedAnswer } from '@/integration/sealed-answers';
-import type { HostedProvingState } from '@/providers/midnight-providers';
+import {
+  formatElapsed,
+  needsHostedConsent,
+  WALLETLESS_PROVING_COPY,
+  type WalletlessProvingState,
+} from '@/integration/walletless-proving';
 import { CopyReceiptButton } from '@/views/CopyReceiptButton';
 import { localizePoll, type Poll, type VoteReceipt } from '@/views/poll-model';
 import { ReceiptVerifier } from '@/views/ReceiptVerifier';
@@ -112,7 +117,9 @@ export interface ActivityViewProps {
   readonly countingId?: string | null;
   readonly countNotices?: Readonly<Record<string, CountNotice>>;
   readonly onCount?: (referendumId: string) => void;
-  readonly hostedProving?: HostedProvingState;
+  readonly walletlessProving?: WalletlessProvingState;
+  /** When this device started the proof it is building now. */
+  readonly deviceProofStartedAt?: number | null;
   readonly locale: CicoLocale;
 }
 
@@ -136,17 +143,18 @@ export function ActivityView({
   countingId = null,
   countNotices = {},
   onCount,
-  hostedProving,
+  walletlessProving,
+  deviceProofStartedAt = null,
   locale,
 }: ActivityViewProps) {
   const copy = COPY[locale];
   const sealedCopy = SEALED_ANSWER_COPY[locale];
   const hostedCopy = HOSTED_PROVING_COPY[locale];
+  const proverCopy = WALLETLESS_PROVING_COPY[locale];
   const waitingForCount = sealedAnswers.some((answer) => answer.state === 'sealed');
-  /* Counting needs a proof. On a device without a wallet that means the
-     proving server, and the person is asked before it is used. */
-  const needsConsent =
-    waitingForCount && Boolean(hostedProving?.offered) && !hostedProving?.accepted;
+  /* Counting needs a proof. If the person chose the proving server, they are
+     asked before it is used. A device that proves by itself needs no asking. */
+  const needsConsent = waitingForCount && needsHostedConsent(walletlessProving);
 
   return (
     <main className="activity">
@@ -166,7 +174,11 @@ export function ActivityView({
             <Callout tone="warning" role="status" title={hostedCopy.title}>
               {hostedCopy.body} {hostedCopy.alternative}
               <span className="activity__consent">
-                <Button size="sm" variant="secondary" onClick={() => hostedProving?.accept()}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => walletlessProving?.acceptHosted()}
+                >
                   {hostedCopy.accept}
                 </Button>
               </span>
@@ -252,6 +264,12 @@ export function ActivityView({
                             {counting ? sealedCopy.counting : sealedCopy.count}
                           </Button>
                         </div>
+                      ) : null}
+                      {counting && deviceProofStartedAt !== null ? (
+                        <p className="activity-card__results-note" role="status">
+                          {proverCopy.deviceWait} {proverCopy.elapsed}:{' '}
+                          {formatElapsed(Date.now() - deviceProofStartedAt)}
+                        </p>
                       ) : null}
                       {notice && !counting ? (
                         <p className="activity-card__results-note" role="status">

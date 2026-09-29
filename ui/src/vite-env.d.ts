@@ -33,6 +33,10 @@ interface ImportMetaEnv {
    * answer while it proves, so the interface asks before using it.
    */
   readonly VITE_HOSTED_PROOF_SERVER_URL?: string;
+  /** `off` disables proving in the browser (ADR-011). On by default. */
+  readonly VITE_DEVICE_PROVING?: string;
+  /** Where `bls_midnight_2p<k>` is served. Defaults to `/zk-params` on this origin. */
+  readonly VITE_DEVICE_PARAMS_URL?: string;
 }
 
 interface ImportMeta {

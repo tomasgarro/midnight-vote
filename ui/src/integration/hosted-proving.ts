@@ -102,8 +102,8 @@ export const HOSTED_PROVING_COPY = {
     provedBy: 'Proof built by',
     byServer: 'our proving server, which sees your answer while it works',
     byWallet: 'Lace, on this device',
-    preparing: 'Connecting to the proving server…',
-    unavailable: 'The proving server is not reachable right now.',
+    preparing: 'Getting the prover ready…',
+    unavailable: 'The proof cannot be built right now. Try again later.',
   },
   es: {
     title: 'Este dispositivo no puede crear la prueba por sí solo',
@@ -114,8 +114,8 @@ export const HOSTED_PROVING_COPY = {
     provedBy: 'Quién crea la prueba',
     byServer: 'nuestro servidor de pruebas, que ve tu respuesta mientras trabaja',
     byWallet: 'Lace, en este dispositivo',
-    preparing: 'Conectando con el servidor de pruebas…',
-    unavailable: 'El servidor de pruebas no responde en este momento.',
+    preparing: 'Preparando la creación de la prueba…',
+    unavailable: 'La prueba no se puede crear en este momento. Probá más tarde.',
   },
   fr: {
     title: 'Cet appareil ne peut pas produire la preuve seul',
@@ -127,7 +127,7 @@ export const HOSTED_PROVING_COPY = {
     provedBy: 'Preuve produite par',
     byServer: 'notre serveur de preuve, qui voit votre réponse pendant le calcul',
     byWallet: 'Lace, sur cet appareil',
-    preparing: 'Connexion au serveur de preuve…',
-    unavailable: "Le serveur de preuve n'est pas joignable pour le moment.",
+    preparing: 'Préparation de la preuve…',
+    unavailable: 'La preuve ne peut pas être produite pour le moment. Réessayez plus tard.',
   },
 } as const satisfies Record<CicoLocale, Record<string, string>>;

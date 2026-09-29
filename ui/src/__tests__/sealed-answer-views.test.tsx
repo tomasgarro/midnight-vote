@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getPreviewReadiness } from '../integration/preview';
-import type { HostedProvingState } from '../providers/midnight-providers';
+import type { WalletlessProvingState } from '../integration/walletless-proving';
 import { ActivityView } from '../views/ActivityView';
 import type { Poll, VoteReceipt } from '../views/poll-model';
 import { VoteFlow, type VoteFlowProps } from '../views/VoteFlow';
@@ -43,14 +43,19 @@ function poll(overrides: Partial<Poll> = {}): Poll {
   };
 }
 
-function hosted(overrides: Partial<HostedProvingState> = {}): HostedProvingState {
+function walletless(overrides: Partial<WalletlessProvingState> = {}): WalletlessProvingState {
   return {
     offered: true,
-    accepted: false,
+    deviceAvailable: true,
+    hostedAvailable: true,
+    selected: 'device',
+    hostedAccepted: false,
     preparing: false,
     error: null,
-    accept: vi.fn(),
-    withdraw: vi.fn(),
+    chooseDevice: vi.fn(),
+    chooseHosted: vi.fn(),
+    acceptHosted: vi.fn(),
+    withdrawHosted: vi.fn(),
     ...overrides,
   };
 }
@@ -77,34 +82,71 @@ function flowProps(overrides: Partial<VoteFlowProps> = {}): VoteFlowProps {
 }
 
 describe('sealing an answer without a wallet', () => {
-  it('shows what the proving server sees before anything can be confirmed', () => {
-    const hostedProving = hosted();
-    const props = flowProps({ hostedProving });
+  it('proves on this device by default, with no disclosure to accept', () => {
+    const props = flowProps({
+      walletlessProving: walletless(),
+      executionMode: 'sponsored-device-proving',
+      provingParty: 'device',
+    });
+    render(<VoteFlow {...props} />);
+
+    expect(
+      (screen.getByRole('radio', { name: /On this device/u }) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(
+      screen.getByText(/Your answer is not sent to any server until it is counted\./u),
+    ).toBeTruthy();
+    expect(screen.queryByText('This device cannot build the proof on its own')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'I understand, continue' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm real action' }));
+    expect(props.onConfirm).toHaveBeenCalledOnce();
+  });
+
+  it('lets the person choose the proving server, and says what it sees', () => {
+    const walletlessProving = walletless();
+    render(<VoteFlow {...flowProps({ walletlessProving })} />);
+
+    expect(
+      screen.getByText(
+        'Takes about a minute. While it works, the server can see your answer and your pass secret.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /On our proving server/u }));
+    expect(walletlessProving.chooseHosted).toHaveBeenCalledOnce();
+    expect(walletlessProving.acceptHosted).not.toHaveBeenCalled();
+  });
+
+  it('asks for acceptance before the proving server can be used', () => {
+    const walletlessProving = walletless({ selected: 'hosted-server' });
+    const props = flowProps({ walletlessProving });
     render(<VoteFlow {...props} />);
 
     expect(screen.getByText('This device cannot build the proof on its own')).toBeTruthy();
-    expect(screen.getByText(/can see your answer and your pass secret/u)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Confirm real action' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'I understand, continue' }));
-    expect(hostedProving.accept).toHaveBeenCalledOnce();
+    expect(walletlessProving.acceptHosted).toHaveBeenCalledOnce();
     expect(props.onConfirm).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('radio', { name: /On this device/u }));
+    expect(walletlessProving.chooseDevice).toHaveBeenCalledOnce();
   });
 
-  it('keeps confirm disabled until the proving server is connected', () => {
-    const props = flowProps({ hostedProving: hosted({ accepted: true, preparing: true }) });
+  it('keeps confirm disabled until the chosen prover is ready', () => {
+    const props = flowProps({ walletlessProving: walletless({ preparing: true }) });
     render(<VoteFlow {...props} />);
 
-    const waiting = screen.getByRole('button', { name: 'Connecting to the proving server…' });
+    const waiting = screen.getByRole('button', { name: 'Getting the prover ready…' });
     expect((waiting as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(waiting);
     expect(props.onConfirm).not.toHaveBeenCalled();
   });
 
-  it('confirms once accepted and connected, and still names the proving server', () => {
-    const hostedProving = hosted({ accepted: true });
+  it('confirms with the proving server once accepted, and still names it', () => {
+    const walletlessProving = walletless({ selected: 'hosted-server', hostedAccepted: true });
     const props = flowProps({
-      hostedProving,
+      walletlessProving,
       executionMode: 'sponsored-hosted-proving',
       provingParty: 'hosted-server',
     });
@@ -117,32 +159,76 @@ describe('sealing an answer without a wallet', () => {
     expect(props.onConfirm).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop using the proving server' }));
-    expect(hostedProving.withdraw).toHaveBeenCalledOnce();
+    expect(walletlessProving.withdrawHosted).toHaveBeenCalledOnce();
   });
 
-  it('says so when the proving server cannot be reached', () => {
+  it('offers only the device where no proving server is configured', () => {
     render(
       <VoteFlow
-        {...flowProps({ hostedProving: hosted({ accepted: true, error: 'fetch failed' }) })}
+        {...flowProps({
+          walletlessProving: walletless({ hostedAvailable: false }),
+          executionMode: 'sponsored-device-proving',
+          provingParty: 'device',
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getByText('On this device')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Confirm real action' })).toBeTruthy();
+  });
+
+  it('says so when the prover cannot be prepared', () => {
+    render(
+      <VoteFlow
+        {...flowProps({
+          walletlessProving: walletless({ error: 'Public parameters failed their check' }),
+        })}
       />,
     );
 
     expect(screen.getByRole('alert').textContent).toContain(
-      'The proving server is not reachable right now.',
+      'The proof cannot be built right now. Try again later.',
     );
     expect(
       (screen.getByRole('button', { name: 'Confirm real action' }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 
-  it('does not offer the proving server when a wallet is connected', () => {
+  it('shows how long this device has been building the proof', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-06T10:02:05.000Z'));
+    try {
+      render(
+        <VoteFlow
+          {...flowProps({
+            stage: 'processing',
+            walletlessProving: walletless(),
+            executionMode: 'sponsored-device-proving',
+            provingParty: 'device',
+            deviceProofStartedAt: Date.parse('2026-10-06T10:00:00.000Z'),
+          })}
+        />,
+      );
+
+      expect(screen.getByText(/This device is building the proof\./u)).toBeTruthy();
+      expect(screen.getByText('2:05')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('offers no walletless prover when a wallet is connected', () => {
     render(
       <VoteFlow
-        {...flowProps({ hostedProving: hosted({ offered: false }), walletStatus: 'connected' })}
+        {...flowProps({
+          walletlessProving: walletless({ offered: false, selected: null }),
+          walletStatus: 'connected',
+        })}
       />,
     );
 
-    expect(screen.queryByText('This device cannot build the proof on its own')).toBeNull();
+    expect(screen.queryByText('Where the proof is built')).toBeNull();
     expect(screen.getByRole('button', { name: 'Confirm real action' })).toBeTruthy();
     expect(screen.getByText('Lace proves, adds DUST, and submits the transaction.')).toBeTruthy();
   });
@@ -225,14 +311,14 @@ describe('sealed answers in the activity view', () => {
 
   it('asks before using the proving server to count', () => {
     const onCount = vi.fn();
-    const hostedProving = hosted();
+    const walletlessProving = walletless({ selected: 'hosted-server' });
     render(
       <ActivityView
         polls={[closedPoll]}
         receipts={[]}
         sealedAnswers={[{ referendumId: SWISS, state: 'sealed' }]}
         onCount={onCount}
-        hostedProving={hostedProving}
+        walletlessProving={walletlessProving}
         locale="en"
       />,
     );
@@ -241,8 +327,26 @@ describe('sealed answers in the activity view', () => {
       (screen.getByRole('button', { name: 'Count my answer' }) as HTMLButtonElement).disabled,
     ).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'I understand, continue' }));
-    expect(hostedProving.accept).toHaveBeenCalledOnce();
+    expect(walletlessProving.acceptHosted).toHaveBeenCalledOnce();
     expect(onCount).not.toHaveBeenCalled();
+  });
+
+  it('counts on this device without asking for anything', () => {
+    const onCount = vi.fn();
+    render(
+      <ActivityView
+        polls={[closedPoll]}
+        receipts={[]}
+        sealedAnswers={[{ referendumId: SWISS, state: 'sealed' }]}
+        onCount={onCount}
+        walletlessProving={walletless()}
+        locale="en"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'I understand, continue' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Count my answer' }));
+    expect(onCount).toHaveBeenCalledExactlyOnceWith(SWISS);
   });
 
   it('reports progress and the reason a count has to wait', () => {
@@ -307,28 +411,28 @@ describe('readiness without a wallet', () => {
   };
 
   it('asks for the disclosure instead of asking for a wallet', () => {
-    const readiness = getPreviewReadiness({ ...base, hostedProving: 'needs-consent' });
+    const readiness = getPreviewReadiness({ ...base, walletlessProving: 'needs-consent' });
     expect(readiness.state).toBe('blocked');
     expect(readiness.label).toBe('Preview necesita tu acuerdo');
   });
 
-  it('follows the proving server from connecting to ready', () => {
+  it('follows the chosen prover from preparing to ready', () => {
     expect(
-      getPreviewReadiness({ ...base, relayerMode: true, hostedProving: 'preparing' }).state,
+      getPreviewReadiness({ ...base, relayerMode: true, walletlessProving: 'preparing' }).state,
     ).toBe('loading');
-    expect(getPreviewReadiness({ ...base, hostedProving: 'failed' }).state).toBe('blocked');
+    expect(getPreviewReadiness({ ...base, walletlessProving: 'failed' }).state).toBe('blocked');
     expect(
       getPreviewReadiness({
         ...base,
         providersReady: true,
         relayerMode: true,
-        hostedProving: 'ready',
+        walletlessProving: 'ready',
       }).state,
     ).toBe('ready');
   });
 
   it('still asks for a wallet when no proving server is offered', () => {
-    expect(getPreviewReadiness({ ...base, hostedProving: 'not-offered' }).label).toBe(
+    expect(getPreviewReadiness({ ...base, walletlessProving: 'not-offered' }).label).toBe(
       'Preview requiere wallet',
     );
   });

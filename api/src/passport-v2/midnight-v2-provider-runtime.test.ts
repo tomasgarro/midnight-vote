@@ -38,8 +38,46 @@ describe('referendum v2 provider runtime composition', () => {
     expect(REFERENDUM_V2_EXECUTION_MODES).toEqual([
       'direct-wallet',
       'sponsored-wallet',
+      'sponsored-device-proving',
       'sponsored-hosted-proving',
     ]);
+  });
+
+  it('composes device proving for a browser without a wallet or a proving server', async () => {
+    vi.stubGlobal('window', {
+      location: { origin: 'https://app.test' },
+      navigator: { userAgent: 'vitest' },
+    });
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input).endsWith('/keys')) {
+        return response(200, { coinPublicKey: 'coin-key', encryptionPublicKey: 'encryption-key' });
+      }
+      throw new Error(`unexpected URL ${String(input)}`);
+    }) as typeof fetch;
+    const provingProvider = { check: vi.fn(), prove: vi.fn() };
+
+    const runtime = await createReferendumV2ProviderRuntime({
+      mode: 'sponsored-device-proving',
+      options: {
+        relayUrl: 'https://relay.test',
+        networkId: 'preview',
+        indexerUri: 'https://indexer.test/api/v4/graphql',
+        indexerWsUri: 'wss://indexer.test/api/v4/graphql/ws',
+        capabilityIssuer: { issue: vi.fn(async () => 'capability') },
+        zkConfigBaseUrl: 'https://app.test/managed/referendum-v2',
+        fetchImpl,
+        deviceProving: { provingProvider },
+      },
+    });
+
+    expect(runtime.mode).toBe('sponsored-device-proving');
+    if (runtime.mode !== 'sponsored-device-proving') {
+      throw new Error('Expected the device-proving runtime');
+    }
+    expect(runtime.provingParty).toBe('device');
+    // Composing the runtime proves nothing and contacts only the relay.
+    expect(provingProvider.prove).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('composes hosted proving for a browser without a wallet', async () => {

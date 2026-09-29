@@ -12,7 +12,7 @@ export interface PassportReceiptRecord {
    * id and no explorer link: either would tie this device to a cast whose
    * answer becomes public at the count (ADR-009).
    */
-  sealed?: { readonly provingParty: 'wallet' | 'hosted-server' };
+  sealed?: { readonly provingParty: 'wallet' | 'device' | 'hosted-server' };
 }
 
 type EncryptedRecord = {

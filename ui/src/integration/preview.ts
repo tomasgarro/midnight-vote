@@ -26,10 +26,11 @@ export interface PreviewReadinessInput {
   /** True only after a provider-backed credential has been issued and verified. */
   credentialVerified?: boolean;
   /**
-   * Hosted proving for a browser without a wallet (ADR-010). `needs-consent`
-   * means the person has not yet accepted what the proving server can see.
+   * Proving without a wallet: on the device (ADR-011) or on the proving
+   * server (ADR-010). `needs-consent` means the server is chosen and the
+   * person has not yet accepted what it can see.
    */
-  hostedProving?: 'not-offered' | 'needs-consent' | 'preparing' | 'failed' | 'ready';
+  walletlessProving?: 'not-offered' | 'needs-consent' | 'preparing' | 'failed' | 'ready';
 }
 
 export interface PublicReadinessInput {
@@ -147,7 +148,7 @@ export function getPreviewReadiness(input: PreviewReadinessInput): PreviewReadin
     };
   }
 
-  if (!input.walletConnected && input.hostedProving === 'needs-consent') {
+  if (!input.walletConnected && input.walletlessProving === 'needs-consent') {
     return {
       state: 'blocked',
       label: `${networkLabel} necesita tu acuerdo`,
@@ -156,19 +157,19 @@ export function getPreviewReadiness(input: PreviewReadinessInput): PreviewReadin
     };
   }
 
-  if (!input.walletConnected && input.hostedProving === 'failed') {
+  if (!input.walletConnected && input.walletlessProving === 'failed') {
     return {
       state: 'blocked',
       label: `${networkLabel} no disponible`,
-      message: 'El servidor de pruebas no responde en este momento. Probá de nuevo más tarde.',
+      message: 'No se pudo preparar la creación de la prueba. Probá de nuevo más tarde.',
     };
   }
 
-  if (!input.walletConnected && input.hostedProving === 'preparing') {
+  if (!input.walletConnected && input.walletlessProving === 'preparing') {
     return {
       state: 'loading',
       label: `Preparando ${networkLabel}`,
-      message: 'Conectando con el servidor de pruebas.',
+      message: 'Preparando la creación de la prueba.',
     };
   }
 

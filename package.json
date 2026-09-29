@@ -22,6 +22,8 @@
     "dev:undeployed": "npm run dev --workspace midnight-referendum-ui -- --mode undeployed --host localhost --port 4173 --strictPort",
     "validate:contract": "npm run compile && npm run test:sim && npm run test:sim:v2",
     "sync:contract": "node scripts/sync-contract-assets.mjs",
+    "zk:params": "node scripts/fetch-zk-params.mjs",
+    "measure:device-proving": "npm run zk:params && node scripts/measure-device-proving.mjs",
     "devnet:up": "node scripts/start-undeployed.mjs",
     "devnet:down": "docker compose -f docker-compose.undeployed.yml down",
     "devnet:ps": "docker compose -f docker-compose.undeployed.yml ps",

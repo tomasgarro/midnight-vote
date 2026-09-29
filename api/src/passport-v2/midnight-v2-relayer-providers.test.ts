@@ -133,6 +133,42 @@ describe('v2 walletless providers', () => {
     ).rejects.toThrow(/must use HTTPS/iu);
   });
 
+  it('keeps device proving to a single prover', async () => {
+    vi.stubGlobal('window', undefined);
+    const base = {
+      relayUrl: 'https://relay.test',
+      networkId: 'preview' as const,
+      indexerUri: 'https://indexer.test/api/v4/graphql',
+      indexerWsUri: 'wss://indexer.test/api/v4/graphql/ws',
+      capabilityIssuer: { issue: vi.fn(async () => 'capability') },
+      zkConfigBaseUrl: 'https://app.test/managed/referendum-v2',
+      fetchImpl: vi.fn() as typeof fetch,
+      deviceProving: { provingProvider: { check: vi.fn(), prove: vi.fn() } },
+    };
+    const api = { getProvingProvider: vi.fn(async () => ({}) as never) } as unknown as ConnectedAPI;
+
+    await expect(createReferendumV2WalletlessProviders({ ...base, api })).rejects.toThrow(
+      /cannot be combined with another prover/iu,
+    );
+    await expect(
+      createReferendumV2WalletlessProviders({ ...base, proofServerUri: 'https://proof.test' }),
+    ).rejects.toThrow(/cannot be combined with another prover/iu);
+    await expect(
+      createReferendumV2WalletlessProviders({
+        ...base,
+        hostedProving: { proofServerUri: 'https://proof.test', disclosureAccepted: true },
+      }),
+    ).rejects.toThrow(/cannot be combined with another prover/iu);
+    await expect(
+      createReferendumV2WalletlessProviders({
+        ...base,
+        deviceProving: { provingProvider: {} as never },
+      }),
+    ).rejects.toThrow(/requires a proving provider/iu);
+    expect(api.getProvingProvider).not.toHaveBeenCalled();
+    expect(base.fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('never combines hosted proving with a wallet or a second proof server', async () => {
     vi.stubGlobal('window', undefined);
     const base = {

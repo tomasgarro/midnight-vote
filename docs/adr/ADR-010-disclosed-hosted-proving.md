@@ -1,6 +1,8 @@
 # ADR-010: Disclosed hosted proving for browsers without a wallet
 
-- Status: Accepted for Wave 2 (no contract change)
+- Status: Accepted for Wave 2 (no contract change). Amended the same day by
+  [ADR-011](ADR-011-on-device-proving.md): hosted proving is a choice, and the
+  device is the default
 - Date: 2026-09-29
 - Related: [ADR-003](ADR-003-proof-relayer-and-receipts.md), [ADR-009](ADR-009-voter-owned-reveal.md)
 
@@ -17,6 +19,11 @@ a local proof server. The relay provider refused to compose in a browser without
 a wallet, so a person on a phone could read a consultation and hold a pass but
 could never seal an answer. The app is mobile-first, so this blocked the main
 journey.
+
+**Correction.** This record first said that no browser prover existed. One
+does: Midnight's WASM prover. ADR-011 adds it and makes it the default. Hosted
+proving remains for a person who prefers a fast proof, or whose device cannot
+finish one, and who accepts the disclosure below.
 
 ## Decision
 
@@ -88,7 +95,7 @@ dishonest operator safe, and the disclosure does not claim that they do.
 
 | Alternative | Why not now |
 | --- | --- |
-| Proving in the browser (WASM) | midnight-js 4.1.1 publishes two proof providers only: the proof-server HTTP client and the dApp connector. There is no supported in-browser prover to call |
+| Proving in the browser (WASM) | Adopted in ADR-011 as the default. It takes minutes, so hosted proving stays as the fast, disclosed choice |
 | A mobile wallet | No Lace build for phones that exposes the dApp connector |
 | Midnight Passport as the prover | Passport runs on stagenet and ledger 9; its dApp connection is unfinished |
 | Desktop only | Removes the mobile journey that the product is built around |
@@ -102,8 +109,8 @@ dishonest operator safe, and the disclosure does not claim that they do.
   is trusted while proving).
 - Results can report how many answers were built in each tier, because the
   runtime records the proving party locally. The tier is not written on-chain.
-- The mode is removed for a network once a supported on-device prover exists
-  there.
+- The mode is a choice beside on-device proving (ADR-011). It is removed once
+  the device prover is fast enough on phones that nobody needs the server.
 
 ## Evidence
 
