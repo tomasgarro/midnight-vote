@@ -35,6 +35,7 @@ import {
   loadPassportReceipts,
   savePassportReceipt,
 } from '@/integration/receipt-store';
+import { RUNTIME_COPY } from '@/integration/runtime-copy';
 import {
   browserAnswerMarkerStore,
   type CountOutcome,
@@ -267,7 +268,7 @@ function CivicApp() {
         error:
           runtimeError instanceof Error
             ? runtimeError.message
-            : 'La configuración de Passport no es válida.',
+            : RUNTIME_COPY[detectLocale('es-AR')].passportConfigInvalid,
       };
     }
   }, []);
@@ -466,25 +467,29 @@ function CivicApp() {
     };
   }, [passportJourneyPorts.credential]);
   const profileId = useMemo(() => deriveProfileId(passportSession), [passportSession]);
-  const previewReadiness = getPreviewReadiness({
-    appMode: APP_MODE === 'preview' ? 'preview' : APP_MODE === 'undeployed' ? 'undeployed' : 'demo',
-    contractAddress: runtimeContractAddress,
-    walletConnected: walletStatus === 'connected',
-    providersReady: isReady && (!passportV2Runtime.config || referendumV2Providers !== null),
-    providersError: providersError ?? passportV2Runtime.error,
-    relayerMode: executionMode !== 'direct-wallet',
-    walletlessProving: !walletlessProving.offered
-      ? 'not-offered'
-      : needsHostedConsent(walletlessProving)
-        ? 'needs-consent'
-        : walletlessProving.error
-          ? 'failed'
-          : walletlessProving.preparing
-            ? 'preparing'
-            : 'ready',
-    v2RuntimeConfigured: CHAIN_RUNTIME_ENABLED,
-    credentialVerified: credential?.kind === 'verified-credential',
-  });
+  const previewReadiness = getPreviewReadiness(
+    {
+      appMode:
+        APP_MODE === 'preview' ? 'preview' : APP_MODE === 'undeployed' ? 'undeployed' : 'demo',
+      contractAddress: runtimeContractAddress,
+      walletConnected: walletStatus === 'connected',
+      providersReady: isReady && (!passportV2Runtime.config || referendumV2Providers !== null),
+      providersError: providersError ?? passportV2Runtime.error,
+      relayerMode: executionMode !== 'direct-wallet',
+      walletlessProving: !walletlessProving.offered
+        ? 'not-offered'
+        : needsHostedConsent(walletlessProving)
+          ? 'needs-consent'
+          : walletlessProving.error
+            ? 'failed'
+            : walletlessProving.preparing
+              ? 'preparing'
+              : 'ready',
+      v2RuntimeConfigured: CHAIN_RUNTIME_ENABLED,
+      credentialVerified: credential?.kind === 'verified-credential',
+    },
+    locale,
+  );
   useEffect(() => {
     let active = true;
     if (!passportSession) {
@@ -533,14 +538,16 @@ function CivicApp() {
       });
       setPassportSession(session);
     } catch (error) {
-      setPassportError(error instanceof Error ? error.message : 'No se pudo conectar Passport');
+      setPassportError(
+        error instanceof Error ? error.message : RUNTIME_COPY[locale].passportConnectFailed,
+      );
     }
   };
 
   const startVote = async (pollId: string) => {
     const poll = polls.find((item) => item.id === pollId);
     if (!poll || !getPollAvailability(poll).isOpen) {
-      setPreviewError('Esta votación está cerrada y no acepta nuevas participaciones.');
+      setPreviewError(RUNTIME_COPY[locale].consultationClosed);
       return;
     }
     if (
@@ -578,20 +585,18 @@ function CivicApp() {
       }
       const poll = polls.find((item) => item.id === activePollId);
       if (!poll || !getPollAvailability(poll).isOpen) {
-        setPreviewError('Esta votación está cerrada y no acepta nuevas participaciones.');
+        setPreviewError(RUNTIME_COPY[locale].consultationClosed);
         return;
       }
       if (!choice) {
-        setPreviewError('Elegí una respuesta antes de firmar.');
+        setPreviewError(RUNTIME_COPY[locale].chooseFirst);
         return;
       }
       setPreviewError(null);
       setFlowStage('processing');
       try {
         if (passportV2Runtime.error) {
-          throw new Error(
-            `La configuración Passport v2 es inválida; el voto fue bloqueado: ${passportV2Runtime.error}`,
-          );
+          throw new Error(RUNTIME_COPY[locale].runtimeInvalid(passportV2Runtime.error));
         }
         if (passportV2Runtime.config) {
           const referendum = findRuntimeReferendum(
@@ -600,21 +605,22 @@ function CivicApp() {
           );
           const actionPort = passportJourneyPorts.actions;
           const credentialPort = passportJourneyPorts.credential;
-          const route = resolvePassportV2ActionRoute({
-            runtimeConfigured: true,
-            credentialVerified: credential?.kind === 'verified-credential',
-            actionPortAvailable: Boolean(actionPort && credentialPort),
-            referendumId: referendum?.referendumId ?? null,
-          });
+          const route = resolvePassportV2ActionRoute(
+            {
+              runtimeConfigured: true,
+              credentialVerified: credential?.kind === 'verified-credential',
+              actionPortAvailable: Boolean(actionPort && credentialPort),
+              referendumId: referendum?.referendumId ?? null,
+            },
+            locale,
+          );
           if (route.mode === 'blocked') throw new Error(route.message);
           if (route.mode !== 'v2' || !actionPort || !credentialPort) {
-            throw new Error('La acción v2 no está disponible; el voto fue bloqueado.');
+            throw new Error(RUNTIME_COPY[locale].actionUnavailable);
           }
           const authorization = await credentialPort.getActionAuthorization();
           if (!authorization) {
-            throw new Error(
-              'La credencial Passport no tiene autorización vigente para una acción cívica.',
-            );
+            throw new Error(RUNTIME_COPY[locale].authorizationMissing);
           }
           if (!ballotVault || (await ballotVault.durability()) === 'memory') {
             throw new Error(SEAL_STORAGE_BLOCKED[locale]);
@@ -643,12 +649,12 @@ function CivicApp() {
           return;
         }
 
-        throw new Error(
-          `${APP_NETWORK_LABEL} requiere un manifiesto v2 completo; el flujo legado está deshabilitado.`,
-        );
+        throw new Error(RUNTIME_COPY[locale].manifestMissing(APP_NETWORK_LABEL));
       } catch (error) {
         setPreviewError(
-          error instanceof Error ? error.message : `Falló la transacción en ${APP_NETWORK_LABEL}`,
+          error instanceof Error
+            ? error.message
+            : RUNTIME_COPY[locale].transactionFailed(APP_NETWORK_LABEL),
         );
         setFlowStage('review');
       }
@@ -890,14 +896,14 @@ function CivicApp() {
             return (
               <main className="page-content flow-page">
                 <section className="flow-card" role="alert">
-                  <h1>Consulta no disponible</h1>
-                  <p>El catálogo v2 cambió o todavía no está listo para esta acción.</p>
+                  <h1>{RUNTIME_COPY[locale].consultationMissingTitle}</h1>
+                  <p>{RUNTIME_COPY[locale].consultationMissingBody}</p>
                   <button
                     type="button"
                     className="secondary-button"
                     onClick={() => setFlowStage(null)}
                   >
-                    Volver a votaciones
+                    {RUNTIME_COPY[locale].backToConsultations}
                   </button>
                 </section>
               </main>
@@ -969,15 +975,13 @@ function CivicApp() {
               openAnswers();
             }}
           >
-            <CheckCircle size={18} />{' '}
-            {locale === 'es' ? 'Último comprobante listo' : 'Latest receipt ready'}{' '}
-            <ArrowRight size={16} />
+            <CheckCircle size={18} /> {RUNTIME_COPY[locale].receiptReady} <ArrowRight size={16} />
           </button>
           <button
             type="button"
             className="receipt-toast-close"
             onClick={() => setReceiptToastVisible(false)}
-            aria-label={locale === 'es' ? 'Cerrar notificación' : 'Dismiss notification'}
+            aria-label={RUNTIME_COPY[locale].dismissNotice}
           >
             <X size={15} />
           </button>
