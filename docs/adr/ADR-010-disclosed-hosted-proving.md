@@ -88,7 +88,7 @@ dishonest operator safe, and the disclosure does not claim that they do.
 
 | Alternative | Why not now |
 | --- | --- |
-| Proving in the browser (WASM) | No supported browser prover for ledger 8 circuits; key material for `castVote` is too large for a phone |
+| Proving in the browser (WASM) | midnight-js 4.1.1 publishes two proof providers only: the proof-server HTTP client and the dApp connector. There is no supported in-browser prover to call |
 | A mobile wallet | No Lace build for phones that exposes the dApp connector |
 | Midnight Passport as the prover | Passport runs on stagenet and ledger 9; its dApp connection is unfinished |
 | Desktop only | Removes the mobile journey that the product is built around |
