@@ -8,6 +8,9 @@ import * as GeneratedRegistry from '../generated/credential-registry-v1/index.js
 import * as GeneratedReferendumV2 from '../generated/referendum-v2/index.js';
 import { deriveRegistryContractBinding } from './crypto.js';
 import type { VoteChoice } from './types.js';
+import { credentialRegistryV1Witnesses, referendumV2Witnesses } from './witnesses.js';
+
+export { choiceToGenerated } from './witnesses.js';
 
 export const CREDENTIAL_REGISTRY_V1_PRIVATE_STATE_ID = 'credentialRegistryV1PrivateState' as const;
 export const REFERENDUM_V2_PRIVATE_STATE_ID = 'referendumV2PrivateState' as const;
@@ -107,82 +110,12 @@ export interface ReferendumV2RegistryBinding {
   readonly registryContractBinding: Uint8Array;
 }
 
-const registryWitnesses: GeneratedRegistry.Witnesses<CredentialRegistryV1PrivateState> = {
-  issuerSecret: (context) => [context.privateState, context.privateState.issuerSecret],
-  holderBinding: (context) => [context.privateState, context.privateState.holderBinding],
-  credentialBlind: (context) => [context.privateState, context.privateState.credentialBlind],
-  credentialCountry: (context) => [context.privateState, context.privateState.credentialCountry],
-  credentialAgeClass: (context) => [context.privateState, context.privateState.credentialAgeClass],
-  credentialAssurance: (context) => [
-    context.privateState,
-    context.privateState.credentialAssurance,
-  ],
-  credentialValidUntil: (context) => [
-    context.privateState,
-    context.privateState.credentialValidUntil,
-  ],
-};
-
-const referendumWitnesses: GeneratedReferendumV2.Witnesses<ReferendumV2PrivateState> = {
-  organizerSecret: (context) => [
-    context.privateState,
-    requireBytes(context.privateState, 'organizerSecret'),
-  ],
-  rootPublisherSecret: (context) => [
-    context.privateState,
-    requireBytes(context.privateState, 'rootPublisherSecret'),
-  ],
-  voterSecret: (context) => [
-    context.privateState,
-    requireBytes(context.privateState, 'voterSecret'),
-  ],
-  holderBinding: (context) => [
-    context.privateState,
-    requireBytes(context.privateState, 'holderBinding'),
-  ],
-  holderBlind: (context) => [
-    context.privateState,
-    requireBytes(context.privateState, 'holderBlind'),
-  ],
-  credentialBlind: (context) => [
-    context.privateState,
-    requireBytes(context.privateState, 'credentialBlind'),
-  ],
-  credentialCountry: (context) => [
-    context.privateState,
-    requireBytes(context.privateState, 'credentialCountry'),
-  ],
-  credentialAgeClass: (context) => [
-    context.privateState,
-    requireBigInt(context.privateState, 'credentialAgeClass'),
-  ],
-  credentialAssurance: (context) => [
-    context.privateState,
-    requireBigInt(context.privateState, 'credentialAssurance'),
-  ],
-  credentialClaimEpoch: (context) => [
-    context.privateState,
-    requireBigInt(context.privateState, 'credentialClaimEpoch'),
-  ],
-  credentialValidUntil: (context) => [
-    context.privateState,
-    requireBigInt(context.privateState, 'credentialValidUntil'),
-  ],
-  voterPath: (context) => [context.privateState, requirePath(context.privateState, 'voterPath')],
-  voterChoice: (context) => [
-    context.privateState,
-    choiceToGenerated(requireChoice(context.privateState)),
-  ],
-  voteSalt: (context) => [context.privateState, requireBytes(context.privateState, 'voteSalt')],
-  revealPath: (context) => [context.privateState, requirePath(context.privateState, 'revealPath')],
-};
-
 export function createCompiledCredentialRegistryV1() {
   return CompiledContract.make<
     GeneratedRegistry.Contract<CredentialRegistryV1PrivateState>,
     CredentialRegistryV1PrivateState
   >('credential-registry-v1', GeneratedRegistry.Contract).pipe(
-    CompiledContract.withWitnesses(registryWitnesses),
+    CompiledContract.withWitnesses(credentialRegistryV1Witnesses),
     CompiledContract.withCompiledFileAssets('managed/credential-registry-v1'),
   );
 }
@@ -192,7 +125,7 @@ export function createCompiledReferendumV2() {
     GeneratedReferendumV2.Contract<ReferendumV2PrivateState>,
     ReferendumV2PrivateState
   >('referendum-v2', GeneratedReferendumV2.Contract).pipe(
-    CompiledContract.withWitnesses(referendumWitnesses),
+    CompiledContract.withWitnesses(referendumV2Witnesses),
     CompiledContract.withCompiledFileAssets('managed/referendum-v2'),
   );
 }
@@ -311,62 +244,6 @@ export function assertReferendumRegistryBinding(
   if (!equalBytes(expectedRegistryContractBinding, binding.registryContractBinding)) {
     throw new Error('Referendum registry contract binding does not match the frozen registry');
   }
-}
-
-export function choiceToGenerated(choice: VoteChoice): GeneratedReferendumV2.Choice {
-  return GeneratedReferendumV2.Choice[choice];
-}
-
-function requireBytes(
-  state: ReferendumV2PrivateState,
-  key:
-    | 'organizerSecret'
-    | 'rootPublisherSecret'
-    | 'voterSecret'
-    | 'holderBinding'
-    | 'holderBlind'
-    | 'credentialBlind'
-    | 'credentialCountry'
-    | 'voteSalt',
-): Uint8Array {
-  const value = state[key];
-  if (!(value instanceof Uint8Array) || value.length !== 32) {
-    throw new Error(`Required ${key} witness is unavailable`);
-  }
-  return value;
-}
-
-function requireBigInt(
-  state: ReferendumV2PrivateState,
-  key:
-    | 'credentialAgeClass'
-    | 'credentialAssurance'
-    | 'credentialClaimEpoch'
-    | 'credentialValidUntil',
-): bigint {
-  const value = state[key];
-  if (typeof value !== 'bigint') throw new Error(`Required ${key} witness is unavailable`);
-  return value;
-}
-
-function requirePath(
-  state: ReferendumV2PrivateState,
-  key: 'voterPath' | 'revealPath',
-): MerkleTreePath<Uint8Array> {
-  const value = state[key];
-  if (!value) throw new Error(`Required ${key} witness is unavailable`);
-  return value;
-}
-
-function requireChoice(state: ReferendumV2PrivateState): VoteChoice {
-  if (
-    state.voterChoice !== 'YES' &&
-    state.voterChoice !== 'NO' &&
-    state.voterChoice !== 'ABSTAIN'
-  ) {
-    throw new Error('Required voterChoice witness is unavailable');
-  }
-  return state.voterChoice;
 }
 
 function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
