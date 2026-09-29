@@ -2,6 +2,18 @@ import type { CanonicalReceipt, CivicActionKind } from 'midnight-referendum-api'
 
 export const V2_ACTION_VERSION = 1 as const;
 
+/**
+ * The only circuits the public relay carries. A citizen seals an answer with
+ * `castVote` and counts it with `revealVote`; the count succeeds only for the
+ * device that holds the answer's opening (ADR-009). Organizer and issuer
+ * circuits never cross this boundary.
+ */
+export const V2_CITIZEN_CIRCUITS = ['castVote', 'revealVote'] as const;
+
+export function isCitizenCircuit(circuit: unknown): boolean {
+  return (V2_CITIZEN_CIRCUITS as readonly unknown[]).includes(circuit);
+}
+
 /** Only the already-proven, unbound transaction crosses this HTTP boundary. */
 export interface V2ActionRequest {
   readonly actionId: string;

@@ -228,7 +228,11 @@ export interface CastVoteRequest {
  */
 export interface RevealVoteRequest {
   readonly referendumId: string;
-  readonly authorization: CivicActionAuthorization;
+  /**
+   * The current pass authorization. Omitted when the pass has expired; the
+   * count is then sponsored with the handle kept beside the sealed answer.
+   */
+  readonly authorization?: CivicActionAuthorization;
 }
 
 /**

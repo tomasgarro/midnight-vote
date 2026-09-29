@@ -178,6 +178,21 @@ describe('ballot opening vault', () => {
     expect(held.map((item) => item.voteSalt[0])).toEqual([1]);
   });
 
+  it('keeps the authorization that lets the count be sponsored later', async () => {
+    const vault = createBallotOpeningVault(slowStore(), 'preview:issuer:1');
+    await vault.save({ ...opening(1, 'sealed'), countAuthorization: 'issuance-handle' });
+    await vault.save(opening(2));
+
+    const held = await vault.list('ch-2026-11-29-ahv');
+    expect(held.find((item) => item.voteSalt[0] === 1)?.countAuthorization).toBe('issuance-handle');
+    expect(held.find((item) => item.voteSalt[0] === 2)).not.toHaveProperty('countAuthorization');
+
+    expect(() => vault.save({ ...opening(3), countAuthorization: '' })).toThrow(/incomplete/u);
+    expect(() => vault.save({ ...opening(3), countAuthorization: 'x'.repeat(257) })).toThrow(
+      /incomplete/u,
+    );
+  });
+
   it('hands out copies, so a caller cannot change what is stored', async () => {
     const vault = createBallotOpeningVault(slowStore(), 'preview:issuer:1');
     const original = opening(1);

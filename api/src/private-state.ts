@@ -374,6 +374,9 @@ function copyOpening(opening: BallotOpening): BallotOpening {
     ballotCommitment: new Uint8Array(opening.ballotCommitment),
     status: opening.status,
     ...(opening.sealedAt === undefined ? {} : { sealedAt: opening.sealedAt }),
+    ...(opening.countAuthorization === undefined
+      ? {}
+      : { countAuthorization: opening.countAuthorization }),
   };
 }
 
@@ -388,7 +391,11 @@ function isBallotOpening(value: unknown, referendumId: string): value is BallotO
     isBytes32(candidate.voteSalt) &&
     isBytes32(candidate.ballotCommitment) &&
     (candidate.status === 'sealing' || candidate.status === 'sealed') &&
-    (candidate.sealedAt === undefined || typeof candidate.sealedAt === 'string')
+    (candidate.sealedAt === undefined || typeof candidate.sealedAt === 'string') &&
+    (candidate.countAuthorization === undefined ||
+      (typeof candidate.countAuthorization === 'string' &&
+        candidate.countAuthorization.length > 0 &&
+        candidate.countAuthorization.length <= 256))
   );
 }
 

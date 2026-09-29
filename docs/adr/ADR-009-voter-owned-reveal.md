@@ -43,6 +43,12 @@ refused it for a citizen credential.
    the opening whose commitment is in the ballot tree.
 5. The organizer's scripts keep `closeVote` and `finalizeVote`, which are
    permissionless and time-gated on-chain. They no longer need any opening.
+6. **A sealed answer keeps what it needs to be counted.** A pass lasts days,
+   and a count can come weeks after the answer was sealed. The opaque
+   authorization that sponsored the cast is stored beside the opening, and the
+   relay sponsors the count against it when the pass has expired. The person
+   is asked to verify again only if the device holds neither. A connected
+   wallet pays for itself and needs no authorization.
 
 ## What this does not fix
 
@@ -77,3 +83,6 @@ copy and scheduled for contract v3.
   already-counted path.
 - `cico-service/src/action-capability-issuer.test.ts`: `revealVote` is granted
   only when allowlisted; organizer circuits remain refused.
+- `relayer/src/config.ts` and `relayer/src/v2-http.ts`: the public relay
+  carries `castVote` and `revealVote` and refuses every other circuit at both
+  layers.

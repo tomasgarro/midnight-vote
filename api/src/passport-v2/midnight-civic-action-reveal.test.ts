@@ -104,13 +104,20 @@ class FakeCredential implements CivicCredentialPort, CivicCredentialPrivateState
   async getCredentialSummary() {
     return { provider: 'rarimo' as const, status: 'issued' as const, ...claims };
   }
-  async getActionAuthorization() {
+  async getActionAuthorization(): Promise<typeof authorization | null> {
     return authorization;
   }
   async getPrivateCredentialMaterial() {
     return material;
   }
   async clearCredential(): Promise<void> {}
+}
+
+/** A pass that has expired: it authorizes nothing any more. */
+class ExpiredCredential extends FakeCredential {
+  override async getActionAuthorization() {
+    return null;
+  }
 }
 
 /** Keeps openings per referendum; `save` replaces only an opening with the same commitment. */
@@ -225,22 +232,29 @@ function adapter(options: {
   calls?: Calls;
   castVote?: () => Promise<CanonicalReceipt>;
   randomBytes?: (length: number) => Uint8Array;
+  credential?: FakeCredential;
+  /** A connected wallet pays for itself, so nothing is relayed. */
+  wallet?: boolean;
 }) {
   const calls = options.calls ?? { joined: [], revealed: [], scopes: [] };
   return new MidnightCivicActionAdapter({
     providers: {} as ReferendumV2Providers,
-    credential: new FakeCredential(),
+    credential: options.credential ?? new FakeCredential(),
     referenda: [entry],
     randomBytes: options.randomBytes ?? (() => new Uint8Array(32).fill(8)),
     stateResolver: options.stateResolver,
     executorFactory: executorFactory(calls, options.castVote),
     ballotOpenings: options.vault,
-    actionExecutionContext: {
-      async run(scope, operation) {
-        calls.scopes.push(scope);
-        return operation();
-      },
-    },
+    ...(options.wallet
+      ? {}
+      : {
+          actionExecutionContext: {
+            async run(scope, operation) {
+              calls.scopes.push(scope);
+              return operation();
+            },
+          },
+        }),
   });
 }
 
@@ -574,5 +588,117 @@ describe('where a sealed answer stands', () => {
     });
     await actions.getSealedAnswerStatus(entry.referendumId);
     expect(resolveRevealContext).not.toHaveBeenCalled();
+  });
+});
+
+describe('counting after the pass has expired', () => {
+  const counting = (sealed: BallotOpening) =>
+    resolver({ phase: 'REVEAL', closed: true, onChain: [sealed.ballotCommitment] });
+
+  it('keeps, with the sealed answer, the authorization that sponsored it', async () => {
+    const vault = new MemoryVault();
+    await adapter({ vault, stateResolver: open }).castVote({
+      referendumId: entry.referendumId,
+      choice: 'YES',
+      authorization,
+    });
+
+    expect(vault.openings).toHaveLength(1);
+    expect(vault.openings[0]).toMatchObject({
+      status: 'sealed',
+      countAuthorization: authorization.handle,
+    });
+  });
+
+  it('sponsors the count with the kept authorization, without a current pass', async () => {
+    const vault = new MemoryVault();
+    const sealed = { ...opening('NO', 8, 'sealed'), countAuthorization: 'handle-at-seal' };
+    await vault.save(sealed);
+    const calls: Calls = { joined: [], revealed: [], scopes: [] };
+
+    const receipt = await adapter({
+      vault,
+      calls,
+      credential: new ExpiredCredential(),
+      stateResolver: counting(sealed),
+    }).revealVote({ referendumId: entry.referendumId });
+
+    expect(receipt).toMatchObject({ circuit: 'revealVote', status: 'confirmed' });
+    expect(calls.scopes).toEqual([
+      {
+        credentialAuthorization: 'handle-at-seal',
+        contractAddress: entry.contractAddress,
+        circuit: 'revealVote',
+        action: 'vote',
+      },
+    ]);
+    expect(calls.revealed[0]?.choice).toBe('NO');
+    expect(vault.openings).toHaveLength(0);
+  });
+
+  it('prefers the current pass while it is valid', async () => {
+    const vault = new MemoryVault();
+    const sealed = { ...opening('NO', 8, 'sealed'), countAuthorization: 'handle-at-seal' };
+    await vault.save(sealed);
+    const calls: Calls = { joined: [], revealed: [], scopes: [] };
+
+    await adapter({ vault, calls, stateResolver: counting(sealed) }).revealVote({
+      referendumId: entry.referendumId,
+      authorization,
+    });
+
+    expect(calls.scopes[0]?.credentialAuthorization).toBe(authorization.handle);
+  });
+
+  it('asks for a new pass when nothing can sponsor the count, and keeps the answer', async () => {
+    const vault = new MemoryVault();
+    const sealed = opening('NO', 8, 'sealed');
+    await vault.save(sealed);
+    const calls: Calls = { joined: [], revealed: [], scopes: [] };
+
+    await expect(
+      adapter({
+        vault,
+        calls,
+        credential: new ExpiredCredential(),
+        stateResolver: counting(sealed),
+      }).revealVote({ referendumId: entry.referendumId }),
+    ).rejects.toMatchObject({ code: 'CREDENTIAL_NOT_FOUND' });
+
+    expect(calls.revealed).toHaveLength(0);
+    expect(vault.openings).toHaveLength(1);
+  });
+
+  it('lets a wallet count without any authorization, because it pays for itself', async () => {
+    const vault = new MemoryVault();
+    const sealed = opening('YES', 8, 'sealed');
+    await vault.save(sealed);
+    const calls: Calls = { joined: [], revealed: [], scopes: [] };
+
+    const receipt = await adapter({
+      vault,
+      calls,
+      wallet: true,
+      credential: new ExpiredCredential(),
+      stateResolver: counting(sealed),
+    }).revealVote({ referendumId: entry.referendumId });
+
+    expect(receipt).toMatchObject({ circuit: 'revealVote', status: 'confirmed' });
+    expect(calls.scopes).toHaveLength(0);
+    expect(vault.openings).toHaveLength(0);
+  });
+
+  it('still refuses an authorization that is not the current pass', async () => {
+    const vault = new MemoryVault();
+    const sealed = { ...opening('NO', 8, 'sealed'), countAuthorization: 'handle-at-seal' };
+    await vault.save(sealed);
+
+    await expect(
+      adapter({ vault, stateResolver: counting(sealed) }).revealVote({
+        referendumId: entry.referendumId,
+        authorization: { kind: 'civic-credential', handle: 'someone-else' },
+      }),
+    ).rejects.toMatchObject({ code: 'CREDENTIAL_NOT_FOUND' });
+    expect(vault.openings).toHaveLength(1);
   });
 });

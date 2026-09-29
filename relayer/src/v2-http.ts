@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { V2ActionService } from './v2-service.js';
-import { V2ActionError } from './v2-types.js';
+import { isCitizenCircuit, V2ActionError } from './v2-types.js';
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 type Json = Record<string, unknown>;
@@ -15,7 +15,8 @@ export interface V2HttpRouteOptions {
 
 /**
  * Handles the walletless citizen HTTP surface. It is structurally limited to
- * `castVote`; operator circuits never cross this public boundary. Returns
+ * the citizen circuits, `castVote` and `revealVote`, whatever the service
+ * allowlist says; operator circuits never cross this public boundary. Returns
  * false for non-v2 paths so explicitly enabled compatibility mode can be
  * handled by the legacy server code.
  */
@@ -40,7 +41,10 @@ export async function handleV2Route(
     const receiptMatch = /^\/v2\/receipts\/([^/]+)$/u.exec(url.pathname);
     if (request.method === 'POST' && url.pathname === '/v2/actions') {
       const body = await readJson(request);
-      if (body.circuit !== 'castVote' || (body.action !== undefined && body.action !== 'vote')) {
+      if (
+        !isCitizenCircuit(body.circuit) ||
+        (body.action !== undefined && body.action !== 'vote')
+      ) {
         send(response, 403, { error: 'not_allowlisted' });
         return true;
       }

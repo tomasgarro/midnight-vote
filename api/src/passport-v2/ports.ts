@@ -157,6 +157,12 @@ export interface BallotOpening {
   readonly status: 'sealing' | 'sealed';
   /** Block time of the confirmed cast. */
   readonly sealedAt?: string;
+  /**
+   * The opaque handle that let the relay sponsor the cast. It is kept so the
+   * count can be sponsored after the pass has expired: weeks can pass between
+   * the two, and a pass lasts days. It is not a witness and opens nothing.
+   */
+  readonly countAuthorization?: string;
 }
 
 /**

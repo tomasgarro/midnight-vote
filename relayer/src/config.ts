@@ -6,6 +6,11 @@
  * here is public infrastructure detail.
  */
 
+import { isCitizenCircuit } from './v2-types.js';
+
+/** The longest delay an operator may configure before a submission. */
+const MAX_SUBMIT_DELAY_MS = 60_000;
+
 export interface RelayerConfig {
   seedHex: string;
   networkId: string;
@@ -24,6 +29,11 @@ export interface RelayerConfig {
   v2AllowedNetworks: string[];
   v2AllowedContracts: string[];
   v2AllowedCircuits: string[];
+  /**
+   * Upper bound of the random wait before an accepted action is submitted.
+   * Zero submits at once.
+   */
+  v2SubmitDelayMaxMs: number;
   /** Production uses PostgreSQL; file path is for local/test adapter only. */
   v2DatabaseUrl: string;
   v2JobStorePath: string;
@@ -69,8 +79,26 @@ export function loadConfig(): RelayerConfig {
   }
 
   const v2AllowedCircuits = list('RELAYER_V2_ALLOWED_CIRCUITS', 'castVote');
-  if (v2AllowedCircuits.length !== 1 || v2AllowedCircuits[0] !== 'castVote') {
-    throw new Error('The public v2 relayer may allow only the castVote circuit.');
+  if (
+    v2AllowedCircuits.length === 0 ||
+    new Set(v2AllowedCircuits).size !== v2AllowedCircuits.length ||
+    !v2AllowedCircuits.every(isCitizenCircuit)
+  ) {
+    throw new Error(
+      'The public v2 relayer may allow only the citizen circuits castVote and revealVote.',
+    );
+  }
+
+  const submitDelay = optional('RELAYER_V2_SUBMIT_DELAY_MAX_MS', '0');
+  const v2SubmitDelayMaxMs = Number(submitDelay);
+  if (
+    !/^\d+$/u.test(submitDelay) ||
+    !Number.isSafeInteger(v2SubmitDelayMaxMs) ||
+    v2SubmitDelayMaxMs > MAX_SUBMIT_DELAY_MS
+  ) {
+    throw new Error(
+      `RELAYER_V2_SUBMIT_DELAY_MAX_MS must be a whole number from 0 to ${MAX_SUBMIT_DELAY_MS}.`,
+    );
   }
 
   return {
@@ -97,6 +125,7 @@ export function loadConfig(): RelayerConfig {
     v2AllowedNetworks: list('RELAYER_V2_ALLOWED_NETWORKS', 'preview'),
     v2AllowedContracts: list('RELAYER_V2_ALLOWED_CONTRACTS', ''),
     v2AllowedCircuits,
+    v2SubmitDelayMaxMs,
     v2DatabaseUrl: optional('RELAYER_V2_DATABASE_URL', ''),
     v2JobStorePath: optional('RELAYER_V2_JOB_STORE_PATH', '.state/v2-actions.json'),
     v2ExplorerBaseUrl: optional('RELAYER_EXPLORER_BASE_URL', ''),

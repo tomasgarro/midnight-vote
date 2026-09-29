@@ -242,9 +242,9 @@ describe('counting a sealed answer', () => {
     expect(markers.get(SWISS)).toEqual(marker);
   });
 
-  it('waits for the pass instead of giving up on the answer', async () => {
+  it('counts after the pass has expired, without asking for a new one', async () => {
     const markers = browserAnswerMarkerStore('s', memoryStorage());
-    const revealVote = vi.fn();
+    const revealVote = vi.fn(async () => ({}) as never);
 
     const outcome = await countSealedAnswer({
       referendumId: SWISS,
@@ -253,8 +253,26 @@ describe('counting a sealed answer', () => {
       markers,
     });
 
+    expect(outcome).toEqual({ state: 'counted' });
+    expect(revealVote).toHaveBeenCalledExactlyOnceWith({ referendumId: SWISS });
+    expect(markers.get(SWISS)).toEqual({ state: 'counted' });
+  });
+
+  it('asks for the pass only when nothing on the device can sponsor the count', async () => {
+    const markers = browserAnswerMarkerStore('s', memoryStorage());
+
+    const outcome = await countSealedAnswer({
+      referendumId: SWISS,
+      actions: {
+        revealVote: async () => {
+          throw new CivicCredentialError('CREDENTIAL_NOT_FOUND', 'nothing can sponsor the count');
+        },
+      },
+      credential: { getActionAuthorization: async () => null },
+      markers,
+    });
+
     expect(outcome).toEqual({ state: 'waiting', reason: 'pass-missing' });
-    expect(revealVote).not.toHaveBeenCalled();
     expect(markers.get(SWISS)).toBeNull();
   });
 });

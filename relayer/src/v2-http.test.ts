@@ -199,3 +199,62 @@ describe('v2 HTTP routes', () => {
     });
   });
 });
+
+describe('v2 HTTP circuit boundary', () => {
+  function countingService() {
+    return new V2ActionService({
+      store: new InMemoryV2ActionStore(),
+      executor: {
+        balanceAndFinalize: vi.fn(async (tx) => `finalized-${tx}`),
+        submit: vi.fn(async () => 'tx-count'),
+      },
+      receiptResolver: { resolve: vi.fn(async () => null) },
+      // Deliberately wider than the public boundary, to show that the HTTP
+      // layer refuses an organizer circuit even if the allowlist were wrong.
+      allowedCircuits: ['castVote', 'revealVote', 'closeVote'],
+      allowedNetworks: ['preview'],
+      allowedContracts: ['contract-1'],
+      capabilitySecret: secret,
+      confirmationRetryMs: 60_000,
+    });
+  }
+
+  function post(baseUrl: string, request: typeof body, idempotencyKey: string) {
+    return fetch(`${baseUrl}/v2/actions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': idempotencyKey,
+        'x-action-capability': capabilityFor(request, idempotencyKey),
+      },
+      body: JSON.stringify(request),
+    });
+  }
+
+  it('carries the count of a sealed answer', async () => {
+    await withServer({ service: countingService(), capabilitySecret: secret }, async (baseUrl) => {
+      const count = { ...body, actionId: 'action-count', circuit: 'revealVote' };
+      const accepted = await post(baseUrl, count, 'request-count');
+      expect(accepted.status).toBe(202);
+      expect(await accepted.json()).toMatchObject({ actionId: 'action-count', status: 'pending' });
+    });
+  });
+
+  it.each([['closeVote'], ['finalizeVote'], ['addCredential'], ['freeze']])(
+    'refuses %s before it reaches the service',
+    async (circuit) => {
+      const service = countingService();
+      const accept = vi.spyOn(service, 'accept');
+      await withServer({ service, capabilitySecret: secret }, async (baseUrl) => {
+        const refused = await post(
+          baseUrl,
+          { ...body, actionId: `action-${circuit}`, circuit },
+          `request-${circuit}`,
+        );
+        expect(refused.status).toBe(403);
+        expect(await refused.json()).toEqual({ error: 'not_allowlisted' });
+      });
+      expect(accept).not.toHaveBeenCalled();
+    },
+  );
+});

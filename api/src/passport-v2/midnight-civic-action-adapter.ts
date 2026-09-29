@@ -242,6 +242,7 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
       voteSalt: new Uint8Array(voteSalt),
       ballotCommitment: deriveBallotCommitment(entry.config.eventId, request.choice, voteSalt),
       status: 'sealing',
+      countAuthorization: request.authorization.handle,
     };
     // Written before the cast leaves the device. If the response is lost the
     // opening survives, and the chain later says whether the cast landed. A
@@ -318,12 +319,14 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
         'This build keeps no ballot openings, so it cannot count an answer',
       );
     }
-    const authorization = await this.credential.getActionAuthorization();
-    if (!authorization || authorization.handle !== request.authorization.handle) {
-      throw new CivicCredentialError(
-        'CREDENTIAL_NOT_FOUND',
-        'The civic credential authorization is missing or stale',
-      );
+    if (request.authorization) {
+      const authorization = await this.credential.getActionAuthorization();
+      if (!authorization || authorization.handle !== request.authorization.handle) {
+        throw new CivicCredentialError(
+          'CREDENTIAL_NOT_FOUND',
+          'The civic credential authorization is missing or stale',
+        );
+      }
     }
 
     const openings = ownOpenings(await vault.list(request.referendumId), entry);
@@ -374,13 +377,24 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
       );
     }
 
+    // The relay sponsors the fee against an authorization. A pass that is
+    // still valid supplies it; otherwise the one kept with the sealed answer
+    // does. A wallet pays for itself and needs neither.
+    const sponsorship = request.authorization?.handle ?? opening.countAuthorization;
+    if (this.actionExecutionContext && !sponsorship) {
+      throw new CivicCredentialError(
+        'CREDENTIAL_NOT_FOUND',
+        'Nothing on this device can sponsor the count; verify the pass again',
+      );
+    }
+
     const executor = this.executorFactory(this.providers, entry.config);
     await executor.join(entry.contractAddress, { role: 'voter', revealPath: ballot.revealPath });
     const count = () => executor.revealVote(opening.choice, new Uint8Array(opening.voteSalt));
     const receipt = this.actionExecutionContext
       ? await this.actionExecutionContext.run(
           {
-            credentialAuthorization: request.authorization.handle,
+            credentialAuthorization: sponsorship as string,
             contractAddress: entry.contractAddress,
             circuit: 'revealVote',
             action: 'vote',

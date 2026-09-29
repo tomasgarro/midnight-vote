@@ -4,6 +4,7 @@ import { loadConfig } from './config.js';
 const controlledVariables = [
   'RELAYER_SEED',
   'RELAYER_V2_ALLOWED_CIRCUITS',
+  'RELAYER_V2_SUBMIT_DELAY_MAX_MS',
   'RELAYER_LEGACY_API_ENABLED',
 ] as const;
 const originalValues = Object.fromEntries(
@@ -35,8 +36,36 @@ describe('relayer configuration boundaries', () => {
     expect(() => loadConfig()).toThrow('RELAYER_LEGACY_API_ENABLED must be either');
   });
 
-  it('fails closed when an operator circuit is configured on the public v2 relay', () => {
-    process.env.RELAYER_V2_ALLOWED_CIRCUITS = 'castVote,closeVote';
-    expect(() => loadConfig()).toThrow('public v2 relayer may allow only the castVote circuit');
+  it('carries sealing by default, and the count when it is allowlisted', () => {
+    expect(loadConfig().v2AllowedCircuits).toEqual(['castVote']);
+    process.env.RELAYER_V2_ALLOWED_CIRCUITS = 'castVote, revealVote';
+    expect(loadConfig().v2AllowedCircuits).toEqual(['castVote', 'revealVote']);
   });
+
+  it.each([
+    ['castVote,closeVote'],
+    ['castVote,revealVote,finalizeVote'],
+    ['addCredential'],
+    ['castVote,castVote'],
+    [','],
+  ])('fails closed when the public v2 relay is configured with "%s"', (circuits) => {
+    process.env.RELAYER_V2_ALLOWED_CIRCUITS = circuits;
+    expect(() => loadConfig()).toThrow(
+      'public v2 relayer may allow only the citizen circuits castVote and revealVote',
+    );
+  });
+
+  it('submits at once by default and accepts a bounded random wait', () => {
+    expect(loadConfig().v2SubmitDelayMaxMs).toBe(0);
+    process.env.RELAYER_V2_SUBMIT_DELAY_MAX_MS = '20000';
+    expect(loadConfig().v2SubmitDelayMaxMs).toBe(20_000);
+  });
+
+  it.each([['-1'], ['1.5'], ['60001'], ['soon'], ['1e3']])(
+    'rejects a submit delay of "%s"',
+    (value) => {
+      process.env.RELAYER_V2_SUBMIT_DELAY_MAX_MS = value;
+      expect(() => loadConfig()).toThrow('RELAYER_V2_SUBMIT_DELAY_MAX_MS must be a whole number');
+    },
+  );
 });

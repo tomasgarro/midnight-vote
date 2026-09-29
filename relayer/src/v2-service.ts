@@ -54,6 +54,17 @@ export interface V2ActionServiceOptions {
   readonly now?: () => string;
   readonly idFactory?: () => string;
   readonly confirmationRetryMs?: number;
+  /**
+   * Upper bound of a random wait before an accepted action reaches the wallet.
+   * The relay sees when a request arrives, and the chain shows when its
+   * transaction lands. Submitting at once lets anyone who sees both match a
+   * network address to a transaction by time alone. The wait weakens that
+   * match when several people answer in the same minute. It does nothing for
+   * a lone request. Zero, the default, submits at once.
+   */
+  readonly submitDelayMaxMs?: number;
+  /** A number in [0, 1). Replaced in tests. */
+  readonly random?: () => number;
   /** Decode the unbound transaction before it is accepted into the journal. */
   readonly validateTransaction?: (tx: string) => void;
   /** Shared secret used only to verify short-lived trusted action capabilities. */
@@ -75,14 +86,23 @@ export class V2ActionService {
   private readonly now: () => string;
   private readonly idFactory: () => string;
   private readonly confirmationRetryMs: number;
+  private readonly submitDelayMaxMs: number;
+  private readonly random: () => number;
   private readonly transient = new Map<string, { unbound: string; finalized?: string }>();
   private readonly running = new Map<string, Promise<void>>();
+  /** Actions that are waiting for their turn at the wallet. */
+  private readonly delayed = new Set<string>();
   private walletTail: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly options: V2ActionServiceOptions) {
     this.now = options.now ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? randomUUID;
     this.confirmationRetryMs = options.confirmationRetryMs ?? 2_000;
+    this.submitDelayMaxMs = options.submitDelayMaxMs ?? 0;
+    if (!Number.isSafeInteger(this.submitDelayMaxMs) || this.submitDelayMaxMs < 0) {
+      throw new TypeError('submitDelayMaxMs must be a non-negative whole number');
+    }
+    this.random = options.random ?? Math.random;
   }
 
   /** Reconciles persisted jobs after a process restart without resubmitting. */
@@ -200,7 +220,11 @@ export class V2ActionService {
     if (result.created) this.transient.set(existing.id, { unbound: request.tx });
 
     if (existing.status === 'authorized' && !this.running.has(existing.id)) {
-      this.run(existing.id);
+      // Only a new action waits. A retry of one already accepted must not
+      // start a second wait, or a client could keep its own action pending.
+      const delayMs = result.created ? this.nextSubmitDelay() : 0;
+      if (delayMs > 0) this.scheduleRun(existing.id, delayMs);
+      else if (!this.delayed.has(existing.id)) this.run(existing.id);
     } else if (
       (existing.status === 'submitted' || existing.status === 'indexer_pending') &&
       existing.transactionId
@@ -364,10 +388,19 @@ export class V2ActionService {
   }
 
   private scheduleRun(id: string, delayMs: number): void {
+    this.delayed.add(id);
     const timer = setTimeout(() => {
+      this.delayed.delete(id);
       if (!this.running.has(id)) this.run(id);
     }, delayMs);
     timer.unref?.();
+  }
+
+  private nextSubmitDelay(): number {
+    if (this.submitDelayMaxMs === 0) return 0;
+    const sample = this.random();
+    const bounded = Number.isFinite(sample) ? Math.min(Math.max(sample, 0), 1) : 0;
+    return Math.min(Math.floor(bounded * (this.submitDelayMaxMs + 1)), this.submitDelayMaxMs);
   }
 
   private async enqueueWallet<T>(operation: () => Promise<T>): Promise<T> {

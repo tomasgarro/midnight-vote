@@ -168,8 +168,8 @@ export interface CountSealedAnswerInput {
 
 /**
  * Counts one sealed answer and records the outcome. The request carries the
- * referendum and the pass authorization; the choice and the salt stay in the
- * vault, where the action port reads them.
+ * referendum and, while the pass is valid, its authorization; the choice and
+ * the salt stay in the vault, where the action port reads them.
  */
 export async function countSealedAnswer(input: CountSealedAnswerInput): Promise<CountOutcome> {
   const settle = (marker: AnswerMarker): AnswerMarker => {
@@ -183,10 +183,15 @@ export async function countSealedAnswer(input: CountSealedAnswerInput): Promise<
   } catch {
     return { state: 'waiting', reason: 'try-again' };
   }
-  if (!authorization) return { state: 'waiting', reason: 'pass-missing' };
 
   try {
-    await input.actions.revealVote({ referendumId: input.referendumId, authorization });
+    // A pass lasts days and a count can come weeks later. Without a current
+    // pass, the action port sponsors the count with the authorization kept
+    // beside the sealed answer, and asks for a new pass only if there is none.
+    await input.actions.revealVote({
+      referendumId: input.referendumId,
+      ...(authorization ? { authorization } : {}),
+    });
     return settle({ state: 'counted' });
   } catch (error) {
     if (!isCivicCredentialError(error)) return { state: 'waiting', reason: 'try-again' };
