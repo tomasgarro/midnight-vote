@@ -34,8 +34,48 @@ function walletApi(overrides: Partial<ConnectedAPI> = {}): ConnectedAPI {
 }
 
 describe('referendum v2 provider runtime composition', () => {
-  it('exposes exactly the direct and sponsored execution modes', () => {
-    expect(REFERENDUM_V2_EXECUTION_MODES).toEqual(['direct-wallet', 'sponsored-wallet']);
+  it('exposes exactly the two wallet modes and the disclosed hosted-proving mode', () => {
+    expect(REFERENDUM_V2_EXECUTION_MODES).toEqual([
+      'direct-wallet',
+      'sponsored-wallet',
+      'sponsored-hosted-proving',
+    ]);
+  });
+
+  it('composes hosted proving for a browser without a wallet', async () => {
+    vi.stubGlobal('window', {
+      location: { origin: 'https://app.test' },
+      navigator: { userAgent: 'vitest' },
+    });
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input).endsWith('/keys')) {
+        return response(200, { coinPublicKey: 'coin-key', encryptionPublicKey: 'encryption-key' });
+      }
+      throw new Error(`unexpected URL ${String(input)}`);
+    }) as typeof fetch;
+
+    const runtime = await createReferendumV2ProviderRuntime({
+      mode: 'sponsored-hosted-proving',
+      options: {
+        relayUrl: 'https://relay.test',
+        networkId: 'preview',
+        indexerUri: 'https://indexer.test/api/v4/graphql',
+        indexerWsUri: 'wss://indexer.test/api/v4/graphql/ws',
+        capabilityIssuer: { issue: vi.fn(async () => 'capability') },
+        zkConfigBaseUrl: 'https://app.test/managed/referendum-v2',
+        fetchImpl,
+        hostedProving: { proofServerUri: 'https://proof.test', disclosureAccepted: true },
+      },
+    });
+
+    expect(runtime.mode).toBe('sponsored-hosted-proving');
+    if (runtime.mode !== 'sponsored-hosted-proving') {
+      throw new Error('Expected the hosted-proving runtime');
+    }
+    expect(runtime.provingParty).toBe('hosted-server');
+    expect(runtime.actionContext).toBeDefined();
+    // Composition itself contacts the relay for its keys and nothing else.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('dispatches direct-wallet to Lace-backed providers', async () => {

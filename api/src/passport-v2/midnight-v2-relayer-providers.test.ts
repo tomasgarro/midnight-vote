@@ -79,6 +79,83 @@ describe('v2 walletless providers', () => {
     ).rejects.toThrow(/require a connected Lace API for proving/iu);
   });
 
+  it('allows hosted proving in a browser only with its disclosure flag', async () => {
+    vi.stubGlobal('window', {
+      location: { origin: 'https://app.test' },
+      navigator: { userAgent: 'vitest' },
+    });
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      if (String(input).endsWith('/keys')) {
+        return response(200, { coinPublicKey: 'coin-key', encryptionPublicKey: 'encryption-key' });
+      }
+      throw new Error(`unexpected URL ${String(input)}`);
+    }) as typeof fetch;
+    const base = {
+      relayUrl: 'https://relay.test',
+      networkId: 'preview' as const,
+      indexerUri: 'https://indexer.test/api/v4/graphql',
+      indexerWsUri: 'wss://indexer.test/api/v4/graphql/ws',
+      capabilityIssuer: { issue: vi.fn(async () => 'capability') },
+      zkConfigBaseUrl: 'https://app.test/managed/referendum-v2',
+      fetchImpl,
+    };
+
+    const runtime = await createReferendumV2WalletlessProviders({
+      ...base,
+      hostedProving: { proofServerUri: 'https://proof.test', disclosureAccepted: true },
+    });
+    expect(runtime.provingParty).toBe('hosted-server');
+    expect(runtime.providers.proofProvider).toBeDefined();
+
+    // A config file or a cast cannot switch the mode on without the flag.
+    await expect(
+      createReferendumV2WalletlessProviders({
+        ...base,
+        hostedProving: { proofServerUri: 'https://proof.test' } as never,
+      }),
+    ).rejects.toThrow(/accepted its disclosure/iu);
+    await expect(
+      createReferendumV2WalletlessProviders({
+        ...base,
+        hostedProving: {
+          proofServerUri: 'https://proof.test',
+          disclosureAccepted: 'yes',
+        } as never,
+      }),
+    ).rejects.toThrow(/accepted its disclosure/iu);
+
+    // The witness never travels over plain HTTP to a remote host.
+    await expect(
+      createReferendumV2WalletlessProviders({
+        ...base,
+        hostedProving: { proofServerUri: 'http://proof.test', disclosureAccepted: true },
+      }),
+    ).rejects.toThrow(/must use HTTPS/iu);
+  });
+
+  it('never combines hosted proving with a wallet or a second proof server', async () => {
+    vi.stubGlobal('window', undefined);
+    const base = {
+      relayUrl: 'https://relay.test',
+      networkId: 'preview' as const,
+      indexerUri: 'https://indexer.test/api/v4/graphql',
+      indexerWsUri: 'wss://indexer.test/api/v4/graphql/ws',
+      capabilityIssuer: { issue: vi.fn(async () => 'capability') },
+      zkConfigBaseUrl: 'https://app.test/managed/referendum-v2',
+      fetchImpl: vi.fn() as typeof fetch,
+      hostedProving: { proofServerUri: 'https://proof.test', disclosureAccepted: true as const },
+    };
+    const api = { getProvingProvider: vi.fn(async () => ({}) as never) } as unknown as ConnectedAPI;
+
+    await expect(createReferendumV2WalletlessProviders({ ...base, api })).rejects.toThrow(
+      /browser proving must stay in the wallet/iu,
+    );
+    expect(api.getProvingProvider).not.toHaveBeenCalled();
+    await expect(
+      createReferendumV2WalletlessProviders({ ...base, proofServerUri: 'https://other.test' }),
+    ).rejects.toThrow(/mutually exclusive/iu);
+  });
+
   it('uses the relay request digest shared by the capability and atomic action', async () => {
     const issued: Parameters<WalletlessActionCapabilityIssuer['issue']>[0][] = [];
     let posted: Record<string, unknown> | null = null;

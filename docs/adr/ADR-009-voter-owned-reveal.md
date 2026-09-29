@@ -55,7 +55,7 @@ copy and scheduled for contract v3.
 | The choice becomes public at the count | The tally key is the disclosed choice | Inherent to commit–reveal; the copy says "not a secret ballot" |
 | A late reveal is accepted until someone finalizes | `revealVote` has no `blockTimeLt(revealClosesAtUnix)` | Strict cutoff (ZK-04) |
 | The scheme is not receipt-free | Whoever holds an opening can prove the choice | Receipts carry no transaction id; the opening is deleted after the count |
-| On a phone the proving server sees the choice and the salt | No local proof server exists on mobile | Named on the page; wallet proving on desktop (ADR-010) |
+| On a phone the proving server sees the choice and the salt | No local proof server exists on mobile | Named on the page; wallet proving on desktop ([ADR-010](ADR-010-disclosed-hosted-proving.md)) |
 
 ## Consequences
 

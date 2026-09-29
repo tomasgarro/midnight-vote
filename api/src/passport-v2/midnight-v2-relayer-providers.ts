@@ -127,12 +127,32 @@ export class InMemoryWalletlessPendingActionStore implements WalletlessPendingAc
   }
 }
 
+/**
+ * A browser with no wallet, typically a phone, has nowhere to build a proof.
+ * Hosted proving sends the witness to a proving server run by the operator.
+ * That server sees the answer, its salt and the credential opening while it
+ * works, so the mode can only be selected together with the flag below.
+ */
+export interface HostedProvingOptions {
+  readonly proofServerUri: string;
+  /**
+   * The literal `true`, set only after the person was shown, in plain words,
+   * that the proving server sees their answer while it builds the proof.
+   */
+  readonly disclosureAccepted: true;
+}
+
+/** Who builds the proof for this runtime. Shown to the person, never inferred. */
+export type ProvingParty = 'wallet' | 'hosted-server' | 'operator';
+
 export interface ReferendumV2WalletlessProviderOptions {
   readonly relayUrl: string;
-  /** Node/operator fallback. Browser proving must come from Lace instead. */
+  /** Node/operator fallback. Browser proving comes from Lace or from `hostedProving`. */
   readonly proofServerUri?: string;
   /** Connected Lace API used for browser-side proving in sponsored mode. */
   readonly api?: ConnectedAPI;
+  /** Disclosed hosted proving for browsers without a wallet. Never combined with `api`. */
+  readonly hostedProving?: HostedProvingOptions;
   readonly networkId: 'undeployed' | 'preview';
   readonly indexerUri: string;
   readonly indexerWsUri: string;
@@ -148,6 +168,7 @@ export interface ReferendumV2WalletlessProviderOptions {
 
 export interface ReferendumV2WalletlessRuntime {
   readonly providers: ReferendumV2Providers;
+  readonly provingParty: ProvingParty;
   readonly actionContext: WalletlessActionExecutionContext;
   /** Returns the last confirmed action without exposing the capability token. */
   readonly getLastActionTrace: () => WalletlessActionTrace | null;
@@ -158,27 +179,40 @@ export interface ReferendumV2WalletlessRuntime {
  * proving to Lace, then this provider forwards only the serialized proven,
  * unbound transaction to the atomic relay. Balancing and submission never
  * become two browser-visible operations. Node operator scripts may use the
- * explicit proof-server fallback for local/hosted service execution.
+ * explicit proof-server fallback for local/hosted service execution. A browser
+ * without a wallet may use hosted proving, and only with its disclosure flag.
  */
 export async function createReferendumV2WalletlessProviders(
   options: ReferendumV2WalletlessProviderOptions,
 ): Promise<ReferendumV2WalletlessRuntime> {
   const hasBrowserWindow = typeof window !== 'undefined';
-  if (hasBrowserWindow && !options.api) {
-    throw new TypeError('Sponsored browser providers require a connected Lace API for proving');
-  }
-  if (options.api && options.proofServerUri) {
+  const hosted = options.hostedProving;
+  if (options.api && (options.proofServerUri || hosted)) {
     throw new TypeError(
       'proofServerUri cannot be combined with a Lace API; browser proving must stay in the wallet',
     );
   }
+  if (hosted) {
+    if (options.proofServerUri) {
+      throw new TypeError('hostedProving and proofServerUri are mutually exclusive');
+    }
+    // A runtime check as well as a type: a JSON config or a cast must not switch it on.
+    if ((hosted as { disclosureAccepted?: unknown }).disclosureAccepted !== true) {
+      throw new TypeError('Hosted proving requires the person to have accepted its disclosure');
+    }
+    assertLocalOrSecureUrl(hosted.proofServerUri, 'proof server');
+  }
+  if (hasBrowserWindow && !options.api && !hosted) {
+    throw new TypeError('Sponsored browser providers require a connected Lace API for proving');
+  }
   assertLocalOrSecureUrl(options.relayUrl, 'relay');
-  if (!options.api) {
+  if (!options.api && !hosted) {
     if (!options.proofServerUri) {
       throw new TypeError('proofServerUri is required for Node sponsored providers');
     }
     assertLocalOrSecureUrl(options.proofServerUri, 'proof server');
   }
+  const provingParty: ProvingParty = options.api ? 'wallet' : hosted ? 'hosted-server' : 'operator';
   setNetworkId(options.networkId);
 
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -237,7 +271,7 @@ export async function createReferendumV2WalletlessProviders(
         await options.api.getProvingProvider(zkConfigProvider.asKeyMaterialProvider()),
       )
     : httpClientProofProvider<ReferendumV2CircuitKeys>(
-        options.proofServerUri as string,
+        (hosted?.proofServerUri ?? options.proofServerUri) as string,
         zkConfigProvider,
       );
   const pendingStore = options.pendingStore ?? new InMemoryWalletlessPendingActionStore();
@@ -357,6 +391,7 @@ export async function createReferendumV2WalletlessProviders(
       walletProvider,
       midnightProvider,
     },
+    provingParty,
     actionContext,
     getLastActionTrace: () => (lastActionTrace ? { ...lastActionTrace } : null),
   };
