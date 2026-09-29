@@ -60,7 +60,8 @@ const COPY = {
     lock: 'Bloquear y conservar datos',
     lockHint: 'Cierra la sesión y conserva los datos locales.',
     remove: 'Eliminar datos locales',
-    removeHint: 'Borra el pase y los comprobantes de este navegador.',
+    removeHint:
+      'Borra el pase, los comprobantes y las respuestas selladas de este navegador. Una respuesta sellada que todavía no se contó no se contará nunca.',
     removeConfirm: 'Confirmar eliminación local',
     cancel: 'Cancelar',
     soon: 'Pronto',
@@ -156,7 +157,8 @@ const COPY = {
     lock: 'Lock and keep data',
     lockHint: 'End the session while keeping local data.',
     remove: 'Remove local data',
-    removeHint: 'Delete the pass and receipts from this browser.',
+    removeHint:
+      'Delete the pass, receipts and sealed answers from this browser. A sealed answer that was not counted yet will never be counted.',
     removeConfirm: 'Confirm local deletion',
     cancel: 'Cancel',
     soon: 'Soon',
@@ -250,7 +252,8 @@ const COPY = {
     lock: 'Verrouiller et conserver les données',
     lockHint: 'Terminer la session en conservant les données locales.',
     remove: 'Supprimer les données locales',
-    removeHint: 'Effacer le justificatif et les reçus de ce navigateur.',
+    removeHint:
+      'Effacer le justificatif, les reçus et les réponses scellées de ce navigateur. Une réponse scellée pas encore comptée ne le sera jamais.',
     removeConfirm: 'Confirmer la suppression locale',
     cancel: 'Annuler',
     soon: 'Bientôt',

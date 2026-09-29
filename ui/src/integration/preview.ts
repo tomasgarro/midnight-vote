@@ -25,6 +25,11 @@ export interface PreviewReadinessInput {
   v2RuntimeConfigured?: boolean;
   /** True only after a provider-backed credential has been issued and verified. */
   credentialVerified?: boolean;
+  /**
+   * Hosted proving for a browser without a wallet (ADR-010). `needs-consent`
+   * means the person has not yet accepted what the proving server can see.
+   */
+  hostedProving?: 'not-offered' | 'needs-consent' | 'preparing' | 'failed' | 'ready';
 }
 
 export interface PublicReadinessInput {
@@ -139,6 +144,31 @@ export function getPreviewReadiness(input: PreviewReadinessInput): PreviewReadin
       label: `${networkLabel} requiere credencial`,
       message:
         'La acción v2 requiere una credencial Passport verificada. No se usará una fixture ni el flujo de voto legado como alternativa.',
+    };
+  }
+
+  if (!input.walletConnected && input.hostedProving === 'needs-consent') {
+    return {
+      state: 'blocked',
+      label: `${networkLabel} necesita tu acuerdo`,
+      message:
+        'Este dispositivo no tiene wallet. Leé el aviso sobre el servidor de pruebas y aceptalo para continuar, o conectá Lace en una computadora.',
+    };
+  }
+
+  if (!input.walletConnected && input.hostedProving === 'failed') {
+    return {
+      state: 'blocked',
+      label: `${networkLabel} no disponible`,
+      message: 'El servidor de pruebas no responde en este momento. Probá de nuevo más tarde.',
+    };
+  }
+
+  if (!input.walletConnected && input.hostedProving === 'preparing') {
+    return {
+      state: 'loading',
+      label: `Preparando ${networkLabel}`,
+      message: 'Conectando con el servidor de pruebas.',
     };
   }
 

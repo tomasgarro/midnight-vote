@@ -1,11 +1,12 @@
 import { ArrowRight, CheckCircle, X } from '@phosphor-icons/react';
 import type { CivicPassportSession, CredentialSummary } from 'midnight-referendum-api';
 import {
+  browserBallotOpeningVault,
   browserCivicCredentialVault,
   MidnightCivicActionAdapter,
   RarimoCivicCredentialAdapter,
 } from 'midnight-referendum-api';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PassportJourney } from '@/components/passport-v2/PassportJourney';
 import type { PreviewPassportJourneyPorts } from '@/components/passport-v2/PreviewPassportJourney';
 import { useWallet } from '@/hooks/use-wallet';
@@ -33,6 +34,14 @@ import {
   loadPassportReceipts,
   savePassportReceipt,
 } from '@/integration/receipt-store';
+import {
+  browserAnswerMarkerStore,
+  type CountOutcome,
+  countSealedAnswer,
+  listSealedAnswers,
+  type OnChainAnswerStatus,
+  type SealedAnswer,
+} from '@/integration/sealed-answers';
 import {
   applyTheme,
   detectThemePreference,
@@ -95,6 +104,18 @@ function toDisplayCredential(summary: CredentialSummary): DemoCredentialSummary 
     validUntil: summary.validUntil,
   };
 }
+
+/**
+ * Shown when the browser can keep nothing on disk, for example in a private
+ * window. Sealing there would produce an answer that can never be counted.
+ */
+const SEAL_STORAGE_BLOCKED: Record<CicoLocale, string> = {
+  es: 'Esta ventana no puede guardar tu respuesta sellada, así que nunca se podría contar. Abrí el sitio en una ventana normal, no privada.',
+  en: 'This window cannot keep your sealed answer, so it could never be counted. Open the site in a normal window, not a private one.',
+  fr: 'Cette fenêtre ne peut pas conserver votre réponse scellée ; elle ne pourrait donc jamais être comptée. Ouvrez le site dans une fenêtre normale, non privée.',
+};
+
+type CountNotice = Extract<CountOutcome, { state: 'waiting' }>['reason'];
 
 /** The tab title follows the chosen language like everything else. */
 const DOCUMENT_TITLE: Record<CicoLocale, string> = {
@@ -194,6 +215,8 @@ function CivicApp() {
     setExecutionMode,
     sponsoredAvailable,
     sponsoredError,
+    hostedProving,
+    provingParty,
     isReady,
     error: providersError,
   } = useMidnightProviders();
@@ -240,6 +263,19 @@ function CivicApp() {
       setActivePollId(polls[0].id);
     }
   }, [activePollId, polls]);
+  // One scope for everything the device keeps about this deployment, so a
+  // pass, a sealed answer and its marker never cross into another one.
+  const deviceScope = passportV2Runtime.config
+    ? `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`
+    : null;
+  const ballotVault = useMemo(
+    () => (deviceScope ? browserBallotOpeningVault(deviceScope) : null),
+    [deviceScope],
+  );
+  const answerMarkers = useMemo(
+    () => (deviceScope ? browserAnswerMarkerStore(deviceScope) : null),
+    [deviceScope],
+  );
   const passportJourneyPorts = useMemo<PreviewPassportJourneyPorts>(() => {
     const base = { passport: passportSessionPort };
     if (passportV2Runtime.error) {
@@ -277,6 +313,7 @@ function CivicApp() {
           ...(referendumV2ActionContext
             ? { actionExecutionContext: referendumV2ActionContext }
             : {}),
+          ...(ballotVault ? { ballotOpenings: ballotVault } : {}),
         })
       : undefined;
     return {
@@ -286,8 +323,99 @@ function CivicApp() {
       referenda: passportV2Runtime.config.referenda,
       runtimeCatalogConfigured: true,
     };
-  }, [passportSessionPort, passportV2Runtime, referendumV2ActionContext, referendumV2Providers]);
+  }, [
+    ballotVault,
+    passportSessionPort,
+    passportV2Runtime,
+    referendumV2ActionContext,
+    referendumV2Providers,
+  ]);
   const runtimeContractAddress = passportV2Runtime.config?.referenda[0]?.contractAddress ?? null;
+
+  const [sealedAnswers, setSealedAnswers] = useState<SealedAnswer[]>([]);
+  const [countingId, setCountingId] = useState<string | null>(null);
+  const [countNotices, setCountNotices] = useState<Readonly<Record<string, CountNotice>>>({});
+  const autoCounted = useRef(new Set<string>());
+  const refreshSealedAnswers = useCallback(async () => {
+    const referenda = passportV2Runtime.config?.referenda;
+    if (!ballotVault || !answerMarkers || !referenda) {
+      setSealedAnswers([]);
+      return;
+    }
+    // Only the action adapter can read the ballot tree. Without it, an attempt
+    // whose outcome is unknown stays out of the list.
+    const actions = passportJourneyPorts.actions as
+      | { getSealedAnswerStatus?: (referendumId: string) => Promise<OnChainAnswerStatus> }
+      | undefined;
+    const readChain = actions?.getSealedAnswerStatus?.bind(actions);
+    try {
+      setSealedAnswers(
+        await listSealedAnswers({
+          referendumIds: referenda.map((entry) => entry.referendumId),
+          vault: ballotVault,
+          markers: answerMarkers,
+          ...(readChain ? { resolveOnChain: readChain } : {}),
+        }),
+      );
+    } catch {
+      // Storage could not be read. Showing nothing is safer than showing a guess.
+      setSealedAnswers([]);
+    }
+  }, [answerMarkers, ballotVault, passportJourneyPorts.actions, passportV2Runtime.config]);
+  useEffect(() => {
+    void refreshSealedAnswers();
+  }, [refreshSealedAnswers]);
+  const countAnswer = useCallback(
+    async (referendumId: string) => {
+      const actions = passportJourneyPorts.actions;
+      const credentialPort = passportJourneyPorts.credential;
+      if (!actions || !credentialPort || !answerMarkers) {
+        setCountNotices((previous) => ({ ...previous, [referendumId]: 'try-again' }));
+        return;
+      }
+      setCountingId(referendumId);
+      try {
+        const outcome = await countSealedAnswer({
+          referendumId,
+          actions,
+          credential: credentialPort,
+          markers: answerMarkers,
+        });
+        setCountNotices((previous) => {
+          const { [referendumId]: _settled, ...rest } = previous;
+          return outcome.state === 'waiting' ? { ...rest, [referendumId]: outcome.reason } : rest;
+        });
+      } finally {
+        setCountingId(null);
+        await refreshSealedAnswers();
+      }
+    },
+    [
+      answerMarkers,
+      passportJourneyPorts.actions,
+      passportJourneyPorts.credential,
+      refreshSealedAnswers,
+    ],
+  );
+  useEffect(() => {
+    // A wallet asks for approval, so the person starts that count. With hosted
+    // proving the returning device counts on its own, once per visit.
+    if (provingParty !== 'hosted-server' || countingId) return;
+    const due = sealedAnswers.find((answer) => {
+      if (answer.state !== 'sealed' || autoCounted.current.has(answer.referendumId)) return false;
+      const poll = polls.find((item) => item.id === answer.referendumId);
+      if (!poll) return false;
+      try {
+        const availability = getPollAvailability(poll);
+        return !availability.isOpen && availability.reason !== 'not-open';
+      } catch {
+        return false;
+      }
+    });
+    if (!due) return;
+    autoCounted.current.add(due.referendumId);
+    void countAnswer(due.referendumId);
+  }, [countAnswer, countingId, polls, provingParty, sealedAnswers]);
   useEffect(() => {
     let active = true;
     const credentialPort = passportJourneyPorts.credential;
@@ -309,7 +437,16 @@ function CivicApp() {
     walletConnected: walletStatus === 'connected',
     providersReady: isReady && (!passportV2Runtime.config || referendumV2Providers !== null),
     providersError: providersError ?? passportV2Runtime.error,
-    relayerMode: executionMode === 'sponsored-wallet',
+    relayerMode: executionMode !== 'direct-wallet',
+    hostedProving: !hostedProving.offered
+      ? 'not-offered'
+      : !hostedProving.accepted
+        ? 'needs-consent'
+        : hostedProving.error
+          ? 'failed'
+          : hostedProving.preparing
+            ? 'preparing'
+            : 'ready',
     v2RuntimeConfigured: CHAIN_RUNTIME_ENABLED,
     credentialVerified: credential?.kind === 'verified-credential',
   });
@@ -444,28 +581,29 @@ function CivicApp() {
               'La credencial Passport no tiene autorización vigente para una acción cívica.',
             );
           }
+          if (!ballotVault || (await ballotVault.durability()) === 'memory') {
+            throw new Error(SEAL_STORAGE_BLOCKED[locale]);
+          }
+          // Weeks can pass between sealing and the count. Ask the browser not
+          // to evict the opening in the meantime; a refusal is not an error.
+          void ballotVault.requestPersistence();
           const confirmed = await actionPort.castVote({
             referendumId: route.referendumId,
             choice,
             authorization,
           });
+          // The sealed answer is tracked by the vault, not by a stored receipt.
+          // This one lives for the receipt screen only and names no transaction.
           const nextReceipt: VoteReceipt = {
-            id: confirmed.transactionId,
+            id: `sealed:${route.referendumId}`,
             pollId: activePollId,
             createdAt: new Date().toISOString(),
             status: 'confirmed',
             network: confirmed.network,
-            explorerUrl: confirmed.explorerUrl,
+            sealed: { provingParty: provingParty ?? 'wallet' },
           };
-          if (passportSession) {
-            const receiptProfileKey = await deriveReceiptProfileKey(passportSession);
-            await savePassportReceipt(receiptProfileKey, nextReceipt);
-          }
-          setReceipts((previous) => [
-            nextReceipt,
-            ...previous.filter((item) => item.id !== nextReceipt.id),
-          ]);
           setReceipt(nextReceipt);
+          await refreshSealedAnswers();
           setFlowStage('receipt');
           return;
         }
@@ -519,6 +657,17 @@ function CivicApp() {
     setGuideMessages([]);
     const credentialPort = passportJourneyPorts.credential;
     if (credentialPort) await credentialPort.clearCredential();
+    // Removing local data removes sealed answers too. Any that were not yet
+    // counted can never be counted; the settings screen says so before this runs.
+    if (ballotVault) {
+      for (const entry of passportV2Runtime.config?.referenda ?? []) {
+        await ballotVault.clear(entry.referendumId);
+      }
+    }
+    answerMarkers?.clear();
+    autoCounted.current.clear();
+    setSealedAnswers([]);
+    setCountNotices({});
     if (receiptProfileKey) await clearPassportReceipts(receiptProfileKey);
     await passportSessionPort.disconnect();
     setCredential(null);
@@ -551,7 +700,16 @@ function CivicApp() {
         locale={locale}
       />
     ) : tab === 'activity' ? (
-      <ActivityView polls={polls} receipts={receipts} locale={locale} />
+      <ActivityView
+        polls={polls}
+        receipts={receipts}
+        sealedAnswers={sealedAnswers}
+        countingId={countingId}
+        countNotices={countNotices}
+        onCount={(referendumId) => void countAnswer(referendumId)}
+        hostedProving={hostedProving}
+        locale={locale}
+      />
     ) : tab === 'passport' ? (
       <ProfileView
         passportSession={passportSession}
@@ -702,6 +860,8 @@ function CivicApp() {
               onExecutionModeChange={setExecutionMode}
               sponsoredAvailable={sponsoredAvailable}
               sponsoredError={sponsoredError}
+              hostedProving={hostedProving}
+              provingParty={provingParty}
               previewError={previewError}
               receipt={receipt}
               dustBalance={dustBalance}

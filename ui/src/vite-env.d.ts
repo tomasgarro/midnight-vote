@@ -28,6 +28,11 @@ interface ImportMetaEnv {
   readonly VITE_CICO_REFERENDA_JSON?: string;
   /** Set to run the wallet-less sponsored-relayer path. */
   readonly VITE_RELAYER_URL?: string;
+  /**
+   * HTTPS proving server for browsers without a wallet (ADR-010). It sees the
+   * answer while it proves, so the interface asks before using it.
+   */
+  readonly VITE_HOSTED_PROOF_SERVER_URL?: string;
 }
 
 interface ImportMeta {

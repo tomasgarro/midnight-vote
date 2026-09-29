@@ -14,7 +14,11 @@ import {
   SuccessMark,
 } from '@/components/system';
 import { WalletWidget } from '@/components/wallet-widget';
+import { formatDate } from '@/integration/format';
+import { HOSTED_PROVING_COPY } from '@/integration/hosted-proving';
 import type { CicoLocale } from '@/integration/locale';
+import { SEALED_ANSWER_COPY } from '@/integration/sealed-answers';
+import type { HostedProvingState } from '@/providers/midnight-providers';
 import { CHAIN_RUNTIME_ENABLED, type FlowStage, networkLabel } from '@/views/app-runtime';
 import { CopyReceiptButton } from '@/views/CopyReceiptButton';
 import { type Choice, localizePoll, type Poll, type VoteReceipt } from '@/views/poll-model';
@@ -58,10 +62,10 @@ const COPY = {
     chooseLabel: 'Tu respuesta',
     yes: 'Sí',
     no: 'No',
-    abstain: 'Abstención',
+    abstain: 'Sin decidir',
     yesBody: 'Estoy de acuerdo con priorizar esta propuesta',
     noBody: 'No estoy de acuerdo con priorizarla así',
-    abstainBody: 'Prefiero no tomar una posición binaria',
+    abstainBody: 'Todavía no tomé una posición',
     review: 'Revisar mi voto',
     // review sheet
     reviewTitle: 'Revisá antes de confirmar',
@@ -98,6 +102,16 @@ const COPY = {
       'La prueba se crea localmente; el relay reserva DUST, envía una vez y espera confirmación.',
     processingWallet:
       'El flujo reúne prueba, balanceo DUST/NIGHT, aprobación del wallet y confirmación canónica.',
+    processingHosted:
+      'Nuestro servidor de pruebas crea la prueba; el relay paga la tarifa, envía una vez y espera la confirmación.',
+    sealedTitle: 'Tu respuesta está sellada',
+    sealedBody: (closes: string | null) =>
+      closes
+        ? `Se cuenta cuando vuelvas en este dispositivo después del ${closes}. Nadie más puede contarla por vos.`
+        : 'Se cuenta cuando vuelvas en este dispositivo después del cierre. Nadie más puede contarla por vos.',
+    sealedState: 'sellada',
+    closes: 'Cierra',
+    viewSealed: 'Ver mis respuestas',
     processingDuration: 'Suele tardar entre 30 y 90 segundos. No cierres esta pantalla.',
     processingDurationDemo: 'En demo esto es inmediato: no se envía nada a ninguna red.',
     processingNoCancel:
@@ -123,10 +137,10 @@ const COPY = {
     chooseLabel: 'Your response',
     yes: 'Yes',
     no: 'No',
-    abstain: 'Abstain',
+    abstain: 'Undecided',
     yesBody: 'I support prioritising this proposal',
     noBody: 'I do not support prioritising it this way',
-    abstainBody: 'I prefer not to take a binary position',
+    abstainBody: 'I have not taken a position yet',
     review: 'Review my vote',
     reviewTitle: 'Review before confirming',
     yourVote: 'Your vote',
@@ -161,6 +175,16 @@ const COPY = {
       'The proof is created locally; the relay reserves DUST, submits once, and waits for confirmation.',
     processingWallet:
       'The flow combines proof, DUST/NIGHT balancing, wallet approval, and canonical confirmation.',
+    processingHosted:
+      'Our proving server builds the proof; the relay pays the fee, submits once, and waits for confirmation.',
+    sealedTitle: 'Your answer is sealed',
+    sealedBody: (closes: string | null) =>
+      closes
+        ? `It is counted when you return on this device after ${closes}. Nobody else can count it for you.`
+        : 'It is counted when you return on this device after the consultation closes. Nobody else can count it for you.',
+    sealedState: 'sealed',
+    closes: 'Closes',
+    viewSealed: 'View my answers',
     processingDuration: 'This usually takes 30 to 90 seconds. Do not close this screen.',
     processingDurationDemo: 'In demo this is instant: nothing is sent to any network.',
     processingNoCancel:
@@ -185,10 +209,10 @@ const COPY = {
     chooseLabel: 'Votre réponse',
     yes: 'Oui',
     no: 'Non',
-    abstain: 'Abstention',
+    abstain: 'Ne se prononce pas',
     yesBody: 'Je soutiens la priorité donnée à cette proposition',
     noBody: 'Je ne soutiens pas cette priorité sous cette forme',
-    abstainBody: 'Je préfère ne pas prendre position de façon binaire',
+    abstainBody: "Je n'ai pas encore pris position",
     review: 'Relire mon vote',
     reviewTitle: 'Relisez avant de confirmer',
     yourVote: 'Votre vote',
@@ -223,6 +247,16 @@ const COPY = {
       'La preuve est créée localement ; le relais réserve le DUST, soumet une seule fois et attend la confirmation.',
     processingWallet:
       "Le processus combine la preuve, l'équilibrage DUST/NIGHT, l'approbation du portefeuille et la confirmation canonique.",
+    processingHosted:
+      'Notre serveur de preuve produit la preuve ; le relais paie les frais, soumet une seule fois et attend la confirmation.',
+    sealedTitle: 'Votre réponse est scellée',
+    sealedBody: (closes: string | null) =>
+      closes
+        ? `Elle sera comptée quand vous reviendrez sur cet appareil après le ${closes}. Personne d'autre ne peut la compter à votre place.`
+        : "Elle sera comptée quand vous reviendrez sur cet appareil après la clôture. Personne d'autre ne peut la compter à votre place.",
+    sealedState: 'scellée',
+    closes: 'Clôture',
+    viewSealed: 'Voir mes réponses',
     processingDuration: 'Cela prend en général 30 à 90 secondes. Ne fermez pas cet écran.',
     processingDurationDemo: "En démo, c'est instantané : rien n'est envoyé sur un réseau.",
     processingNoCancel:
@@ -267,6 +301,9 @@ export interface VoteFlowProps {
   readonly onExecutionModeChange: (mode: ExecutionMode) => void;
   readonly sponsoredAvailable: boolean;
   readonly sponsoredError?: string | null;
+  /** Hosted proving for a browser without a wallet (ADR-010). */
+  readonly hostedProving?: HostedProvingState;
+  readonly provingParty?: 'wallet' | 'hosted-server' | null;
   readonly previewError: string | null;
   readonly receipt: VoteReceipt | null;
   readonly dustBalance?: bigint | null;
@@ -287,15 +324,24 @@ export function VoteFlow({
   onExecutionModeChange,
   sponsoredAvailable,
   sponsoredError = null,
+  hostedProving,
+  provingParty = null,
   previewError,
   receipt,
   dustBalance = null,
   locale,
 }: VoteFlowProps) {
   const copy = COPY[locale];
+  const hostedCopy = HOSTED_PROVING_COPY[locale];
   const displayPoll = localizePoll(poll, locale);
   const live = CHAIN_RUNTIME_ENABLED;
-  const relayerMode = executionMode === 'sponsored-wallet';
+  const relayerMode = executionMode !== 'direct-wallet';
+  const hostedActive = executionMode === 'sponsored-hosted-proving';
+  /* Offered means: no wallet here, and this build has a proving server. The
+     person is asked before anything is sent to it. */
+  const hostedOffered = live && walletStatus !== 'connected' && Boolean(hostedProving?.offered);
+  const hostedNeedsConsent = hostedOffered && !hostedProving?.accepted;
+  const hostedWaiting = hostedOffered && !hostedNeedsConsent && !hostedActive;
   const choiceLabel = (value: Choice) =>
     value === 'YES' ? copy.yes : value === 'NO' ? copy.no : copy.abstain;
   const screenIndex = Math.max(VOTE_SCREENS.indexOf(stage === 'review' ? 'choose' : stage), 0);
@@ -323,7 +369,13 @@ export function VoteFlow({
     return (
       <Screen header={header(false)}>
         <Display>{copy.processingTitle}</Display>
-        <p className="flow__body">{relayerMode ? copy.processingRelayer : copy.processingWallet}</p>
+        <p className="flow__body">
+          {hostedActive
+            ? copy.processingHosted
+            : relayerMode
+              ? copy.processingRelayer
+              : copy.processingWallet}
+        </p>
         {/* Indeterminate: the pipeline reports no percentage, so the bar must
             not imply one. What it can honestly report is how long this
             normally takes, which is the difference between waiting and
@@ -335,6 +387,44 @@ export function VoteFlow({
           {live ? copy.processingDuration : copy.processingDurationDemo}
         </p>
         {live ? <Callout>{copy.processingNoCancel}</Callout> : null}
+      </Screen>
+    );
+  }
+
+  if (stage === 'receipt' && receipt?.sealed) {
+    /* A sealed answer is not finished: it still has to be counted, and only
+       this device can do that. So the screen says when to come back, and it
+       shows no identifier -- a transaction id here would tie this device to an
+       answer that becomes public at the count. */
+    const closes = formatDate(poll.closesAt, locale);
+    return (
+      <Screen
+        header={header(false)}
+        footer={
+          <Button block onClick={onViewReceipt}>
+            {copy.viewSealed}
+          </Button>
+        }
+      >
+        <SuccessMark label={copy.sealedTitle} size="sm" />
+        <Display>{copy.sealedTitle}</Display>
+        <p className="flow__body">{copy.sealedBody(closes)}</p>
+        <Card>
+          <StatGroup label={copy.receiptGroup}>
+            <StatRow label={copy.state} value={copy.sealedState} />
+            <StatRow label={copy.network} value={receipt.network} />
+            {closes ? <StatRow label={copy.closes} value={closes} /> : null}
+            <StatRow
+              label={hostedCopy.provedBy}
+              value={
+                receipt.sealed.provingParty === 'hosted-server'
+                  ? hostedCopy.byServer
+                  : hostedCopy.byWallet
+              }
+            />
+          </StatGroup>
+        </Card>
+        <Callout>{SEALED_ANSWER_COPY[locale].publicAtCount}</Callout>
       </Screen>
     );
   }
@@ -438,16 +528,44 @@ export function VoteFlow({
         closeLabel={copy.change}
         actions={
           <>
-            <Button block onClick={onConfirm}>
-              {live ? copy.confirmReal : copy.confirmSimulated}
-            </Button>
+            {/* One primary action at a time: first the disclosure is accepted,
+                then the answer is confirmed. */}
+            {hostedNeedsConsent ? (
+              <Button block onClick={() => hostedProving?.accept()}>
+                {hostedCopy.accept}
+              </Button>
+            ) : (
+              <Button block disabled={hostedWaiting} onClick={onConfirm}>
+                {hostedWaiting && !hostedProving?.error
+                  ? hostedCopy.preparing
+                  : live
+                    ? copy.confirmReal
+                    : copy.confirmSimulated}
+              </Button>
+            )}
             <Button variant="link" onClick={() => onStage('choose')}>
               {copy.change}
             </Button>
           </>
         }
       >
-        {live ? (
+        {hostedOffered ? (
+          <div className="flow__sheet-group">
+            <Callout tone="warning" role="status" title={hostedCopy.title}>
+              {hostedCopy.body} {hostedCopy.alternative}
+            </Callout>
+            {hostedProving?.error ? (
+              <Callout tone="danger" role="alert">
+                {hostedCopy.unavailable}
+              </Callout>
+            ) : null}
+            {hostedNeedsConsent ? null : (
+              <Button variant="link" onClick={() => hostedProving?.withdraw()}>
+                {hostedCopy.withdraw}
+              </Button>
+            )}
+          </div>
+        ) : live ? (
           <fieldset className="flow__execution-modes">
             <legend>{copy.feePayer}</legend>
             <label className="flow__execution-mode">
@@ -501,8 +619,21 @@ export function VoteFlow({
                 The demo says what actually happens instead. */}
             {!live ? (
               <StatRow label={copy.signer} value={copy.signerDemo} />
+            ) : hostedOffered ? (
+              <>
+                <StatRow label={hostedCopy.provedBy} value={hostedCopy.byServer} />
+                <StatRow label={copy.signer} value={copy.relayer} />
+              </>
             ) : relayerMode ? (
-              <StatRow label={copy.signer} value={copy.relayer} />
+              <>
+                <StatRow
+                  label={hostedCopy.provedBy}
+                  value={
+                    provingParty === 'hosted-server' ? hostedCopy.byServer : hostedCopy.byWallet
+                  }
+                />
+                <StatRow label={copy.signer} value={copy.relayer} />
+              </>
             ) : (
               <>
                 <StatRow
@@ -521,6 +652,8 @@ export function VoteFlow({
             )}
           </StatGroup>
         </div>
+        {/* With hosted proving on offer the wallet stays reachable: connecting
+            Lace is the way to keep the proof on the device. */}
         {live && !relayerMode ? <WalletWidget /> : null}
         {previewError ? (
           <div className="flow__sheet-group">
