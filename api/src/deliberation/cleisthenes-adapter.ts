@@ -39,6 +39,9 @@ export interface CleisthenesAssistantOptions {
   readonly baseUrl: string;
   readonly consultations: Readonly<Record<string, CleisthenesConsultationSource>>;
   readonly fetchImpl?: typeof fetch;
+  /** How long a brief is reused before it is read again. Five minutes by default. */
+  readonly cacheMs?: number;
+  readonly now?: () => number;
 }
 
 type Json = Record<string, unknown>;
@@ -237,9 +240,26 @@ export function createCleisthenesAssistant(
       ? (options.consultations[consultationId] ?? null)
       : null;
 
-  async function loadObject(consultationId: string): Promise<Json | null> {
+  // A brief, its prepared questions and the scope of a question all come
+  // from one object. It is read once and reused, and a failure is not kept.
+  const cacheMs = options.cacheMs ?? 5 * 60 * 1000;
+  const now = options.now ?? (() => Date.now());
+  const held = new Map<string, { readonly until: number; readonly object: Promise<Json | null> }>();
+
+  function loadObject(consultationId: string): Promise<Json | null> {
     const mapped = source(consultationId);
-    if (!mapped) return null;
+    if (!mapped) return Promise.resolve(null);
+    const cached = held.get(mapped.objectId);
+    if (cached && cached.until > now()) return cached.object;
+    const object = readObject(mapped);
+    held.set(mapped.objectId, { until: now() + cacheMs, object });
+    object.catch(() => {
+      if (held.get(mapped.objectId)?.object === object) held.delete(mapped.objectId);
+    });
+    return object;
+  }
+
+  async function readObject(mapped: CleisthenesConsultationSource): Promise<Json | null> {
     let response: Response;
     try {
       response = await request(`/votes/${encodeURIComponent(mapped.objectId)}`);

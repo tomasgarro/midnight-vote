@@ -347,6 +347,63 @@ describe('reading a brief', () => {
   });
 });
 
+describe('reading the record once', () => {
+  it('serves the brief, the prepared questions and a question from one read', async () => {
+    const { port, calls } = assistant(({ url }) =>
+      url.endsWith('/votes/6900')
+        ? json(voteObject())
+        : ndjson([{ type: 'answer', answer: preparedAnswer('en') }]),
+    );
+    const request = { consultationId: CONSULTATION, language: 'en' as const };
+
+    await Promise.all([port.getBrief(request), port.listPreparedQuestions(request)]);
+    await port.getBrief({ ...request, language: 'de' });
+    await port.ask({ ...request, question: 'Why?' });
+
+    expect(calls.map((call) => call.url)).toEqual([
+      `${BASE}/votes/6900`,
+      `${BASE}/parliament/ask/stream`,
+    ]);
+  });
+
+  it('reads again once the brief is older than its cache time', async () => {
+    let time = 0;
+    const calls: string[] = [];
+    const port = createCleisthenesAssistant({
+      baseUrl: BASE,
+      consultations: { [CONSULTATION]: { objectId: '6900' } },
+      cacheMs: 60_000,
+      now: () => time,
+      fetchImpl: (async (input: string | URL | Request) => {
+        calls.push(String(input));
+        return json(voteObject());
+      }) as typeof fetch,
+    });
+    const request = { consultationId: CONSULTATION, language: 'en' as const };
+
+    await port.getBrief(request);
+    time = 59_999;
+    await port.getBrief(request);
+    expect(calls).toHaveLength(1);
+
+    time = 60_000;
+    await port.getBrief(request);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('does not keep a failure', async () => {
+    const responses = [json({}, 502), json(voteObject())];
+    const { port, calls } = assistant(() => responses.shift() as Response);
+    const request = { consultationId: CONSULTATION, language: 'en' as const };
+
+    await expect(port.getBrief(request)).rejects.toMatchObject({ code: 'ASSISTANT_UNAVAILABLE' });
+    expect((await port.getBrief(request))?.officialTitle).toBe(
+      'Federal decree on financing the 13th AHV pension',
+    );
+    expect(calls).toHaveLength(2);
+  });
+});
+
 describe('prepared questions', () => {
   it('lists each question with its checked answer, in the language asked for', async () => {
     const { port } = serving(voteObject());
@@ -420,7 +477,8 @@ describe('asking a question', () => {
     await port.getBrief({ consultationId: CONSULTATION, language: 'en' });
     await port.ask({ consultationId: CONSULTATION, language: 'en', question: 'Why?' });
 
-    expect(calls.length).toBeGreaterThanOrEqual(3);
+    // One read of the record, and one question.
+    expect(calls).toHaveLength(2);
     for (const call of calls) {
       expect(call.init.credentials).toBe('omit');
       expect(call.init.referrerPolicy).toBe('no-referrer');

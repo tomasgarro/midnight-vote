@@ -11,9 +11,11 @@ import {
 } from '@/components/system';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import { countryName as getCountryName } from '@/integration/country-catalog';
+import type { AppAssistant } from '@/integration/deliberation';
 import { formatDate } from '@/integration/format';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability } from '@/integration/poll-lifecycle';
+import { ConsultationBrief } from '@/views/ConsultationBrief';
 import { COUNTRY_POLL_COUNTRIES, localizePoll, type Poll } from '@/views/poll-model';
 import './policy-detail-view.css';
 import { canUseDemoPass } from './discovery-presentation';
@@ -62,10 +64,10 @@ const COPY = {
     options: 'Qué expresa cada opción',
     yes: 'Sí',
     no: 'No',
-    abstain: 'Abstención',
+    abstain: 'Sin decidir',
     yesBody: 'Apoyás priorizar la propuesta en los términos de esta consulta.',
     noBody: 'No apoyás priorizarla en estos términos.',
-    abstainBody: 'Preferís no tomar una posición binaria.',
+    abstainBody: 'Todavía no tomaste una posición.',
     sources: 'Fuentes primarias',
     vote: 'Votá ahora',
     prepare: 'Preparar mi credencial',
@@ -93,10 +95,10 @@ const COPY = {
     options: 'What each option expresses',
     yes: 'Yes',
     no: 'No',
-    abstain: 'Abstain',
+    abstain: 'Undecided',
     yesBody: 'You support prioritising the proposal on these terms.',
     noBody: 'You do not support prioritising it on these terms.',
-    abstainBody: 'You prefer not to take a binary position.',
+    abstainBody: 'You have not taken a position yet.',
     sources: 'Primary sources',
     vote: 'Vote now',
     prepare: 'Prepare my credential',
@@ -124,10 +126,10 @@ const COPY = {
     options: 'Ce que chaque option exprime',
     yes: 'Oui',
     no: 'Non',
-    abstain: 'Abstention',
+    abstain: 'Ne se prononce pas',
     yesBody: 'Vous soutenez la priorité donnée à la proposition dans ces termes.',
     noBody: 'Vous ne soutenez pas cette priorité dans ces termes.',
-    abstainBody: 'Vous préférez ne pas prendre position de façon binaire.',
+    abstainBody: "Vous n'avez pas encore pris position.",
     sources: 'Sources primaires',
     vote: 'Voter maintenant',
     prepare: 'Préparer mon justificatif',
@@ -145,6 +147,8 @@ export interface PolicyDetailViewProps {
   readonly onStartVote: (pollId: string) => void;
   readonly credential: DemoCredentialSummary | null;
   readonly onOpenPassportJourney: () => void;
+  /** The deliberation assistant, when this build has one. */
+  readonly assistant?: AppAssistant | null;
   readonly locale: CicoLocale;
 }
 
@@ -154,9 +158,14 @@ export function PolicyDetailView({
   onStartVote,
   credential,
   onOpenPassportJourney,
+  assistant = null,
   locale,
 }: PolicyDetailViewProps) {
   const copy = COPY[locale];
+  /* With a brief from the record, the page shows that and not the catalogue's
+     own summary: two accounts of one question would compete, and only one of
+     them is tied to sources. */
+  const briefed = assistant?.covers(poll.id) ? assistant : null;
   const displayPoll = localizePoll(poll, locale);
   const runtimePoll = Boolean(poll.runtimeContractAddress);
   const isOpen = getPollAvailability(poll).isOpen;
@@ -224,49 +233,57 @@ export function PolicyDetailView({
         </StatGroup>
       </Card>
 
-      <section className="policy__section">
-        <Eyebrow>{copy.about}</Eyebrow>
-        <p className="policy__prose">{displayPoll.whyNow}</p>
-        <Card tone="sunken" className="policy__evidence">
-          <p className="policy__evidence-label">{displayPoll.evidenceLabel}</p>
-          <p className="policy__prose">{displayPoll.evidence}</p>
-        </Card>
-      </section>
+      {briefed ? (
+        <ConsultationBrief assistant={briefed.port} consultationId={poll.id} locale={locale} />
+      ) : null}
 
-      <section className="policy__section">
-        <Eyebrow>{copy.frame}</Eyebrow>
-        <p className="policy__prose">{displayPoll.legalFrame}</p>
-      </section>
+      {briefed ? null : (
+        <>
+          <section className="policy__section">
+            <Eyebrow>{copy.about}</Eyebrow>
+            <p className="policy__prose">{displayPoll.whyNow}</p>
+            <Card tone="sunken" className="policy__evidence">
+              <p className="policy__evidence-label">{displayPoll.evidenceLabel}</p>
+              <p className="policy__prose">{displayPoll.evidence}</p>
+            </Card>
+          </section>
 
-      <section className="policy__section" aria-labelledby="policy-perspectives">
-        <Eyebrow>{copy.perspectives}</Eyebrow>
-        <h2 className="sr-only" id="policy-perspectives">
-          {copy.perspectives}
-        </h2>
-        <div className="policy__args">
-          <div>
-            <p className="policy__args-label">{copy.forIt}</p>
-            <ul className="policy__list">
-              {displayPoll.argumentsFor.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <p className="policy__args-label">{copy.againstIt}</p>
-            <ul className="policy__list">
-              {displayPoll.argumentsAgainst.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
+          <section className="policy__section">
+            <Eyebrow>{copy.frame}</Eyebrow>
+            <p className="policy__prose">{displayPoll.legalFrame}</p>
+          </section>
 
-      <section className="policy__section">
-        <Eyebrow>{copy.uncertainty}</Eyebrow>
-        <p className="policy__prose">{displayPoll.uncertainty}</p>
-      </section>
+          <section className="policy__section" aria-labelledby="policy-perspectives">
+            <Eyebrow>{copy.perspectives}</Eyebrow>
+            <h2 className="sr-only" id="policy-perspectives">
+              {copy.perspectives}
+            </h2>
+            <div className="policy__args">
+              <div>
+                <p className="policy__args-label">{copy.forIt}</p>
+                <ul className="policy__list">
+                  {displayPoll.argumentsFor.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="policy__args-label">{copy.againstIt}</p>
+                <ul className="policy__list">
+                  {displayPoll.argumentsAgainst.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section className="policy__section">
+            <Eyebrow>{copy.uncertainty}</Eyebrow>
+            <p className="policy__prose">{displayPoll.uncertainty}</p>
+          </section>
+        </>
+      )}
 
       <section className="policy__section">
         <Eyebrow>{copy.options}</Eyebrow>

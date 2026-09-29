@@ -13,6 +13,7 @@ import { useWallet } from '@/hooks/use-wallet';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import type { OnboardingStage } from '@/integration/civic-state';
 import { ASSIGNED_COUNTRIES } from '@/integration/country-catalog';
+import { createAppAssistant } from '@/integration/deliberation';
 import { type CicoLocale, detectLocale, persistLocale } from '@/integration/locale';
 import { PassportIdentityBridge } from '@/integration/passport';
 import { MidnightPassportSessionAdapter } from '@/integration/passport-session-port';
@@ -251,6 +252,8 @@ function CivicApp() {
       };
     }
   }, []);
+  // Built from public values only. It is handed no pass and no session.
+  const assistant = useMemo(() => createAppAssistant(import.meta.env, window.location.origin), []);
   const polls = useMemo(
     () =>
       CHAIN_RUNTIME_ENABLED && passportV2Runtime.config
@@ -880,6 +883,7 @@ function CivicApp() {
           onStartVote={startVote}
           credential={credential}
           onOpenPassportJourney={() => setPassportJourneyOpen(true)}
+          assistant={assistant}
           locale={locale}
         />
       ) : (
