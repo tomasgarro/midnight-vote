@@ -152,7 +152,7 @@ export function findCredentialPath(
   return path;
 }
 
-/** Resolves a public ballot opening path for the operator lifecycle probe. */
+/** Resolves the public path of a ballot commitment in the referendum's ballot tree. */
 export function findBallotPath(
   data: ChargedState,
   ballotCommitment: Uint8Array,
@@ -161,6 +161,14 @@ export function findBallotPath(
     GeneratedReferendumV2.ledger(data).ballotCommitments.findPathForLeaf(ballotCommitment);
   if (!path) throw new Error('Ballot commitment is not present in the canonical referendum');
   return path;
+}
+
+/**
+ * True once a ballot commitment has been counted. Used by the voter's own
+ * device to recognise a count that landed before the device could record it.
+ */
+export function isBallotRevealed(data: ChargedState, ballotCommitment: Uint8Array): boolean {
+  return GeneratedReferendumV2.ledger(data).revealedCommitments.member(ballotCommitment);
 }
 
 export function parseReferendumV2(data: ChargedState): ReferendumV2State {

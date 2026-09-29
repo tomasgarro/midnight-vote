@@ -113,8 +113,12 @@ function actionForCircuit(circuit: string): CivicActionKind | undefined {
   // This issuer is authenticated by a citizen's credential authorization.
   // Organizer and issuer circuits require a distinct role-bound capability
   // issuer; treating every referendum mutation as a "vote" would allow a
-  // credential holder to request close/reveal/finalize authority.
-  if (circuit === 'castVote') return 'vote';
+  // credential holder to request close or finalize authority.
+  //
+  // revealVote is a citizen circuit: it counts one answer and only succeeds
+  // for whoever knows that answer's opening, which stays on the voter's
+  // device (ADR-009). The capability pays the fee; it grants no authority.
+  if (circuit === 'castVote' || circuit === 'revealVote') return 'vote';
   return undefined;
 }
 
