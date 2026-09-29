@@ -73,9 +73,8 @@ services:
     security_opt: [no-new-privileges:true]
     command: [midnight-proof-server, -v]
     tmpfs: [/tmp]
-    # Same loopback requirement as CICO: midnight-issuer-runtime rejects a
-    # non-loopback proof server over HTTP. Sharing the namespace keeps the
-    # prover unreachable from outside while satisfying that guard.
+    # The issuer runtime refuses a non-loopback proof server over HTTP.
+    # Sharing the verifier's namespace makes it loopback and unreachable.
     network_mode: "service:rarimo-verificator"
 
   cico:
