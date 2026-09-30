@@ -239,3 +239,119 @@ describe('v2 walletless action service', () => {
     expect(executor.submit).not.toHaveBeenCalled();
   });
 });
+
+describe('spreading submissions in time', () => {
+  function delayedService(random: () => number, submitDelayMaxMs = 20_000) {
+    const executor: V2RelayerExecutor = {
+      balanceAndFinalize: vi.fn(async (tx) => `finalized-${tx}`),
+      submit: vi.fn(async () => 'tx-1'),
+    };
+    const store = new InMemoryV2ActionStore();
+    const service = new V2ActionService({
+      store,
+      executor,
+      receiptResolver: { resolve: vi.fn(async () => null) },
+      allowedNetworks: ['preview'],
+      allowedContracts: ['contract-1'],
+      allowedCircuits: ['castVote', 'revealVote'],
+      capabilitySecret: secret,
+      confirmationRetryMs: 60_000,
+      idFactory: () => 'reservation',
+      submitDelayMaxMs,
+      random,
+    });
+    return { service, store, executor };
+  }
+
+  it('holds a new action for a random wait before it reaches the wallet', async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, store, executor } = delayedService(() => 0.5);
+      const body = { ...baseRequest };
+      const accepted = await service.accept(body, headersFor(body));
+      expect(accepted.status).toBe('pending');
+
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(executor.balanceAndFinalize).not.toHaveBeenCalled();
+      expect((await store.get('action-1'))?.status).toBe('authorized');
+
+      await vi.advanceTimersByTimeAsync(2);
+      await service.waitForIdle('action-1');
+      expect(executor.submit).toHaveBeenCalledOnce();
+      expect((await store.get('action-1'))?.status).toBe('indexer_pending');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not let a retry skip the wait or start a second one', async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, executor } = delayedService(() => 0.5);
+      const body = { ...baseRequest };
+      const headers = headersFor(body);
+      await service.accept(body, headers);
+      await vi.advanceTimersByTimeAsync(5_000);
+      await service.accept(body, headers);
+      expect(executor.balanceAndFinalize).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(5_001);
+      await service.waitForIdle('action-1');
+      expect(executor.balanceAndFinalize).toHaveBeenCalledOnce();
+      expect(executor.submit).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['the lowest sample', 0, 0],
+    ['the highest sample', 0.999_999, 20_000],
+    ['a sample above the range', 7, 20_000],
+    ['a sample below the range', -3, 0],
+    ['a sample that is not a number', Number.NaN, 0],
+  ])('keeps the wait inside its bound for %s', async (_label, sample, expectedMs) => {
+    vi.useFakeTimers();
+    try {
+      const { service, executor } = delayedService(() => sample);
+      const body = { ...baseRequest };
+      await service.accept(body, headersFor(body));
+      if (expectedMs > 0) {
+        await vi.advanceTimersByTimeAsync(expectedMs - 1);
+        expect(executor.balanceAndFinalize).not.toHaveBeenCalled();
+      }
+      await vi.advanceTimersByTimeAsync(1);
+      await service.waitForIdle('action-1');
+      expect(executor.submit).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('submits at once when no wait is configured, and refuses a negative one', async () => {
+    const { service, executor } = delayedService(() => 0.9, 0);
+    const body = { ...baseRequest };
+    await service.accept(body, headersFor(body));
+    await service.waitForIdle('action-1');
+    expect(executor.submit).toHaveBeenCalledOnce();
+
+    expect(() => delayedService(() => 0, -1)).toThrow(/non-negative whole number/u);
+    expect(() => delayedService(() => 0, 1.5)).toThrow(/non-negative whole number/u);
+  });
+
+  it('carries the count for a citizen and still refuses an organizer circuit', async () => {
+    const { service, executor } = delayedService(() => 0, 0);
+    const count = { ...baseRequest, actionId: 'action-count', circuit: 'revealVote' };
+    const accepted = await service.accept(count, {
+      ...headersFor({ ...count, idempotencyKey: 'request-count' }),
+    });
+    expect(accepted).toMatchObject({ actionId: 'action-count', status: 'pending' });
+    await service.waitForIdle('action-count');
+    expect(executor.submit).toHaveBeenCalledOnce();
+
+    const close = { ...baseRequest, actionId: 'action-close', circuit: 'closeVote' };
+    await expect(
+      service.accept(close, headersFor({ ...close, idempotencyKey: 'request-close' })),
+    ).rejects.toMatchObject({ code: 'not_allowlisted' });
+  });
+});

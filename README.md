@@ -14,7 +14,7 @@ midnight.vote is a Passport-first civic participation project built on Midnight.
 | --- | --- | --- |
 | **Midnight Passport at the core** | Privacy on your own terms: prove 18+ without a name, or citizenship without a residential address. | Session/profile integration; selective-proof experience remains in progress. |
 | **Real passport → NFC → ZK attestation** | Count participation by real, eligible citizens while keeping identity evidence separate from ballots. | Rarimo evidence and issuer adapters; public participation is simulated. |
-| **AI for informed deliberation** | Browse sources, simplify dense proposals and understand different perspectives. | Authored, source-linked catalogue guidance; generative AI is planned. |
+| **AI for informed deliberation** | Browse sources, simplify dense proposals and understand different perspectives. | In the app, Cleisthenes answers from the authored catalogue. A consultation shows a reviewed, sourced brief once its evidence is connected; none is connected on the public site yet. |
 | **Midnight.city exploration** | Research how AI agents might participate in civic experiments. | Exploratory; separate agent and human result lanes are a design requirement. |
 
 The registry and referendum contracts already use **Compact**. The future migration concerns passport verification now approached through Rarimo; it is a separate engineering challenge.
@@ -31,10 +31,11 @@ flowchart LR
   understand --> choose[Choose a response]
   choose --> review[Review before confirming]
   review --> receipt[Keep a simulated receipt]
-  understand -. Optional .-> pulse[Reflect privately with Civic Pulse]
 ```
 
-The demo works in English, Spanish and French. **Ask Midnight currently provides authored catalogue answers**, not generated AI responses. **Civic Pulse keeps drafts in memory by default** and offers an explicit device-only save/review/delete action. Saving uses browser storage readable by others using that browser profile; answers are not uploaded. Demo credentials and receipts are explicitly labelled as simulated.
+The app has three destinations: **Consultations**, **Cleisthenes** and **You**. The demo works in English, Spanish and French. **In his chat, Cleisthenes provides authored catalogue answers**, not generated AI responses. Demo credentials and receipts are explicitly labelled as simulated.
+
+Civic Pulse, a private reflection, is outside those three steps. No screen links to it; it is kept at `/#app/pulse`. It keeps drafts in memory by default and offers an explicit device-only save, review and delete. Saving uses browser storage readable by others using that browser profile; answers are not uploaded.
 
 ## What works today
 
@@ -42,13 +43,13 @@ Status baseline: **16 September 2026**, application source from merged [PR #35](
 
 | Capability | What you can inspect | Evidence level |
 | --- | --- | --- |
-| Discover, onboarding, guidance and reflection | A complete mobile demo with multilingual copy | Working demo |
+| Consultations, onboarding, guidance and the pass | A complete mobile demo with multilingual copy | Working demo |
 | Review and receipt | A deliberate confirmation followed by a local simulated receipt | Working demo; no chain transaction |
 | Credential Registry V1 | Issuer-authorized admission of commitments to eligibility claims | Compiled and simulator-tested source |
 | Referendum V2 | Eligibility checks, repeat-use prevention, ballot commitment, reveal and tally | Compiled and simulator-tested source |
 | Passport session | Account consent and display-profile integration | Source plus a dated [real-session record](docs/evidence/passport-live/2026-08-31-first-real-session.md) |
 | NFC verification and live participation | Provider, issuer, relay and receipt interfaces | Integration source; physical end-to-end acceptance pending |
-| Generative AI and Swiss parliamentary explanations | Proposed source-grounded research companion | Planned |
+| Sourced briefs from Cleisthenes | The assistant boundary, and the brief inside the consultation page | Integration source; not connected on the public site |
 
 ## Three things that should stay separate
 

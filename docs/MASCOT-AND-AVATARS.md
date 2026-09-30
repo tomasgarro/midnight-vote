@@ -1,5 +1,10 @@
 # Capybara mascot — current assets and future avatar system
 
+> **Superseded on 2026-09-29.** The capybara left the app. Cleisthenes is the
+> companion now: see [COMPANION.md](COMPANION.md). This record is kept for the
+> avatar idea in its last section and for the history of the artwork, which
+> stays in the repository's history.
+
 ## Status
 
 The onboarding now renders the reviewed `CapybaraMascot` component with six

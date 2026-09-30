@@ -41,8 +41,8 @@ test('mobile refinements: Pulse saves only on request, restores, shares locally 
   page.on('request', (r) => {
     if (r.method() === 'POST') requests.push(r.url());
   });
-  await page.goto('/#app');
-  const open = async () => page.getByRole('button', { name: /Try the civic pulse/ }).click();
+  // The civic pulse is outside the three steps. Its address opens it.
+  const open = async () => page.goto('/#app/pulse');
   await open();
   await page.getByRole('button', { name: 'Start reflecting', exact: true }).click();
   await page.getByRole('button', { name: 'Begin', exact: true }).click();
@@ -78,12 +78,13 @@ test('mobile refinements: Pulse saves only on request, restores, shares locally 
   await page.getByRole('button', { name: 'Review saved reflection', exact: true }).click();
   await expect(page.getByText('Cost of living', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Finish reflection', exact: true }).click();
-  await page.getByRole('button', { name: 'Explore with Ask Midnight', exact: true }).click();
+  await page.getByRole('button', { name: 'Explore with Cleisthenes', exact: true }).click();
   await expect(page.locator('.catalogue-chat__reflection')).toContainText('Cost of living');
   await expect(page.locator('.catalogue-chat__reflection')).toContainText(
     'Generative AI is not connected',
   );
-  await page.getByRole('button', { name: 'Discover', exact: true }).click();
+  await page.getByRole('button', { name: 'Consultations', exact: true }).click();
+  await expect(page).toHaveURL(/#app$/);
   await open();
   await page.getByRole('button', { name: 'Delete saved reflection', exact: true }).click();
   expect(

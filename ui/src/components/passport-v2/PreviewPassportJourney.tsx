@@ -25,10 +25,10 @@ import { passportHolderBindingPort } from '@/integration/passport-session-port';
 import { PASSPORT_ACCOUNT_NETWORK } from '@/views/app-runtime';
 import './journey.css';
 import './onboarding.css';
+import { CompanionFigure } from '@/components/companion';
 import type { PassportV2RuntimeReferendum } from '@/integration/passport-v2-runtime-config';
 import { CredentialJourneyTutorial } from './CredentialJourneyTutorial';
 import { EnrollmentHandoff } from './EnrollmentHandoff';
-import { OnboardingMascot } from './OnboardingMascot';
 import { ONBOARDING_COPY } from './onboarding-copy';
 import { PassportPageArt } from './PassportPageArt';
 import { useJourneyHistory } from './useJourneyHistory';
@@ -519,7 +519,7 @@ export function PreviewPassportJourney({
         >
           <div className="onboarding-document-art">
             <PassportPageArt />
-            <OnboardingMascot pose="passport" motion />
+            <CompanionFigure pose="passport" motion />
           </div>
           <h2 id="preview-provider-title" ref={headingRef} tabIndex={-1}>
             {ONBOARDING_COPY[locale].documentTitle}
@@ -699,7 +699,7 @@ export function PreviewPassportJourney({
           aria-labelledby="preview-success-title"
         >
           <div className="journey-success-hero">
-            <OnboardingMascot pose="success" motion />
+            <CompanionFigure pose="success" motion />
             <SuccessMark
               label={pick('Credential created', 'Credencial creada', 'Justificatif créé')}
               size="sm"

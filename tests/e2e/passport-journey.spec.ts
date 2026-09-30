@@ -20,17 +20,15 @@ test('completes the civic pulse without submitting or persisting answers', async
     window.sessionStorage.setItem('cico-wave1-onboarding-complete', '1');
     window.localStorage.setItem('cico-locale', 'en');
   });
-  await page.goto('/#app');
-  const pulseLauncher = page.getByRole('button', {
-    name: /Try the civic pulse|Probar el pulso cívico|Essayer le pouls civique/i,
-  });
-  await expect(pulseLauncher).toBeVisible({ timeout: 60_000 });
+  // The civic pulse is outside the three steps. Its address opens it.
+  await page.goto('/#app/pulse');
+  const start = page.getByRole('button', { name: /Start reflecting/i });
+  await expect(start).toBeVisible({ timeout: 60_000 });
   const storageBeforePulse = await page.evaluate(() => ({
     local: Object.keys(window.localStorage),
     session: Object.keys(window.sessionStorage),
   }));
-  await pulseLauncher.click();
-  await page.getByRole('button', { name: /Start reflecting/i }).click();
+  await start.click();
   await page.getByRole('button', { name: /^Begin/i }).click();
   await page.getByRole('button', { name: /Cost of living/i }).click();
   await page.getByRole('button', { name: /Healthcare/i }).click();
@@ -56,11 +54,7 @@ test('completes the civic pulse without submitting or persisting answers', async
   ).toEqual(storageBeforePulse);
 
   await page.reload();
-  await expect(
-    page.getByRole('button', {
-      name: /Try the civic pulse|Probar el pulso cívico|Essayer le pouls civique/i,
-    }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: /Start reflecting/i })).toBeVisible();
   await expect(page.getByText('2 of 3 selected')).toHaveCount(0);
 });
 
@@ -79,9 +73,10 @@ test('completes Passport onboarding, then creates a choice-free simulated receip
   await journey.issueSyntheticCredential();
   await expect(journey.credentialHeading).toBeVisible();
   await journey.openDashboard();
-  await expect(
-    page.getByRole('button', { name: /Browse by place.*France|Explorar por lugar.*Francia/i }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: /^(France|Francia)$/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await journey.openConsultationAndVote();
   await journey.submitSimulatedReceipt();
 
@@ -104,7 +99,7 @@ test('ends credential onboarding before scope, ballot, proving, or receipts', as
   await journey.openDashboard();
   await expect(
     page.getByRole('heading', {
-      name: /Consultas para vos|Tu lugar en la conversación|Consultations for you|Your place in the conversation/i,
+      name: /^(Consultations|Consultas)$/,
     }),
   ).toBeVisible();
 });

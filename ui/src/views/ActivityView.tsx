@@ -1,8 +1,16 @@
 import { ArrowUpRight, CheckCircle, Clock, Copy, Lock, Receipt } from '@phosphor-icons/react';
-import { Card, Display, EmptyState, Eyebrow } from '@/components/system';
+import { Button, Callout, Card, Display, EmptyState, Eyebrow } from '@/components/system';
 import { formatDate, formatDateTime } from '@/integration/format';
+import { HOSTED_PROVING_COPY } from '@/integration/hosted-proving';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability, type PollAvailability } from '@/integration/poll-lifecycle';
+import { SEALED_ANSWER_COPY, type SealedAnswer } from '@/integration/sealed-answers';
+import {
+  formatElapsed,
+  needsHostedConsent,
+  WALLETLESS_PROVING_COPY,
+  type WalletlessProvingState,
+} from '@/integration/walletless-proving';
 import { CopyReceiptButton } from '@/views/CopyReceiptButton';
 import { localizePoll, type Poll, type VoteReceipt } from '@/views/poll-model';
 import { ReceiptVerifier } from '@/views/ReceiptVerifier';
@@ -98,9 +106,20 @@ const COPY = {
   },
 } as const;
 
+export type CountNotice = 'count-not-open' | 'pass-missing' | 'try-again';
+
 export interface ActivityViewProps {
   readonly polls: readonly Poll[];
   readonly receipts: readonly VoteReceipt[];
+  /** Answers sealed on-chain from this device, read from its vault. */
+  readonly sealedAnswers?: readonly SealedAnswer[];
+  /** The referendum whose answer is being counted right now. */
+  readonly countingId?: string | null;
+  readonly countNotices?: Readonly<Record<string, CountNotice>>;
+  readonly onCount?: (referendumId: string) => void;
+  readonly walletlessProving?: WalletlessProvingState;
+  /** When this device started the proof it is building now. */
+  readonly deviceProofStartedAt?: number | null;
   readonly locale: CicoLocale;
 }
 
@@ -117,8 +136,25 @@ function availabilityOf(poll: Poll): PollAvailability | null {
   }
 }
 
-export function ActivityView({ polls, receipts, locale }: ActivityViewProps) {
+export function ActivityView({
+  polls,
+  receipts,
+  sealedAnswers = [],
+  countingId = null,
+  countNotices = {},
+  onCount,
+  walletlessProving,
+  deviceProofStartedAt = null,
+  locale,
+}: ActivityViewProps) {
   const copy = COPY[locale];
+  const sealedCopy = SEALED_ANSWER_COPY[locale];
+  const hostedCopy = HOSTED_PROVING_COPY[locale];
+  const proverCopy = WALLETLESS_PROVING_COPY[locale];
+  const waitingForCount = sealedAnswers.some((answer) => answer.state === 'sealed');
+  /* Counting needs a proof. If the person chose the proving server, they are
+     asked before it is used. A device that proves by itself needs no asking. */
+  const needsConsent = waitingForCount && needsHostedConsent(walletlessProving);
 
   return (
     <main className="activity">
@@ -127,6 +163,141 @@ export function ActivityView({ polls, receipts, locale }: ActivityViewProps) {
         <Display>{copy.title}</Display>
         <p>{copy.lead}</p>
       </header>
+
+      {sealedAnswers.length ? (
+        <section className="activity__sealed" aria-labelledby="sealed-answers-title">
+          <h2 className="activity__section-title" id="sealed-answers-title">
+            {sealedCopy.heading}
+          </h2>
+          <p className="activity__section-lead">{sealedCopy.lead}</p>
+          {needsConsent ? (
+            <Callout tone="warning" role="status" title={hostedCopy.title}>
+              {hostedCopy.body} {hostedCopy.alternative}
+              <span className="activity__consent">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => walletlessProving?.acceptHosted()}
+                >
+                  {hostedCopy.accept}
+                </Button>
+              </span>
+            </Callout>
+          ) : null}
+          <ol className="activity__list">
+            {sealedAnswers.map((answer) => {
+              const poll = polls.find((item) => item.id === answer.referendumId);
+              const availability = poll ? availabilityOf(poll) : null;
+              const closed = availability
+                ? !availability.isOpen && availability.reason !== 'not-open'
+                : false;
+              const closesLabel = poll ? formatDate(poll.closesAt, locale) : null;
+              const contractAddress = poll?.runtimeContractAddress ?? null;
+              const counting = countingId === answer.referendumId;
+              const notice = countNotices[answer.referendumId];
+              const stateLabel =
+                answer.state === 'counted'
+                  ? sealedCopy.counted
+                  : answer.state === 'missed'
+                    ? sealedCopy.missed
+                    : sealedCopy.sealed;
+              return (
+                <li key={answer.referendumId}>
+                  <Card className="activity-card">
+                    <span
+                      className="activity-card__icon"
+                      data-confirmed={answer.state === 'counted'}
+                    >
+                      {answer.state === 'counted' ? (
+                        <CheckCircle size={22} weight="fill" />
+                      ) : answer.state === 'missed' ? (
+                        <Clock size={22} />
+                      ) : (
+                        <Lock size={22} weight="fill" />
+                      )}
+                    </span>
+                    <div className="activity-card__body">
+                      <div className="activity-card__top">
+                        <strong>
+                          {poll ? localizePoll(poll, locale).title : copy.consultation}
+                        </strong>
+                        <span data-confirmed={answer.state === 'counted'}>{stateLabel}</span>
+                      </div>
+
+                      {availability && closesLabel ? (
+                        <p className="activity-card__lifecycle">
+                          <span className="activity-card__status" data-open={availability.isOpen}>
+                            {availability.reason === 'not-open'
+                              ? copy.statusNotOpen
+                              : availability.isOpen
+                                ? copy.statusOpen
+                                : copy.statusClosed}
+                          </span>
+                          <span className="activity-card__closes">
+                            {availability.isOpen ? copy.closesOn : copy.closedOn} {closesLabel}
+                          </span>
+                        </p>
+                      ) : null}
+
+                      <p className="activity-card__sealed">
+                        <span>
+                          {answer.state === 'counted'
+                            ? sealedCopy.countedBody
+                            : answer.state === 'missed'
+                              ? answer.reason === 'opening-lost'
+                                ? sealedCopy.missedLost
+                                : sealedCopy.missedClosed
+                              : closed
+                                ? sealedCopy.sealedClosed
+                                : sealedCopy.sealedOpen}{' '}
+                          {answer.state === 'sealed' ? sealedCopy.publicAtCount : null}
+                        </span>
+                      </p>
+
+                      {answer.state === 'sealed' && closed && onCount ? (
+                        <div className="activity-card__actions">
+                          <Button
+                            size="sm"
+                            disabled={counting || needsConsent}
+                            onClick={() => onCount(answer.referendumId)}
+                          >
+                            {counting ? sealedCopy.counting : sealedCopy.count}
+                          </Button>
+                        </div>
+                      ) : null}
+                      {counting && deviceProofStartedAt !== null ? (
+                        <p className="activity-card__results-note" role="status">
+                          {proverCopy.deviceWait} {proverCopy.elapsed}:{' '}
+                          {formatElapsed(Date.now() - deviceProofStartedAt)}
+                        </p>
+                      ) : null}
+                      {notice && !counting ? (
+                        <p className="activity-card__results-note" role="status">
+                          {notice === 'count-not-open'
+                            ? sealedCopy.waitingCount
+                            : notice === 'pass-missing'
+                              ? sealedCopy.waitingPass
+                              : sealedCopy.waitingRetry}
+                        </p>
+                      ) : null}
+
+                      {closed && contractAddress ? (
+                        <div className="activity-card__results">
+                          <ResultsPanel
+                            contractAddress={contractAddress}
+                            title={copy.resultsTitle}
+                            locale={locale}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </Card>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ) : null}
 
       {receipts.length ? (
         <ol className="activity__list">
@@ -212,7 +383,7 @@ export function ActivityView({ polls, receipts, locale }: ActivityViewProps) {
             );
           })}
         </ol>
-      ) : (
+      ) : sealedAnswers.length ? null : (
         <EmptyState icon={<Receipt size={30} />} title={copy.emptyTitle} message={copy.empty} />
       )}
 

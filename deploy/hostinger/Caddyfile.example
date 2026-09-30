@@ -38,7 +38,8 @@
 	request_body {
 		max_size 2MB
 	}
-	@relay path /v2/*
+	# The browser reads the relay's public keys from /keys before it proves.
+	@relay path /keys /v2/*
 	handle @relay {
 		reverse_proxy relayer:8790
 	}

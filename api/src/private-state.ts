@@ -1,6 +1,11 @@
 import type { ContractAddress, SigningKey } from '@midnight-ntwrk/compact-runtime';
 import type { PrivateStateProvider } from '@midnight-ntwrk/midnight-js-types';
-import type { CivicCredentialVaultPort, StoredCivicCredential } from './passport-v2/ports.js';
+import type {
+  BallotOpening,
+  BallotOpeningVaultPort,
+  CivicCredentialVaultPort,
+  StoredCivicCredential,
+} from './passport-v2/ports.js';
 
 const PRIVATE_STATE_DB = 'midnight-referendum-private-state';
 const PRIVATE_STATE_DB_VERSION = 2;
@@ -319,5 +324,206 @@ export function browserCivicCredentialVault(scope: string): CivicCredentialVault
     load: async () => provider.get(CIVIC_CREDENTIAL_VAULT_ID),
     save: async (credential) => provider.set(CIVIC_CREDENTIAL_VAULT_ID, credential),
     clear: async () => provider.remove(CIVIC_CREDENTIAL_VAULT_ID),
+  };
+}
+
+const BALLOT_OPENING_RECORD = 'ballot-openings-v1';
+const BALLOT_BYTES = 32;
+
+/**
+ * How well the browser keeps an opening until the count.
+ *
+ * - `persistent`: encrypted on disk, and the browser agreed not to evict it.
+ * - `best-effort`: encrypted on disk, but the browser may evict it under
+ *   storage pressure or after a period without visits.
+ * - `memory`: storage is blocked, for example in a private window. The opening
+ *   is lost when the page closes, so the answer would never be counted.
+ */
+export type BallotOpeningDurability = 'persistent' | 'best-effort' | 'memory';
+
+export interface BrowserBallotOpeningVault extends BallotOpeningVaultPort {
+  durability(): Promise<BallotOpeningDurability>;
+  /** Asks the browser to keep this site's storage. Resolves to whether it agreed. */
+  requestPersistence(): Promise<boolean>;
+}
+
+/** The storage a ballot opening vault writes through; one record per referendum. */
+export interface BallotOpeningRecordStore {
+  get(recordId: string): Promise<unknown>;
+  set(recordId: string, openings: readonly BallotOpening[]): Promise<void>;
+  remove(recordId: string): Promise<void>;
+}
+
+const ballotVaultTails = new Map<string, Promise<void>>();
+const ballotVaultMemory = new Map<string, readonly BallotOpening[]>();
+
+function isBytes32(value: unknown): value is Uint8Array {
+  return value instanceof Uint8Array && value.length === BALLOT_BYTES;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return left.length === right.length && left.every((byte, index) => byte === right[index]);
+}
+
+function copyOpening(opening: BallotOpening): BallotOpening {
+  return {
+    referendumId: opening.referendumId,
+    contractAddress: opening.contractAddress,
+    choice: opening.choice,
+    voteSalt: new Uint8Array(opening.voteSalt),
+    ballotCommitment: new Uint8Array(opening.ballotCommitment),
+    status: opening.status,
+    ...(opening.sealedAt === undefined ? {} : { sealedAt: opening.sealedAt }),
+    ...(opening.countAuthorization === undefined
+      ? {}
+      : { countAuthorization: opening.countAuthorization }),
+  };
+}
+
+function isBallotOpening(value: unknown, referendumId: string): value is BallotOpening {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.referendumId === referendumId &&
+    typeof candidate.contractAddress === 'string' &&
+    candidate.contractAddress.length > 0 &&
+    (candidate.choice === 'YES' || candidate.choice === 'NO' || candidate.choice === 'ABSTAIN') &&
+    isBytes32(candidate.voteSalt) &&
+    isBytes32(candidate.ballotCommitment) &&
+    (candidate.status === 'sealing' || candidate.status === 'sealed') &&
+    (candidate.sealedAt === undefined || typeof candidate.sealedAt === 'string') &&
+    (candidate.countAuthorization === undefined ||
+      (typeof candidate.countAuthorization === 'string' &&
+        candidate.countAuthorization.length > 0 &&
+        candidate.countAuthorization.length <= 256))
+  );
+}
+
+function assertStorable(opening: BallotOpening): void {
+  if (!opening.referendumId.trim()) {
+    throw new TypeError('A ballot opening needs its referendum id');
+  }
+  if (!isBallotOpening(opening, opening.referendumId)) {
+    throw new TypeError('The ballot opening is incomplete and cannot be stored');
+  }
+}
+
+/**
+ * Vault logic over any record store. Writes for one referendum run one after
+ * another, across every vault instance of the same scope, because each write
+ * replaces the whole record: two interleaved writes would drop an opening, and
+ * a dropped opening is an answer that can never be counted.
+ */
+export function createBallotOpeningVault(
+  store: BallotOpeningRecordStore,
+  scope: string,
+): BallotOpeningVaultPort {
+  const normalizedScope = scope.trim();
+  if (!normalizedScope) throw new TypeError('Ballot opening vault scope must not be empty');
+  const recordId = (referendumId: string) => `${BALLOT_OPENING_RECORD}:${referendumId}`;
+
+  const inOrder = <T>(referendumId: string, task: () => Promise<T>): Promise<T> => {
+    const key = `${normalizedScope}\u0000${referendumId}`;
+    const result = (ballotVaultTails.get(key) ?? Promise.resolve()).then(task);
+    const tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    ballotVaultTails.set(key, tail);
+    void tail.then(() => {
+      if (ballotVaultTails.get(key) === tail) ballotVaultTails.delete(key);
+    });
+    return result;
+  };
+
+  const read = async (referendumId: string): Promise<BallotOpening[]> => {
+    const stored = await store.get(recordId(referendumId));
+    if (!Array.isArray(stored)) return [];
+    return stored.filter((item) => isBallotOpening(item, referendumId)).map(copyOpening);
+  };
+
+  return {
+    list: (referendumId) => inOrder(referendumId, () => read(referendumId)),
+    save: (opening) => {
+      assertStorable(opening);
+      return inOrder(opening.referendumId, async () => {
+        const held = await read(opening.referendumId);
+        const next = held.filter(
+          (item) => !sameBytes(item.ballotCommitment, opening.ballotCommitment),
+        );
+        next.push(copyOpening(opening));
+        await store.set(recordId(opening.referendumId), next);
+      });
+    },
+    clear: (referendumId) => inOrder(referendumId, () => store.remove(recordId(referendumId))),
+  };
+}
+
+function encryptedStorageUsable(): boolean {
+  return (
+    typeof indexedDB !== 'undefined' &&
+    typeof crypto !== 'undefined' &&
+    typeof crypto.subtle !== 'undefined'
+  );
+}
+
+/**
+ * Keeps ballot openings in the same non-extractable AES-GCM IndexedDB boundary
+ * as the civic credential. The scope (normally network + issuer + epoch) keeps
+ * openings from one deployment out of another. Nothing here touches the
+ * network.
+ *
+ * Without IndexedDB the openings live in memory for the life of the page, and
+ * `durability()` reports `memory` so the interface can refuse to seal an
+ * answer it could never count.
+ */
+export function browserBallotOpeningVault(scope: string): BrowserBallotOpeningVault {
+  const normalizedScope = scope.trim();
+  if (!normalizedScope) throw new TypeError('Ballot opening vault scope must not be empty');
+  const encrypted = encryptedStorageUsable();
+
+  let store: BallotOpeningRecordStore;
+  if (encrypted) {
+    const provider = browserPrivateStateProvider<string, readonly BallotOpening[]>();
+    provider.setContractAddress(normalizedScope as ContractAddress);
+    store = {
+      get: (recordId) => provider.get(recordId),
+      set: (recordId, openings) => provider.set(recordId, openings),
+      remove: (recordId) => provider.remove(recordId),
+    };
+  } else {
+    const memoryKey = (recordId: string) => `${normalizedScope}\u0000${recordId}`;
+    store = {
+      get: async (recordId) => ballotVaultMemory.get(memoryKey(recordId)),
+      set: async (recordId, openings) => {
+        ballotVaultMemory.set(memoryKey(recordId), openings);
+      },
+      remove: async (recordId) => {
+        ballotVaultMemory.delete(memoryKey(recordId));
+      },
+    };
+  }
+
+  const storageManager = () =>
+    typeof navigator !== 'undefined' && navigator.storage ? navigator.storage : null;
+
+  return {
+    ...createBallotOpeningVault(store, normalizedScope),
+    durability: async () => {
+      if (!encrypted) return 'memory';
+      try {
+        return (await storageManager()?.persisted?.()) ? 'persistent' : 'best-effort';
+      } catch {
+        return 'best-effort';
+      }
+    },
+    requestPersistence: async () => {
+      if (!encrypted) return false;
+      try {
+        return (await storageManager()?.persist?.()) ?? false;
+      } catch {
+        return false;
+      }
+    },
   };
 }

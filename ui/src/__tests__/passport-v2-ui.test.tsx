@@ -86,6 +86,7 @@ function ports(requests: Array<{ referendumId: string }>) {
       requests.push({ referendumId: request.referendumId });
       return receipt;
     }),
+    revealVote: vi.fn(),
     recordPublicCohort: vi.fn(),
     getCanonicalReceipt: vi.fn().mockResolvedValue(receipt),
   };

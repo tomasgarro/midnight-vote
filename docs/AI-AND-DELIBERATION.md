@@ -4,13 +4,15 @@
 
 Deliberative democracy requires more than recording a preference. People need to understand the issue, examine evidence, recognize tradeoffs and understand why someone else might disagree. midnight.vote's AI vision is to turn dense public material into accessible, useful context while leaving the decision with the participant.
 
-## Today: a source-linked catalogue guide
+## Today: a catalogue guide, and a place for sourced briefs
 
-Ask Midnight currently returns authored answers from the published consultation catalogue, with contextual suggestions and source links. It does not browse the web or call a generative model. PR #35 improves conversation scrolling and proposal context; it does not introduce an AI backend.
+Cleisthenes is the guide of the app and one of its three destinations. In his chat he returns authored answers from the published consultation catalogue, with contextual suggestions and source links. The chat does not browse the web or call a generative model, and it says so.
 
-Civic Pulse is an optional reflection experience. Drafts stay in component memory by default. Participants can explicitly save, review or delete a reflection in browser localStorage; anyone using that browser profile can read a saved reflection. A separate copy-prompt action lets the participant take answers to an external AI service, which shares those answers with that service if pasted there. The app does not upload them automatically. It is not a submitted ballot, a public opinion poll or a training-data collection feature.
+A consultation page can show a brief from the Cleisthenes service: what is asked, what Parliament decided and what was argued, each sentence tied to its source, reviewed by a named person. The app asks for a brief with the consultation, a language and the question, and with nothing about the person ([COMPANION.md](COMPANION.md)). No consultation on the public site is connected to a brief yet.
 
-## Planned: a research and summarization companion
+Civic Pulse is a reflection experience outside the three steps of a consultation. No screen links to it; it is kept at `/#app/pulse`. Drafts stay in component memory by default. Participants can explicitly save, review or delete a reflection in browser localStorage; anyone using that browser profile can read a saved reflection. A separate copy-prompt action lets the participant take answers to an external AI service, which shares those answers with that service if pasted there. The app does not upload them automatically. It is not a submitted ballot, a public opinion poll or a training-data collection feature.
+
+## Next: briefs for real consultations
 
 ```mermaid
 flowchart LR
@@ -20,7 +22,7 @@ flowchart LR
   D --> E[Participant checks sources and decides]
 ```
 
-Useful capabilities include plain-language proposal summaries, explanations of unfamiliar terms, side-by-side arguments, multilingual access and follow-up questions grounded in cited public material. A Swiss parliamentary use case is a proposed starting point, not a completed integration.
+Useful capabilities include plain-language proposal summaries, explanations of unfamiliar terms, side-by-side arguments, multilingual access and follow-up questions grounded in cited public material. The Swiss federal votes are the starting point: Cleisthenes already explains them at `/Switzerland`, from the parliamentary record.
 
 ## Requirements before enabling generative AI
 

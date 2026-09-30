@@ -78,9 +78,7 @@ for (const width of [320, 390]) {
     await noOverflow();
     await page.screenshot({ path: test.info().outputPath(`success-${width}.png`), fullPage: true });
     await page.getByRole('button', { name: 'See the consultations', exact: true }).click();
-    await expect(
-      page.getByRole('button', { name: 'Try the civic pulse', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Consultations', exact: true })).toBeVisible();
     await page.reload();
     await expect(
       page.getByRole('heading', {
@@ -88,9 +86,7 @@ for (const width of [320, 390]) {
         exact: true,
       }),
     ).toHaveCount(0);
-    await expect(
-      page.getByRole('button', { name: 'Try the civic pulse', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Consultations', exact: true })).toBeVisible();
     await noOverflow();
   });
 }
@@ -102,12 +98,7 @@ test('reduced motion keeps the proof interaction and landing navigation function
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  expect(
-    await page
-      .locator('.passport-art__pose')
-      .first()
-      .evaluate((el) => getComputedStyle(el).transform),
-  ).toBe('none');
+  await expect(page.locator('.civic-art__view')).toHaveCSS('animation-name', 'none');
   await expect(page.getByRole('button', { name: 'Pause background animation' })).toBeHidden();
   await page.screenshot({ path: test.info().outputPath('landing-desktop.png'), fullPage: true });
   await page

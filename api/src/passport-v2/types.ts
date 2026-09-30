@@ -185,7 +185,11 @@ export type CivicCredentialErrorCode =
   | 'INVALID_CREDENTIAL_CLAIMS'
   | 'ISSUANCE_FAILED'
   | 'ADAPTER_UNAVAILABLE'
-  | 'CONFLICT';
+  | 'CONFLICT'
+  /** This device holds no opening for a sealed answer on this referendum. */
+  | 'BALLOT_OPENING_NOT_FOUND'
+  /** The referendum is not in its counting phase, or the count has closed. */
+  | 'REVEAL_NOT_OPEN';
 
 export class CivicCredentialError extends Error {
   readonly code: CivicCredentialErrorCode;
@@ -216,6 +220,19 @@ export interface CastVoteRequest {
   readonly referendumId: string;
   readonly choice: VoteChoice;
   readonly authorization: CivicActionAuthorization;
+}
+
+/**
+ * Asks this device to have its own sealed answer counted. The request carries
+ * no choice and no salt: the opening never leaves the device's vault.
+ */
+export interface RevealVoteRequest {
+  readonly referendumId: string;
+  /**
+   * The current pass authorization. Omitted when the pass has expired; the
+   * count is then sponsored with the handle kept beside the sealed answer.
+   */
+  readonly authorization?: CivicActionAuthorization;
 }
 
 /**

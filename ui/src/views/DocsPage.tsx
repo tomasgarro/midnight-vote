@@ -206,8 +206,8 @@ export default function DocsPage() {
             <div>
               <dt>AI-assisted deliberation</dt>
               <dd>
-                Ask Midnight currently uses authored catalogue answers. Browsing, generative
-                summaries and comparison of arguments are the product vision.
+                In the app, Cleisthenes answers from the authored catalogue. Sourced briefs appear
+                on a consultation once its evidence is connected and a person has reviewed it.
               </dd>
             </div>
             <div>

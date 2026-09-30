@@ -8,11 +8,11 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
   padding: 48px 34px;
-  border: 1px solid #fffdf5;
+  border: 1px solid var(--surface);
   border-radius: 22px;
   background: #faf7f0f2;
   box-shadow: 0 16px 45px #5146350b;
-  font-family: Outfit, sans-serif;
+  font-family: var(--font-body);
 }
 .landing-bridge > div {
   display: flex;
@@ -20,7 +20,7 @@
   gap: 24px;
 }
 .landing-bridge svg {
-  color: #716592;
+  color: #706c5c;
   width: 58px;
   height: 58px;
   flex-shrink: 0;
@@ -29,13 +29,13 @@
   display: block;
   font-size: 17px;
   font-weight: 500;
-  color: #272339;
+  color: var(--ink);
 }
 .landing-bridge small {
   display: block;
   margin-top: 6px;
   font-size: 13px;
-  color: #827667;
+  color: var(--ink-muted);
 }
 .how-digital-account {
   position: absolute;
@@ -44,14 +44,14 @@
   width: 62%;
   height: 65%;
   border-radius: 18px;
-  background: linear-gradient(145deg, #fefdf9, #e5dfef);
+  background: linear-gradient(145deg, var(--surface), var(--surface-sunken));
   border: 1px solid #fff;
-  box-shadow: 0 18px 35px #40395615;
+  box-shadow: 0 18px 35px #403d3415;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  color: #76688a;
+  color: var(--ink-muted);
   padding: 18px;
   transform: rotate(-7deg);
 }
@@ -65,7 +65,7 @@
   height: 4px;
   width: 4px;
   border-radius: 50%;
-  background: #bcb2c8;
+  background: #b9b6aa;
 }
 .how-digital-account strong {
   font-size: 15px;
@@ -82,7 +82,7 @@
 }
 .how-account-link > span {
   width: 22px;
-  border-top: 1px dashed #a595bc;
+  border-top: 1px dashed #a09c8b;
 }
 .how-art--passport .how-consent {
   top: 22%;
@@ -102,11 +102,11 @@
 .how-passport-cover {
   position: absolute;
   inset: 0 14% 0 0;
-  border: 1px solid #817180;
+  border: 1px solid #7a7664;
   border-radius: 5px 12px 12px 5px;
-  background: linear-gradient(140deg, #51354a, #281f30);
+  background: linear-gradient(140deg, #3a3f37, var(--ink));
   color: #e2cbaa;
-  box-shadow: 0 18px 35px #251b3526;
+  box-shadow: 0 18px 35px #1e211c26;
   display: flex;
   align-items: center;
   flex-direction: column;
@@ -125,16 +125,22 @@
   position: absolute;
   inset: 42% -6% -3% 7%;
   border-radius: 5px 10px 10px 5px;
-  background: repeating-linear-gradient(35deg, #f2e7d4 0px, #f2e7d4 7px, #ece0c9 8px, #f2e7d4 9px);
-  border: 1px solid #fffaed;
+  background: repeating-linear-gradient(
+    35deg,
+    var(--surface-sunken) 0px,
+    var(--surface-sunken) 7px,
+    var(--surface-sunken) 8px,
+    var(--surface-sunken) 9px
+  );
+  border: 1px solid var(--surface);
   padding: 13px 12px;
   overflow: hidden;
-  box-shadow: 0 8px 20px #24183318;
+  box-shadow: 0 8px 20px #1c1e1a18;
 }
 .how-passport-page > span {
   font-size: 6px;
   letter-spacing: 0.06em;
-  color: #8d7c64;
+  color: var(--ink-muted);
 }
 .how-passport-identity {
   display: flex;
@@ -160,7 +166,7 @@
 .how-passport-mrz {
   font: 7px / 1.5 monospace;
   letter-spacing: 1px;
-  color: #746450;
+  color: var(--ink-muted);
   margin-top: 10px;
 }
 .how-passport-scan {
@@ -169,8 +175,8 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #8881b8;
-  box-shadow: 0 -10px 18px #817dbe50;
+  background: #8d8873;
+  box-shadow: 0 -10px 18px #89847050;
   opacity: 0;
 }
 .how-proof-compute {
@@ -181,10 +187,10 @@
   gap: 7px;
   justify-items: center;
   font-size: 10px;
-  color: #827095;
+  color: var(--ink-muted);
 }
 .how-proof-compute code {
-  color: #9d90af;
+  color: var(--ink-muted);
   font-size: 8px;
 }
 .how-art--proof .how-proof-path {
@@ -213,24 +219,24 @@
   gap: 14px;
   padding: 16px;
   margin: 14px 0 18px;
-  border: 1px solid #dcd3e1;
+  border: 1px solid #ded5c7;
   border-radius: 14px;
-  background: linear-gradient(120deg, #ede6f0, #f8f3e9);
+  background: linear-gradient(120deg, var(--ground), var(--surface));
 }
 .how-ai-preview strong {
   font-size: 14px;
   font-weight: 500;
-  color: #49405f;
+  color: #47453a;
 }
 .how-ai-preview p {
   font-size: 13px;
   line-height: 1.5;
   margin: 5px 0;
-  color: #706579;
+  color: var(--ink-muted);
 }
 .how-ai-preview small {
   font-size: 10px;
-  color: #8a7b8f;
+  color: var(--ink-muted);
 }
 .how-ai-robot {
   width: 46px;
@@ -240,7 +246,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  color: #75648b;
+  color: #6f6b5b;
 }
 .how-ai-robot svg {
   flex-basis: 100%;
@@ -249,7 +255,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #b4a2c9;
+  background: #ada99b;
 }
 .how-panel[data-active="true"] .how-ai-robot svg {
   animation: robot-read 2s ease-in-out 2;

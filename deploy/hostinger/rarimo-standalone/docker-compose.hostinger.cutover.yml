@@ -73,7 +73,9 @@ services:
     security_opt: [no-new-privileges:true]
     command: [midnight-proof-server, -v]
     tmpfs: [/tmp]
-    networks: [rarimo-internal, rarimo-egress]
+    # The issuer runtime refuses a non-loopback proof server over HTTP.
+    # Sharing the verifier's namespace makes it loopback and unreachable.
+    network_mode: "service:rarimo-verificator"
 
   cico:
     image: ghcr.io/tomasgarro/midnight-civic-cico:0.1.0-3f2f6b4@sha256:ec3080c8ee6754365af0e390449ad1be7d1897bb95b9b58891d90b36bd66789e
@@ -88,7 +90,7 @@ services:
       CICO_PORT: 8791
       CICO_ALLOWED_ORIGINS: ${CICO_ALLOWED_ORIGINS:?required}
       CICO_STATE_DIRECTORY: /var/lib/cico-passport
-      CICO_RARIMO_BASE_URL: http://rarimo-verificator:8000
+      CICO_RARIMO_BASE_URL: http://127.0.0.1:8000
       CICO_RARIMO_PROOF_PARAMS_ORIGINS: https://rarimo.cardanoschool.org
       CICO_ISSUER_ID: cico-rarimo-preview
       CICO_ISSUER_ID_HEX: 6369636f2d726172696d6f2d7072657669657700000000000000000000000000
@@ -99,13 +101,14 @@ services:
       CICO_ISSUER_ROLE_SECRET: ${CICO_ISSUER_ROLE_SECRET:?required}
       CICO_ROOT_PUBLISHER_SECRET_HEX: ${CICO_ROOT_PUBLISHER_SECRET_HEX:?required}
       CICO_ZK_CONFIG_PATH: /app/contracts/credential-registry-v1/managed/credential-registry-v1
-      CICO_PROOF_SERVER_URL: http://cico-proof:6300
+      CICO_PROOF_SERVER_URL: http://127.0.0.1:6300
     volumes: [cico-state:/var/lib/cico-passport]
     read_only: true
     tmpfs: [/tmp]
     healthcheck: {test: [CMD, node, -e, "fetch('http://127.0.0.1:8791/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 18, start_period: 60s}
     depends_on: {cico-proof: {condition: service_started}, rarimo-verificator: {condition: service_started}}
-    networks: [rarimo-internal, rarimo-egress]
+    # Shares the verifier netns so 127.0.0.1:8000 is a real loopback host.
+    network_mode: "service:rarimo-verificator"
 
   edge:
     image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
@@ -130,7 +133,7 @@ services:
           }
           @ok path /v1/*
           handle @ok {
-            reverse_proxy cico:8791
+            reverse_proxy rarimo-verificator:8791
           }
           respond 404
         }

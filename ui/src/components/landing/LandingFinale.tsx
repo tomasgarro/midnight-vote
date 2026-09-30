@@ -168,13 +168,12 @@ export function LandingFinale({ onStart }: { onStart: () => void }) {
         </div>
         <div className="finale-landscape" aria-hidden="true">
           <img
-            src="/art/landscape/midnight-mountains.webp"
+            src="/art/civic/geneva-lakefront.webp"
             alt=""
             loading="lazy"
-            width="1536"
-            height="1024"
+            width="1600"
+            height="640"
           />
-          <div className="finale-guide-space" data-art-slot="future-mascot" />
         </div>
       </section>
     </>

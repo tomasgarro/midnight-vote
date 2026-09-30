@@ -58,7 +58,7 @@ export class PassportJourneyPage {
       .click();
     await this.page
       .getByRole('heading', {
-        name: /Consultations for you|Your place in the conversation|Consultas para vos|Tu lugar en la conversación/i,
+        name: /^(Consultations|Consultas)$/,
       })
       .waitFor();
   }

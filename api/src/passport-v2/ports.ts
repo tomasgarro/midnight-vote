@@ -13,6 +13,8 @@ import type {
   PassportSession,
   PassportSessionRequest,
   PublicCohortRequest,
+  RevealVoteRequest,
+  VoteChoice,
 } from './types.js';
 
 /**
@@ -138,12 +140,57 @@ export interface CivicCredentialPort {
 }
 
 /**
+ * What a device must keep to have its sealed answer counted later. The
+ * referendum stores only `persistentCommit(choice, salt)`, so a lost opening is
+ * an answer that can never be counted. Whoever holds an opening can prove how
+ * that answer was cast: it never leaves the device, and it is deleted once the
+ * count is confirmed.
+ */
+export interface BallotOpening {
+  readonly referendumId: string;
+  readonly contractAddress: string;
+  readonly choice: VoteChoice;
+  readonly voteSalt: Uint8Array;
+  /** Public value the cast inserts into the ballot tree; used to find this opening on-chain. */
+  readonly ballotCommitment: Uint8Array;
+  /** `sealing` from just before the cast is submitted; `sealed` once the indexer confirmed it. */
+  readonly status: 'sealing' | 'sealed';
+  /** Block time of the confirmed cast. */
+  readonly sealedAt?: string;
+  /**
+   * The opaque handle that let the relay sponsor the cast. It is kept so the
+   * count can be sponsored after the pass has expired: weeks can pass between
+   * the two, and a pass lasts days. It is not a witness and opens nothing.
+   */
+  readonly countAuthorization?: string;
+}
+
+/**
+ * Encrypted, device-local storage for ballot openings. A referendum may hold
+ * several: a cast whose outcome was uncertain must not be overwritten by a
+ * retry, because only the chain can say which one landed. Implementations must
+ * never send an opening over HTTP or write it to logs, telemetry or receipts.
+ */
+export interface BallotOpeningVaultPort {
+  list(referendumId: string): Promise<readonly BallotOpening[]>;
+  /** Adds the opening, or replaces the stored one with the same commitment. */
+  save(opening: BallotOpening): Promise<void>;
+  /** Removes every opening held for the referendum. */
+  clear(referendumId: string): Promise<void>;
+}
+
+/**
  * Durable boundary for citizen actions. Providers return a canonical receipt
  * only after the Midnight indexer confirms the transaction.
  */
 export interface CivicActionPort {
   readonly adapterName: string;
   castVote(request: CastVoteRequest): Promise<CanonicalReceipt>;
+  /**
+   * Counts this device's own sealed answer. The organizer holds no openings,
+   * so an answer is counted only when the device that sealed it returns.
+   */
+  revealVote(request: RevealVoteRequest): Promise<CanonicalReceipt>;
   recordPublicCohort(request: PublicCohortRequest): Promise<CanonicalReceipt>;
   getCanonicalReceipt(transactionId: string): Promise<CanonicalReceipt | null>;
 }

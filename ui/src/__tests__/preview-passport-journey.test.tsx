@@ -69,6 +69,7 @@ describe('Preview Passport journey', () => {
           actions: {
             adapterName: 'unused-actions',
             castVote,
+            revealVote: vi.fn(),
             recordPublicCohort: vi.fn(),
             getCanonicalReceipt: vi.fn(),
           },

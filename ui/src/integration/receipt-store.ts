@@ -7,6 +7,12 @@ export interface PassportReceiptRecord {
   status: ReceiptStatus;
   network: string;
   explorerUrl?: string;
+  /**
+   * Set for an answer sealed on-chain. Such a receipt carries no transaction
+   * id and no explorer link: either would tie this device to a cast whose
+   * answer becomes public at the count (ADR-009).
+   */
+  sealed?: { readonly provingParty: 'wallet' | 'device' | 'hosted-server' };
 }
 
 type EncryptedRecord = {

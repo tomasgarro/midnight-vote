@@ -1,12 +1,11 @@
 import { ArrowDown, ArrowUpRight, List, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import { PassportHeroArt } from './PassportHeroArt';
+import { CivicHeroArt } from './CivicHeroArt';
 import './landing-hero.css';
 
 export function LandingHero({ onStart }: { onStart: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
-  const heroRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -108,16 +107,7 @@ export function LandingHero({ onStart }: { onStart: () => void }) {
           </a>
         </nav>
       </header>
-      <section
-        ref={heroRef}
-        className="midnight-hero"
-        aria-labelledby="landing-title"
-        data-motion="intro"
-      >
-        <div className="midnight-atmosphere" aria-hidden="true">
-          <div />
-          <span />
-        </div>
+      <section className="midnight-hero" aria-labelledby="landing-title" data-motion="intro">
         <div className="midnight-hero__layout">
           <div className="midnight-hero__copy">
             <p className="midnight-hero__eyebrow">
@@ -156,11 +146,9 @@ export function LandingHero({ onStart }: { onStart: () => void }) {
               </a>
             </div>
           </div>
-          <PassportHeroArt heroRef={heroRef} />
+          <CivicHeroArt />
         </div>
       </section>
     </>
   );
 }
-
-import './light-hero.css';

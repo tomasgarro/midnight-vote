@@ -9,13 +9,22 @@ const CivicRuntime = lazy(async () => {
   return { default: module.CivicRuntime };
 });
 
+/**
+ * The app, or the one screen inside it that has an address of its own. The
+ * two addresses are repeated here so that the landing page does not load the
+ * runtime of the app to read them.
+ */
+function isAppHash(hash: string): boolean {
+  return hash === '#app' || hash === '#app/pulse';
+}
+
 export function App() {
   const [inApp, setInApp] = useState(
-    () => window.location.hash === '#app' || window.parent !== window,
+    () => isAppHash(window.location.hash) || window.parent !== window,
   );
   useEffect(() => {
     const syncRoute = () => {
-      const next = window.location.hash === '#app' || window.parent !== window;
+      const next = isAppHash(window.location.hash) || window.parent !== window;
       setInApp(next);
       if (next !== inApp) window.scrollTo(0, 0);
     };

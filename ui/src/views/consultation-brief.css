@@ -1,0 +1,336 @@
+/*
+ * Consultation brief.
+ *
+ * A reading surface. The two sides are set in the same ink and the same size,
+ * so the page takes no side by its layout. A source is a small numbered chip,
+ * large enough to press with a thumb.
+ */
+
+.brief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+.brief__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.brief__caret {
+  flex: none;
+  color: var(--ink-muted);
+}
+
+.brief__status {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 15px;
+}
+
+.brief__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.brief__title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.brief__official {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.brief__heading {
+  display: block;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.brief__note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.brief__prose {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.brief__arguments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.brief__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.brief__side-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.brief__list {
+  margin: 0;
+  padding-left: var(--space-5);
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.brief__list li::marker {
+  color: var(--line-strong);
+}
+
+/* The chip is 28 by 28 and carries 8 of margin, so two chips in a row leave
+   a 44-point target between their centres. */
+.brief__cite {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  margin: 2px 4px 2px 0;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+.brief__cite:hover {
+  background: var(--surface-sunken);
+}
+.brief__cite:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.brief__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.brief__link:hover {
+  text-decoration: underline;
+}
+.brief__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.brief__how {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+.brief__how summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.brief__how summary::-webkit-details-marker {
+  display: none;
+}
+.brief__how summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.brief__how[open] .brief__caret {
+  transform: rotate(180deg);
+}
+.brief__how > * + * {
+  margin-top: var(--space-2);
+}
+
+.brief__prepared {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.brief__questions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+.brief__questions li + li {
+  border-top: 1px solid var(--line);
+}
+
+.brief__question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.brief__question:hover {
+  background: var(--surface-sunken);
+}
+.brief__question:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.brief__question[aria-expanded="true"] .brief__caret {
+  transform: rotate(180deg);
+}
+
+.brief__question-panel {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.brief__answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.brief__answer-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.brief__answer-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.brief__limits {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+.brief__limits-label {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+.brief__limits ul {
+  margin: 0;
+  padding-left: var(--space-5);
+  list-style: disc;
+}
+
+.brief__ask {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.brief__input {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-input);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  /* 16 px keeps iOS from zooming the page when the field takes focus. */
+  font-size: 16px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.brief__input::placeholder {
+  color: var(--ink-muted);
+}
+.brief__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.brief__citation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.brief__quote {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--line-strong);
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.brief__citation-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-4);
+}
+
+@media (min-width: 720px) {
+  .brief__arguments {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--space-6);
+  }
+  .brief__arguments > .brief__heading,
+  .brief__arguments > .brief__note,
+  .brief__arguments > .sys-callout {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brief__caret {
+    transition: transform var(--dur-press) var(--ease-out);
+  }
+}

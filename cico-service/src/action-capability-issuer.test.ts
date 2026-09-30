@@ -65,6 +65,25 @@ describe('HmacActionCapabilityIssuer', () => {
     ).rejects.toBeInstanceOf(ActionCapabilityError);
   });
 
+  it('lets a citizen credential count its own answer when the circuit is allowlisted', async () => {
+    const counting = new HmacActionCapabilityIssuer({
+      secret,
+      credentialAuthorizationExists: vi.fn(async () => true),
+      allowedNetworks: ['undeployed'],
+      allowedContracts: ['contract-1'],
+      allowedCircuits: ['castVote', 'revealVote'],
+      ttlSeconds: 60,
+      nowSeconds: () => 1_000,
+    });
+    const token = await counting.issue({ ...request, circuit: 'revealVote' });
+    const payload = JSON.parse(Buffer.from(token.split('.')[0] ?? '', 'base64url').toString());
+    expect(payload).toMatchObject({ circuit: 'revealVote', action: 'vote' });
+    // The allowlist still decides: a cast-only deployment refuses it.
+    await expect(issuer().issue({ ...request, circuit: 'revealVote' })).rejects.toBeInstanceOf(
+      ActionCapabilityError,
+    );
+  });
+
   it('never grants organizer or issuer circuits from a citizen credential', async () => {
     const misconfigured = new HmacActionCapabilityIssuer({
       secret,
@@ -76,7 +95,7 @@ describe('HmacActionCapabilityIssuer', () => {
       nowSeconds: () => 1_000,
     });
 
-    for (const circuit of ['closeVote', 'revealVote', 'finalizeVote']) {
+    for (const circuit of ['closeVote', 'finalizeVote']) {
       await expect(misconfigured.issue({ ...request, circuit })).rejects.toBeInstanceOf(
         ActionCapabilityError,
       );

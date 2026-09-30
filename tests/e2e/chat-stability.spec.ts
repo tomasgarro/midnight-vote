@@ -16,16 +16,17 @@ for (const viewport of [
     });
     await page.goto('/#app');
     await expect(page.locator('.votes__results').first()).toBeVisible();
+    // The page says what it is before it lists anything.
     expect(
       await page.locator('.votes').evaluate((el) => {
         const sections = [...el.children];
         return (
-          sections.indexOf(el.querySelector('.votes__results')!) <
-          sections.indexOf(el.querySelector('.votes__head')!)
+          sections.indexOf(el.querySelector('.votes__head')!) <
+          sections.indexOf(el.querySelector('.votes__results')!)
         );
       }),
     ).toBe(true);
-    await page.locator('.dashboard-guide-entry').click();
+    await page.getByRole('button', { name: 'Cleisthenes', exact: true }).click();
     const composer = page.locator('.catalogue-chat__composer');
     const before = await composer.boundingBox();
     const pageTop = await page.evaluate(() => window.scrollY);
@@ -44,9 +45,10 @@ for (const viewport of [
     expect((await composer.boundingBox())?.y).toBeCloseTo(before!.y, 0);
     await page.screenshot({ path: `outputs/chat-stable-${viewport.width}.png` });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    // `--surface` in the dark theme (#262723).
     await expect(page.locator('.chat-followups button').first()).toHaveCSS(
       'background-color',
-      'rgb(44, 46, 45)',
+      'rgb(38, 39, 35)',
     );
     await page.screenshot({ path: `outputs/chat-stable-dark-${viewport.width}.png` });
     await page.getByRole('button', { name: 'Clear chat' }).click();

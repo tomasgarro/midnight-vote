@@ -186,6 +186,7 @@ export async function startServer(): Promise<void> {
         allowedNetworks: config.v2AllowedNetworks,
         allowedContracts: config.v2AllowedContracts,
         allowedCircuits: config.v2AllowedCircuits,
+        submitDelayMaxMs: config.v2SubmitDelayMaxMs,
         validateTransaction: (tx) => {
           deserializeUnbound(tx);
         },

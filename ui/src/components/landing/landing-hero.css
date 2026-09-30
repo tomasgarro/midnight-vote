@@ -2,19 +2,13 @@ body:has(.civic-landing) {
   padding: 0;
   min-width: 0;
 }
-@font-face {
-  font-family: Outfit;
-  src: url("/fonts/outfit-variable.ttf") format("truetype");
-  font-weight: 100 900;
-  font-display: swap;
-}
 .midnight-hero {
   position: relative;
   isolation: isolate;
   overflow: clip;
-  background: #08090d;
-  color: #fff;
-  font-family: Outfit, sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
 
   min-height: max(820px, 100svh);
   display: flex;
@@ -35,24 +29,23 @@ body:has(.civic-landing) {
   display: flex;
   align-items: center;
   gap: 28px;
-  border: 1px solid #ffffffc9;
+  border: 1px solid var(--line);
   border-radius: 22px;
-  background: #f5f1e9f2;
-  backdrop-filter: blur(20px);
-  color: #15161c;
-  box-shadow: 0 8px 32px #00000020;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
 }
 .midnight-brand {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 23px;
-  font-weight: 550;
-  letter-spacing: -1px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 .midnight-brand__suffix {
-  color: #555b6c;
+  color: var(--ink-muted);
   font-weight: 400;
 }
 .midnight-nav__links {
@@ -74,7 +67,7 @@ body:has(.civic-landing) {
   height: 1px;
   position: absolute;
   inset: auto 0 5px;
-  background: #0000fe;
+  background: var(--accent);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 180ms;
@@ -87,78 +80,25 @@ body:has(.civic-landing) {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  background: #171821;
-  color: white;
+  background: var(--ink);
+  color: var(--ground);
   border: 0;
   border-radius: 12px;
   padding: 14px 18px;
   min-height: 46px;
-  font:
-    500 14px Outfit,
-    sans-serif;
+  font: 500 14px var(--font-body);
   transition: background 180ms;
   white-space: nowrap;
 }
 .midnight-nav__start:hover {
-  background: #0000fe;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .midnight-nav__toggle {
   display: none;
 }
 .midnight-nav__mobile {
   display: none;
-}
-.midnight-atmosphere {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  background: radial-gradient(ellipse at 82% 47%, #17295350, transparent 50%);
-}
-.midnight-atmosphere > div {
-  position: absolute;
-  inset: -12% -10% -16% 10%;
-  background:
-    radial-gradient(
-      ellipse 27% 38% at 84% 43%,
-      #ecd4bca6 0%,
-      #cbb8d559 24%,
-      #6766a22b 48%,
-      transparent 72%
-    ),
-    radial-gradient(ellipse 38% 22% at 73% 70%, #5e4ee8a6 0%, #333bbd5c 35%, transparent 75%),
-    radial-gradient(ellipse 44% 42% at 57% 66%, #0b46d8a6 0%, #182d7733 52%, transparent 76%);
-  filter: blur(30px);
-  opacity: 0.85;
-  animation: midnight-atmosphere 4s ease-out 1 both;
-}
-.midnight-atmosphere::before {
-  content: "";
-  position: absolute;
-  width: 85%;
-  height: 115%;
-  left: 47%;
-  top: 10%;
-  border-radius: 50%;
-  transform: rotate(-35deg);
-  border: 1px solid #d2c8ff30;
-  box-shadow:
-    -18px -6px 24px #848ef514,
-    -38px -16px 65px #454ff51c,
-    inset 14px 14px 40px #bbc7ff10;
-}
-.midnight-atmosphere::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(95deg, #08090d70 0%, transparent 60%);
-}
-.midnight-atmosphere > span {
-  position: absolute;
-  inset: 0;
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23grain)' opacity='.55' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
 }
 .midnight-hero__layout {
   width: 100%;
@@ -178,45 +118,37 @@ body:has(.civic-landing) {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #b5bdd6;
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   margin: 0 0 30px;
 }
 .midnight-hero__eyebrow > span {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #8492ff;
-  box-shadow: 0 0 12px #748aff;
+  background: var(--accent);
 }
 .midnight-hero h1 {
   margin: 0;
-  font:
-    450 clamp(68px, 7.1vw, 112px) / 1.01 Outfit,
-    sans-serif;
-  letter-spacing: -0.055em;
-  color: white;
+  font: 400 clamp(64px, 6.7vw, 106px) / 1.02 var(--font-display);
+  letter-spacing: -0.03em;
+  color: var(--ink);
 }
+/* The accent is flat: one colour, no gradient. */
 .civic-landing .midnight-hero h1 em {
   font-style: normal;
-  color: #b6beff;
-  background: linear-gradient(105deg, #b3ccfa 0%, #c8bdff 58%, #e7c7c2 100%);
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--accent);
 }
 .midnight-hero__lead {
-  font-size: clamp(21px, 2vw, 27px);
-  font-weight: 350;
-  line-height: 1.4;
+  font: 400 clamp(22px, 2vw, 28px) / 1.35 var(--font-display);
   margin: 32px 0 14px;
-  letter-spacing: -0.025em;
-  color: #f3f3fa;
+  color: var(--ink);
 }
 .midnight-hero__description {
-  max-width: 395px;
-  color: #a9aec3;
+  max-width: 410px;
+  color: var(--ink-muted);
   font-size: 16px;
   line-height: 1.6;
   margin: 0;
@@ -233,17 +165,13 @@ body:has(.civic-landing) {
   gap: 34px;
   align-items: center;
   border: 0;
-  background: #f5eddf;
-  color: #101323;
+  background: var(--ink);
+  color: var(--ground);
   border-radius: 999px;
   padding: 6px 6px 6px 24px;
-  font:
-    500 16px Outfit,
-    sans-serif;
+  font: 500 16px var(--font-body);
   min-height: 58px;
-  transition:
-    box-shadow 200ms,
-    transform 200ms;
+  transition: transform 200ms;
 }
 .midnight-cta > span {
   display: grid;
@@ -251,18 +179,17 @@ body:has(.civic-landing) {
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: #2525f4;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-ink);
   transition:
     transform 220ms,
     background 220ms;
 }
 .midnight-cta:hover {
-  box-shadow: 0 0 28px #b9baff35;
   transform: translateY(-2px);
 }
 .midnight-cta:hover > span {
-  background: #101093;
+  background: var(--accent-hover);
 }
 .midnight-hero__learn {
   display: flex;
@@ -270,35 +197,13 @@ body:has(.civic-landing) {
   align-items: center;
   min-height: 48px;
   font-size: 15px;
-  color: #e0e2ef;
+  color: var(--ink);
 }
 .midnight-hero__learn svg {
   transition: transform 200ms;
 }
 .midnight-hero__learn:hover svg {
   transform: rotate(45deg);
-}
-.midnight-motion {
-  border: 0;
-  background: none;
-  color: #b8bed2;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 12px 0;
-  font:
-    12px Outfit,
-    sans-serif;
-  min-height: 44px;
-}
-.midnight-hero[data-motion="paused"] .midnight-atmosphere > div {
-  animation-play-state: paused;
-}
-@keyframes midnight-atmosphere {
-  to {
-    transform: translate(-5%, -7%) rotate(12deg);
-    opacity: 0.65;
-  }
 }
 
 .civic-landing .landing-skip {
@@ -322,7 +227,7 @@ body:has(.civic-landing) {
     padding-inline: 36px;
   }
   .midnight-hero h1 {
-    font-size: clamp(68px, 8vw, 90px);
+    font-size: clamp(64px, 7.6vw, 86px);
   }
 }
 @media (max-width: 900px) {
@@ -362,18 +267,18 @@ body:has(.civic-landing) {
     flex-shrink: 0;
     border: 0;
     border-radius: 10px;
-    color: #161825;
-    background: #e5e7ed;
+    color: var(--ink);
+    background: var(--surface-sunken);
   }
   .midnight-nav__mobile:not([hidden]) {
     display: grid;
     position: absolute;
     inset: calc(100% + 10px) 0 auto;
     padding: 12px;
-    border: 1px solid #d8dbe5;
+    border: 1px solid var(--line);
     border-radius: 18px;
-    background: #f7f8fc;
-    box-shadow: 0 12px 30px #0003;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
   }
   .midnight-nav__mobile a {
     display: flex;
@@ -387,17 +292,16 @@ body:has(.civic-landing) {
     padding: 14px 0 50px;
   }
   .midnight-hero__eyebrow {
-    font-size: 12px;
+    font-size: 13px;
     margin-bottom: 26px;
     letter-spacing: 0;
   }
   .midnight-hero h1 {
-    font-size: clamp(58px, 14.7vw, 96px);
-    letter-spacing: -0.055em;
+    font-size: clamp(42px, 13.4vw, 92px);
   }
   .midnight-hero__lead {
     margin-top: 26px;
-    font-size: 23px;
+    font-size: clamp(18px, 5.6vw, 23px);
   }
   .midnight-hero__description {
     font-size: 16px;
@@ -416,9 +320,22 @@ body:has(.civic-landing) {
   .midnight-hero__learn {
     font-size: 14px;
   }
-  .midnight-atmosphere > div {
-    inset: 30% -65% -10% -35%;
-    filter: blur(30px);
+}
+/* A phone: the wordmark, the action and the menu share one line. */
+@media (max-width: 430px) {
+  .midnight-brand {
+    font-size: 17px;
+    min-width: 0;
+  }
+  .midnight-brand > img {
+    width: 34px;
+    height: auto;
+  }
+  .midnight-nav__start {
+    padding-inline: 10px;
+  }
+  .midnight-nav__start svg {
+    display: none;
   }
 }
 @media (max-width: 360px) {
@@ -428,13 +345,11 @@ body:has(.civic-landing) {
     gap: 6px;
   }
   .midnight-brand {
-    font-size: 18px;
+    font-size: 16px;
+    gap: 5px;
   }
-  .midnight-nav__start {
-    padding-inline: 10px;
-  }
-  .midnight-nav__start svg {
-    display: none;
+  .midnight-brand > img {
+    width: 30px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -442,8 +357,5 @@ body:has(.civic-landing) {
   .midnight-hero[data-motion] *::after {
     animation: none;
     transition: none;
-  }
-  .midnight-motion {
-    display: none;
   }
 }

@@ -17,6 +17,10 @@
     "./consultation": {
       "types": "./dist/consultation/index.d.ts",
       "default": "./dist/consultation/index.js"
+    },
+    "./deliberation": {
+      "types": "./dist/deliberation/index.d.ts",
+      "default": "./dist/deliberation/index.js"
     }
   },
   "scripts": {

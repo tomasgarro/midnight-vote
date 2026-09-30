@@ -61,9 +61,9 @@ const DEMO_NOTE = {
 } as const;
 
 const CHOICE_LABEL = {
-  es: { YES: 'Sí', NO: 'No', ABSTAIN: 'Abstención' },
-  en: { YES: 'Yes', NO: 'No', ABSTAIN: 'Abstain' },
-  fr: { YES: 'Oui', NO: 'Non', ABSTAIN: 'Abstention' },
+  es: { YES: 'Sí', NO: 'No', ABSTAIN: 'Sin decidir' },
+  en: { YES: 'Yes', NO: 'No', ABSTAIN: 'Undecided' },
+  fr: { YES: 'Oui', NO: 'Non', ABSTAIN: 'Ne se prononce pas' },
 } as const;
 
 /** The frame around the bars: heading, error title, and the two counted lines. */

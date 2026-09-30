@@ -1,5 +1,6 @@
 export * from './crypto.js';
 export * from './deployment-manifest.js';
+export * from './device-proving.js';
 export * from './fixture-credential-adapter.js';
 export * from './midnight-civic-action-adapter.js';
 export * from './midnight-v2.js';
@@ -20,3 +21,4 @@ export type {
   RarimoVerifiedEvidence,
 } from './rarimo-types.js';
 export * from './types.js';
+export { credentialRegistryV1Witnesses, referendumV2Witnesses } from './witnesses.js';

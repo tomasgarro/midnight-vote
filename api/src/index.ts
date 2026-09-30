@@ -36,9 +36,16 @@ export {
   createFixtureEligibilityProvider,
   eligibilityCommitmentForSecret,
 } from './eligibility.js';
+export type {
+  BallotOpeningDurability,
+  BallotOpeningRecordStore,
+  BrowserBallotOpeningVault,
+} from './private-state.js';
 export {
+  browserBallotOpeningVault,
   browserCivicCredentialVault,
   browserPrivateStateProvider,
+  createBallotOpeningVault,
   deserializePrivateStateFromStorage,
   inMemoryPrivateStateProvider,
   serializePrivateStateForStorage,

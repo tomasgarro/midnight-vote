@@ -27,10 +27,6 @@
   margin-inline: auto;
   padding: var(--space-5) 0 var(--space-8);
 }
-.journey-screen .capybara-mascot {
-  align-self: center;
-  margin-bottom: var(--space-4);
-}
 .journey-screen .sys-success {
   margin-bottom: var(--space-3);
 }
@@ -218,9 +214,6 @@
   width: var(--success-hero-size, 168px);
   margin: 0 auto var(--space-4);
 }
-.journey-success-hero .capybara-mascot {
-  margin-bottom: 0;
-}
 .journey-success-hero .sys-success {
   position: absolute;
   right: -10px;
@@ -349,9 +342,6 @@
   padding-top: clamp(var(--space-5), 8vh, var(--space-10));
   text-align: center;
 }
-.journey-welcome .capybara-mascot {
-  margin-bottom: var(--space-5);
-}
 .journey-welcome .journey-screen__title {
   max-width: none;
   font-size: clamp(42px, 13vw, 64px);
@@ -476,10 +466,6 @@
   border-radius: 48% 48% 20px 20px;
   background: radial-gradient(ellipse at 50% 100%, #e8d4c1, #c6c5da 65%, #a3a1cf);
 }
-.journey-mascot-scene .capybara-mascot {
-  margin: 36px 0 0;
-  animation: journey-hello 900ms ease-out 1;
-}
 .journey-mascot-scene__moon {
   position: absolute;
   top: 32px;
@@ -524,10 +510,6 @@
   border-radius: 50%;
   color: var(--accent);
   background: var(--accent-wash);
-}
-.unified-onboarding[data-stage="privacy"] .journey-screen > .capybara-mascot {
-  width: 88px;
-  margin-bottom: 16px;
 }
 .unified-onboarding .proof-playground__lanes {
   padding: 20px 0 12px;
@@ -574,9 +556,6 @@
   .journey-mascot-scene {
     height: 240px;
   }
-  .journey-mascot-scene .capybara-mascot {
-    width: 210px;
-  }
   .journey-welcome__subtitle {
     font-size: 16px;
   }
@@ -586,14 +565,9 @@
     height: 192px;
     margin-bottom: 16px;
   }
-  .journey-mascot-scene .capybara-mascot {
-    width: 180px;
-    margin-top: 20px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .unified-onboarding .journey-screen,
-  .journey-mascot-scene .capybara-mascot {
+  .unified-onboarding .journey-screen {
     animation: none;
   }
 }

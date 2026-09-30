@@ -1,0 +1,129 @@
+name: Publish service images
+
+# Builds the credential service and the relayer from a clean checkout and
+# publishes both to GHCR. It runs only when started by hand. It deploys
+# nothing: the printed digests are what an operator pins in the VPS project.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Release label, for example 0.2.0
+        required: true
+        type: string
+
+concurrency:
+  group: publish-service-images
+  cancel-in-progress: false
+
+env:
+  # node:22.22.0-bookworm-slim, pinned by digest. Update both together.
+  NODE_IMAGE: node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94
+
+jobs:
+  publish:
+    name: Build and publish ${{ matrix.service.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        service:
+          - name: cico
+            workspace: midnight-referendum-cico-service
+            directory: cico-service
+          - name: relayer
+            workspace: midnight-referendum-relayer
+            directory: relayer
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Validate the release label
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          if ! printf '%s' "$RELEASE" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "The release label must look like 0.2.0 or 0.2.0-rc.1" >&2
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: HUSKY=0 npm ci
+
+      - name: Install Compact developer tools
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+
+      - name: Add Compact to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned Compact toolchain
+        run: $HOME/.local/bin/compact update 0.31.1
+
+      # The images carry the compiled circuits and keys, which are not tracked.
+      - name: Compile contracts and keys
+        run: npm run compile && npm run compile:v2
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Build the image
+        id: build
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/midnight-civic-${{ matrix.service.name }}"
+          tag="${RELEASE}-${short_sha}"
+          docker build --pull \
+            --build-arg NODE_IMAGE="$NODE_IMAGE" \
+            --build-arg SERVICE_WORKSPACE="${{ matrix.service.workspace }}" \
+            --build-arg SERVICE_DIR="${{ matrix.service.directory }}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${RELEASE}" \
+            --label "org.opencontainers.image.licenses=Apache-2.0" \
+            -f deploy/hostinger/Dockerfile.node-service \
+            -t "${image}:${tag}" .
+          echo "reference=${image}:${tag}" >> "$GITHUB_OUTPUT"
+
+      # The image must hold no operator secret and no environment file.
+      - name: Check the image for operator material
+        env:
+          REFERENCE: ${{ steps.build.outputs.reference }}
+        run: |
+          found="$(docker run --rm --entrypoint /bin/sh "$REFERENCE" -c \
+            "find /app -maxdepth 4 \( -name '.env' -o -name '.env.*' -o -name '*.local' -o -name '.state' \) -not -path '*/node_modules/*' | head -20")"
+          if [ -n "$found" ]; then
+            echo "Operator material found in the image:" >&2
+            echo "$found" >&2
+            exit 1
+          fi
+
+      - name: Publish and report the digest
+        env:
+          REFERENCE: ${{ steps.build.outputs.reference }}
+        run: |
+          docker push "$REFERENCE"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$REFERENCE")"
+          {
+            echo "### ${{ matrix.service.name }}"
+            echo
+            echo "Pin this reference in the VPS project:"
+            echo
+            echo '```'
+            echo "${REFERENCE}@${digest##*@}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

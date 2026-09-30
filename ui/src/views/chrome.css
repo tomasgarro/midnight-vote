@@ -90,30 +90,6 @@
 .chrome-environment--showcase {
   color: var(--accent);
 }
-.chrome-utility,
-.chrome-settings {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  border: 1px solid transparent;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--ink-muted);
-  cursor: pointer;
-}
-.chrome-utility:hover,
-.chrome-settings:hover {
-  background: var(--surface-sunken);
-  color: var(--ink);
-}
-.chrome-utility:focus-visible,
-.chrome-settings:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 .chrome-popover {
   position: absolute;
   top: calc(100% + var(--space-2));
@@ -164,38 +140,33 @@
   background: var(--surface-sunken);
 }
 
-/* ---- floating navigation capsule ---- */
-/* The capsule and the action are siblings: Scan overlaps the capsule visually
-   without being one of its destinations. This is the scanner-app grammar from
-   the AppLlama round-two references, adapted to a web shell. */
+/* ---- the navigation bar ---- */
+/* Three destinations in one capsule. The guide stands a little above the
+   line, because he is the one people come to ask. */
 .chrome-bar {
   position: relative;
-  padding: 30px var(--space-2) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
-  background: color-mix(in srgb, var(--ground) 72%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(118%);
-  backdrop-filter: blur(16px) saturate(118%);
+  padding: 22px var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--ground);
 }
 .chrome-nav {
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  width: min(100%, 420px);
+  width: min(100%, 380px);
   margin: 0 auto;
-  padding: 4px;
-  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  padding: 6px;
+  border: 1px solid var(--line);
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
-  box-shadow: 0 10px 28px rgba(26, 26, 24, 0.12);
-  -webkit-backdrop-filter: blur(18px) saturate(120%);
-  backdrop-filter: blur(18px) saturate(120%);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 .chrome-nav__item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0;
+  justify-content: flex-end;
+  gap: 2px;
   min-height: 56px;
   min-width: 0;
   padding: 6px;
@@ -204,72 +175,36 @@
   background: transparent;
   color: var(--ink-muted);
   font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 600;
   cursor: pointer;
-}
-.chrome-nav__center-slot {
-  min-width: 0;
-  min-height: 56px;
 }
 .chrome-nav__icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 28px;
 }
-/* The action overlaps the capsule, but shares its material instead of sitting
-   inside a ground-coloured aperture. That makes the bar read as one composed
-   navigation surface, while the thin edge keeps the action legible. It never
-   takes a selected state, because it is an action rather than a place. */
-.chrome-verify {
-  position: absolute;
-  top: 24px;
-  left: 50%;
-  z-index: 21;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transform: translateX(-50%);
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  transition: transform var(--dur-press) var(--ease-out);
+.chrome-nav__label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
 }
-.chrome-verify__disc {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
-  box-shadow: 0 4px 14px rgba(26, 26, 24, 0.12);
-  -webkit-backdrop-filter: blur(18px) saturate(120%);
-  backdrop-filter: blur(18px) saturate(120%);
-}
-.chrome-verify__mark {
+.chrome-nav__face {
   display: block;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
+  margin-top: -26px;
+  overflow: hidden;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  /* The paper the bust was painted on. */
+  background: #f7ecd9;
+  box-shadow: 0 0 0 1px var(--line);
 }
-.chrome-verify:active {
-  transform: translateX(-50%) scale(0.96);
-}
-.chrome-verify:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: var(--r-input);
-}
-/* The duration collapse alone left the press scale firing instantly rather than
-   not at all -- it is the one transform in the shell, and the guard missed it. */
-@media (prefers-reduced-motion: reduce) {
-  .chrome-verify,
-  .chrome-verify:active {
-    transform: translateX(-50%);
-    transition: none;
-  }
+.chrome-nav__face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .chrome-nav__item:focus-visible {
   outline: 2px solid var(--accent);
@@ -279,6 +214,9 @@
 .chrome-nav__item--active {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   color: var(--accent);
+}
+.chrome-nav__item--active .chrome-nav__face {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* ---- receipt toast ----
@@ -341,13 +279,6 @@
   flex: none;
 }
 
-/* Independent product identity occupies the top-right corner. */
-.chrome-header__identity {
-  order: 2;
-}
-.chrome-actions {
-  order: 1;
-}
 .dashboard-symbol.dashboard-symbol--product {
   width: 40px;
   height: 25px;

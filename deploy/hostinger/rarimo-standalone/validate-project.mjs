@@ -105,9 +105,24 @@ const checks = [
     'Rarimo public route allow-list is missing',
   ],
   [!cutoverCompose.includes('/private/*'), 'a private Rarimo wildcard is exposed at cutover'],
+  // CICO and its proof server share the verifier's network namespace. The
+  // issuer runtime refuses a non-loopback proof server over HTTP, and the
+  // shared namespace keeps both services off every other network.
   [
-    cutoverCompose.includes('CICO_RARIMO_BASE_URL: http://rarimo-verificator:8000'),
-    'CICO does not use the private verifier network',
+    cutoverCompose.includes('CICO_RARIMO_BASE_URL: http://127.0.0.1:8000'),
+    'CICO does not reach the verifier over loopback',
+  ],
+  [
+    cutoverCompose.includes('CICO_PROOF_SERVER_URL: http://127.0.0.1:6300'),
+    'CICO does not reach its proof server over loopback',
+  ],
+  [
+    (cutoverCompose.match(/network_mode: "service:rarimo-verificator"/gu) ?? []).length === 2,
+    'CICO and its proof server must share the verifier network namespace',
+  ],
+  [
+    cutoverCompose.includes('reverse_proxy rarimo-verificator:8791'),
+    'the edge does not reach CICO through the shared namespace',
   ],
   [
     cutoverCompose.includes('CICO_STATE_DIRECTORY: /var/lib/cico-passport'),

@@ -32,10 +32,12 @@ export function canUseCatalogueDialogue(
 }
 export const GUIDE_COPY = {
   en: {
-    name: 'Ask Midnight',
+    name: 'Cleisthenes',
     badge: 'Catalogue guide',
     title: 'A little context.\nA clearer choice.',
-    intro: 'Find open consultations and understand what is being proposed.',
+    intro: 'I find open consultations and explain what is proposed. I never say how to answer.',
+    briefs: 'Briefs from the official record',
+    briefsBody: 'Each sentence is tied to its source, and a named person reviewed the brief.',
     disclosure:
       'Answers come from the published catalogue. Generative AI is not connected. Your chat stays in this open page.',
     input: 'Ask about a consultation',
@@ -64,10 +66,12 @@ export const GUIDE_COPY = {
     reset: 'Chat cleared.',
   },
   es: {
-    name: 'Preguntá a Midnight',
+    name: 'Cleisthenes',
     badge: 'Guía del catálogo',
     title: 'Un poco de contexto.\nUna decisión más clara.',
-    intro: 'Encontrá consultas abiertas y entendé qué se propone.',
+    intro: 'Encuentro consultas abiertas y explico qué se propone. Nunca digo cómo responder.',
+    briefs: 'Informes basados en el registro oficial',
+    briefsBody: 'Cada oración está ligada a su fuente, y una persona con nombre revisó el informe.',
     disclosure:
       'Las respuestas vienen del catálogo publicado. La IA generativa no está conectada. El chat queda en esta página abierta.',
     input: 'Preguntá sobre una consulta',
@@ -96,10 +100,13 @@ export const GUIDE_COPY = {
     reset: 'Chat borrado.',
   },
   fr: {
-    name: 'Demandez à Midnight',
+    name: 'Cleisthenes',
     badge: 'Guide du catalogue',
     title: 'Un peu de contexte.\nUn choix plus éclairé.',
-    intro: 'Trouvez les consultations ouvertes et comprenez les propositions.',
+    intro:
+      'Je trouve les consultations ouvertes et j’explique ce qui est proposé. Je ne dis jamais comment répondre.',
+    briefs: 'Notes fondées sur le registre officiel',
+    briefsBody: 'Chaque phrase est liée à sa source, et une personne nommée a relu la note.',
     disclosure:
       'Les réponses viennent du catalogue publié. L’IA générative n’est pas connectée. Le chat reste dans cette page ouverte.',
     input: 'Posez une question sur une consultation',

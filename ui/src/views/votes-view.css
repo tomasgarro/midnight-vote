@@ -28,104 +28,52 @@
   font-size: 15px;
   line-height: 1.5;
 }
-.votes__pulse {
+/* ---- places ----
+   One row of chips. It scrolls sideways when the places do not fit, and the
+   last chip opens the full list. */
+.votes__scopes {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
-  border-radius: var(--r-card);
-  background: color-mix(in srgb, var(--accent-wash) 62%, var(--surface));
-}
-.votes__pulse-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--r-input);
-  background: var(--surface);
-  color: var(--accent);
-}
-.votes__pulse-copy {
-  display: grid;
+  gap: 8px;
   min-width: 0;
-  gap: var(--space-2);
-}
-.votes__pulse-copy .sys-eyebrow,
-.votes__pulse-copy h2,
-.votes__pulse-copy p {
   margin: 0;
+  padding: 2px 0;
+  border: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.votes__pulse-copy h2 {
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 21px;
-  line-height: 1.15;
+.votes__scopes::-webkit-scrollbar {
+  display: none;
 }
-.votes__pulse-copy > p:not(.sys-eyebrow) {
-  color: var(--ink-muted);
-  font-size: 14px;
-  line-height: 1.45;
-}
-.votes__pulse-copy .sys-btn {
-  width: fit-content;
-  margin-top: var(--space-1);
-}
-.votes__scope-trigger {
-  display: flex;
+.votes__scopes button {
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: 60px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-card);
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-body);
-  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
 }
-.votes__scope-trigger:hover {
-  background: var(--surface-sunken);
+.votes__scopes button[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ground);
 }
-.votes__scope-trigger:focus-visible {
+.votes__scopes button.votes__scopes-more {
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+  color: var(--ink-muted);
+}
+.votes__scopes button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-.votes__scope-trigger-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-input);
-  background: var(--accent-wash);
-  color: var(--accent);
-}
-.votes__scope-trigger-copy {
-  display: grid;
-  flex: 1 1 auto;
-  min-width: 0;
-  gap: 2px;
-}
-.votes__scope-trigger-copy small {
-  color: var(--ink-muted);
-  font-size: 11px;
-  font-weight: 650;
-}
-.votes__scope-trigger-copy strong {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 16px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.votes__scope-trigger > svg {
-  flex: 0 0 auto;
-  color: var(--ink-muted);
 }
 .votes__results,
 .votes__results-head {
@@ -257,7 +205,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 10px 0 0;
+  margin: 0;
   color: var(--ink-muted);
   font-size: 12px;
   line-height: 1.45;

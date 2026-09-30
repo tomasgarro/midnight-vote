@@ -11,20 +11,20 @@ test.beforeEach(async ({ page }) => {
   });
   await page.goto('/#app');
 });
-test('global first, regional second, source-backed chat and reduced motion', async ({ page }) => {
-  await page.getByRole('button', { name: /Browse by place/ }).click();
-  // Selection closes the sheet, so assert the resulting scope rather than a detached radio.
-  await page.getByRole('radio', { name: /Switzerland/ }).click();
-  await expect(page.locator('.votes__results h2')).toHaveText(['Global', 'Switzerland']);
+test('one place at a time, source-backed chat and reduced motion', async ({ page }) => {
+  const places = page.getByRole('group', { name: 'Consultation scope' });
+  await expect(page.locator('.votes__results h2')).toHaveText(['Global']);
+  await places.getByRole('button', { name: 'Switzerland' }).click();
+  await expect(page.locator('.votes__results h2')).toHaveText(['Switzerland']);
   await expect(page.getByRole('heading', { name: 'Should the SNB hold Bitcoin?' })).toBeVisible();
-  await page.locator('.dashboard-guide-entry').click();
+  await page.getByRole('button', { name: 'Cleisthenes', exact: true }).click();
   await page.getByRole('textbox').fill('Summarize the Swiss Bitcoin initiative');
   await page.getByRole('button', { name: 'Send question' }).click();
   await expect(page.getByRole('status')).toContainText('Finding catalogue context');
   await expect(page.locator('.catalogue-chat__answer')).toContainText(
     'constitutional reserve provision',
   );
-  await page.screenshot({ path: 'outputs/ask-midnight-bitcoin-390.png' });
+  await page.screenshot({ path: 'outputs/cleisthenes-bitcoin-390.png' });
   await page.getByRole('button', { name: 'Sources', exact: true }).click();
   await expect(page.getByRole('link', { name: /Swiss National Bank/ })).toHaveAttribute(
     'href',
@@ -38,7 +38,8 @@ test('global first, regional second, source-backed chat and reduced motion', asy
   await expect(page.getByRole('status')).toHaveCount(0);
 });
 test('budget reflection preserves choices on back and review editing', async ({ page }) => {
-  await page.locator('.votes__pulse button').click();
+  // The civic pulse is outside the three steps. Its address opens it.
+  await page.goto('/#app/pulse');
   await page.getByRole('button', { name: 'Start reflecting' }).click();
   await page.getByRole('button', { name: 'Begin', exact: true }).click();
   await page.getByRole('button', { name: /Cost of living/ }).click();

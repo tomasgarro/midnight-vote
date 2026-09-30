@@ -1,22 +1,12 @@
 import {
   ArrowRight,
-  CaretDown,
+  DotsThree,
   GlobeHemisphereWest,
   MapPin,
-  Robot,
   ShieldCheck,
-  UsersThree,
 } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Card,
-  CountryPicker,
-  Display,
-  EmptyState,
-  Eyebrow,
-  Sheet,
-} from '@/components/system';
+import { Button, Card, CountryPicker, Display, EmptyState, Sheet } from '@/components/system';
 import { CountryFlag } from '@/components/system/CountryFlag';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import { countryName, findAssignedCountry } from '@/integration/country-catalog';
@@ -39,11 +29,10 @@ import './discovery-cards.css';
 
 const COPY = {
   es: {
-    eyebrow: 'Descubrir',
-    title: 'Tu lugar en la conversación',
-    lead: 'Explorá preguntas abiertas, entendé las propuestas y participá cuando estés listo.',
+    title: 'Consultas',
+    lead: 'Entendé la pregunta, preguntá lo que necesites y decí dónde estás parado.',
     world: 'Global',
-    scopeButton: 'Explorar por lugar',
+    scopeMore: 'Más lugares',
     scopeDialogTitle: 'Elegí un lugar',
     scopeLabel: 'Alcance de las consultas',
     globalScope: 'Consultas globales',
@@ -67,17 +56,12 @@ const COPY = {
     fromContract: 'Estado público leído desde Midnight',
     empty: 'No hay consultas publicadas en este alcance todavía.',
     passOnFile: 'Pase registrado para',
-    pulseEyebrow: 'Un momento para reflexionar',
-    pulseTitle: '¿Qué importa en tu día a día?',
-    pulseBody: 'Unas preguntas sobre los cambios que querés ver. En privado y a tu ritmo.',
-    pulseAction: 'Probar el pulso cívico',
   },
   en: {
-    eyebrow: 'Discover',
-    title: 'Your place in the conversation',
-    lead: 'Explore open questions, understand the proposals, and take part when you are ready.',
+    title: 'Consultations',
+    lead: 'Understand the question, ask what you need, and say where you stand.',
     world: 'Global',
-    scopeButton: 'Browse by place',
+    scopeMore: 'More places',
     scopeDialogTitle: 'Choose a place',
     scopeLabel: 'Consultation scope',
     globalScope: 'Global consultations',
@@ -101,18 +85,12 @@ const COPY = {
     fromContract: 'Public state read from Midnight',
     empty: 'No consultations are published in this scope yet.',
     passOnFile: 'Pass on file for',
-    pulseEyebrow: 'A moment to reflect',
-    pulseTitle: 'What matters in your everyday life?',
-    pulseBody:
-      'A few thoughtful questions about the changes you want to see. Private, and at your pace.',
-    pulseAction: 'Try the civic pulse',
   },
   fr: {
-    eyebrow: 'Découvrir',
-    title: 'Votre place dans la conversation',
-    lead: 'Explorez les questions ouvertes, comprenez les propositions et participez à votre rythme.',
+    title: 'Consultations',
+    lead: 'Comprenez la question, demandez ce qu’il vous faut et dites où vous vous situez.',
     world: 'Monde',
-    scopeButton: 'Parcourir par lieu',
+    scopeMore: 'Plus de lieux',
     scopeDialogTitle: 'Choisir un lieu',
     scopeLabel: 'Périmètre de la consultation',
     globalScope: 'Consultations mondiales',
@@ -137,13 +115,11 @@ const COPY = {
     fromContract: 'État public lu depuis Midnight',
     empty: "Aucune consultation n'est encore publiée dans ce périmètre.",
     passOnFile: 'Laissez-passer enregistré pour',
-    pulseEyebrow: 'Un moment pour réfléchir',
-    pulseTitle: 'Qu’est-ce qui compte au quotidien ?',
-    pulseBody:
-      'Quelques questions sur les changements que vous souhaitez. En privé, à votre rythme.',
-    pulseAction: 'Essayer le pouls civique',
   },
 } as const;
+
+/** With this many consultations or fewer, the whole list is already in view. */
+const SUBJECT_FILTER_FROM = 4;
 
 export interface VotesViewProps {
   readonly polls: readonly Poll[];
@@ -152,8 +128,6 @@ export interface VotesViewProps {
   readonly onStartVote: (pollId: string) => void;
   readonly onOpenPolicy: (pollId: string) => void;
   readonly onOpenPassportJourney: () => void;
-  readonly onOpenPulse: () => void;
-  readonly onOpenGuide?: () => void;
   readonly locale: CicoLocale;
 }
 
@@ -164,8 +138,6 @@ export function VotesView({
   onStartVote,
   onOpenPolicy,
   onOpenPassportJourney,
-  onOpenPulse,
-  onOpenGuide,
   locale,
 }: VotesViewProps) {
   const copy = COPY[locale];
@@ -200,6 +172,11 @@ export function VotesView({
       ? polls.filter((poll) => !isCountryPoll(poll))
       : polls.filter((poll) => isCountryPollForCountry(poll, scope.code));
   const countryLabel = scope.kind === 'country' ? countryName(scope.code, locale) : copy.world;
+  // A place chosen in the sheet gets a chip of its own, so the choice is visible.
+  const scopeChips =
+    scope.kind === 'country' && !availableCountryCodes.includes(scope.code)
+      ? [...availableCountryCodes, scope.code]
+      : availableCountryCodes;
   const passMatchesCountry = Boolean(
     credential &&
       scope.kind === 'country' &&
@@ -219,52 +196,42 @@ export function VotesView({
 
   return (
     <main className="votes">
-      {onOpenGuide ? (
-        <button className="dashboard-guide-entry" type="button" onClick={onOpenGuide}>
-          <Robot size={26} />
-          <span>
-            <strong>
-              {locale === 'en'
-                ? 'Ask about a consultation'
-                : locale === 'es'
-                  ? 'Preguntá sobre una consulta'
-                  : 'Une question sur une consultation ?'}
-            </strong>
-            <small>
-              {locale === 'en'
-                ? 'Find a project. Get the essentials.'
-                : locale === 'es'
-                  ? 'Encontrá un proyecto. Conocé lo esencial.'
-                  : 'Trouvez un projet. Comprenez l’essentiel.'}
-            </small>
-          </span>
-          <ArrowRight size={18} />
+      <header className="votes__head">
+        <Display>{copy.title}</Display>
+        <p className="votes__lead">{copy.lead}</p>
+      </header>
+
+      {/* The places that have consultations are one tap away. Every other
+          place is in the sheet, behind the last chip. */}
+      <fieldset className="votes__scopes" aria-label={copy.scopeLabel}>
+        <button type="button" aria-pressed={scope.kind === 'world'} onClick={chooseGlobal}>
+          <GlobeHemisphereWest size={17} aria-hidden="true" />
+          {copy.world}
         </button>
-      ) : null}
+        {scopeChips.map((code) => (
+          <button
+            type="button"
+            key={code}
+            aria-pressed={scope.kind === 'country' && scope.code === code}
+            onClick={() => chooseCountry(code)}
+          >
+            <CountryFlag alpha2={code} size="sm" />
+            {countryName(code, locale)}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="votes__scopes-more"
+          aria-haspopup="dialog"
+          aria-expanded={scopeSheetOpen}
+          aria-label={copy.scopeMore}
+          title={copy.scopeMore}
+          onClick={() => setScopeSheetOpen(true)}
+        >
+          <DotsThree size={20} weight="bold" aria-hidden="true" />
+        </button>
+      </fieldset>
 
-      <button
-        type="button"
-        className="votes__scope-trigger"
-        aria-haspopup="dialog"
-        aria-expanded={scopeSheetOpen}
-        onClick={() => setScopeSheetOpen(true)}
-      >
-        <span className="votes__scope-trigger-icon" aria-hidden="true">
-          {scope.kind === 'world' ? (
-            <GlobeHemisphereWest size={19} />
-          ) : (
-            <CountryFlag alpha2={scope.code} size="sm" />
-          )}
-        </span>
-        <span className="votes__scope-trigger-copy">
-          <small>{copy.scopeButton}</small>
-          <strong>{countryLabel}</strong>
-        </span>
-        <CaretDown size={18} aria-hidden="true" />
-      </button>
-
-      {/* Browsing scope is a filter, not a page tab. The full catalogue stays
-          searchable in the sheet while published countries lead the list. */}
       <p className="votes__scope-note">
         <MapPin size={15} aria-hidden="true" />
         <span>
@@ -272,16 +239,21 @@ export function VotesView({
         </span>
       </p>
 
-      <fieldset className="discovery-subjects" aria-label={SUBJECTS[locale].all}>
+      {/* A subject filter earns its row only when there is a list to shorten. */}
+      <fieldset
+        className="discovery-subjects"
+        aria-label={SUBJECTS[locale].all}
+        hidden={scopedPolls.length <= SUBJECT_FILTER_FROM}
+      >
         {(Object.keys(SUBJECTS[locale]) as (keyof typeof SUBJECTS.en)[])
           .filter(
             (key) =>
               key === 'all' ||
               polls
-                .filter(
-                  (poll) =>
-                    !isCountryPoll(poll) ||
-                    (scope.kind === 'country' && isCountryPollForCountry(poll, scope.code)),
+                .filter((poll) =>
+                  scope.kind === 'country'
+                    ? isCountryPollForCountry(poll, scope.code)
+                    : !isCountryPoll(poll),
                 )
                 .some((poll) => pollSubject(poll) === key),
           )
@@ -299,10 +271,9 @@ export function VotesView({
           ))}
       </fieldset>
       {[
-        { key: 'global', label: copy.world, items: polls.filter((poll) => !isCountryPoll(poll)) },
-        ...(scope.kind === 'country'
-          ? [{ key: scope.code, label: countryLabel, items: scopedPolls }]
-          : []),
+        scope.kind === 'country'
+          ? { key: scope.code, label: countryLabel, items: scopedPolls }
+          : { key: 'global', label: copy.world, items: scopedPolls },
       ].map(({ key: sectionKey, label: countryLabel, items: sectionPolls }) => {
         const visiblePolls = sectionPolls.filter(
           (poll) => subject === 'all' || pollSubject(poll) === subject,
@@ -403,26 +374,6 @@ export function VotesView({
           </section>
         );
       })}
-
-      <header className="votes__head">
-        <Eyebrow>{copy.eyebrow}</Eyebrow>
-        <Display>{copy.title}</Display>
-        <p className="votes__lead">{copy.lead}</p>
-      </header>
-
-      <section className="votes__pulse" aria-labelledby="civic-pulse-title">
-        <span className="votes__pulse-icon" aria-hidden="true">
-          <UsersThree size={23} />
-        </span>
-        <div className="votes__pulse-copy">
-          <p className="sys-eyebrow">{copy.pulseEyebrow}</p>
-          <h2 id="civic-pulse-title">{copy.pulseTitle}</h2>
-          <p>{copy.pulseBody}</p>
-          <Button size="sm" onClick={onOpenPulse}>
-            {copy.pulseAction} <ArrowRight size={16} />
-          </Button>
-        </div>
-      </section>
 
       {scope.kind === 'world' ? (
         <ResultsPanel contractAddress={publicContractAddress} locale={locale} />

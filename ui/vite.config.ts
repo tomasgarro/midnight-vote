@@ -32,6 +32,11 @@ export default defineConfig({
       ),
     },
   },
+  // The device prover is a worker that loads Midnight's WASM prover.
+  worker: {
+    format: 'es',
+    plugins: () => [wasm(), topLevelAwait()],
+  },
   build: {
     target: 'esnext',
     minify: 'esbuild',

@@ -89,12 +89,12 @@ export const REFLECTION_COPY = {
     remove: 'Delete saved reflection',
     failed: 'Browser storage is unavailable. Your answers are still in this page.',
     note: 'Saving is optional. Anyone using this browser profile can read it. Nothing is uploaded; you can delete it here.',
-    discuss: 'Explore with Ask Midnight',
+    discuss: 'Explore with Cleisthenes',
     copy: 'Copy a prompt for AI',
     copied: 'Prompt copied',
     copyFailed: 'Clipboard access is unavailable. Select and copy the prompt below.',
     handoff:
-      'Ask Midnight currently uses catalogue information, not generative AI. You can also copy this reflection into an AI service of your choice; that shares your answers with that service.',
+      'In this chat Cleisthenes uses catalogue information, not generative AI. You can also copy this reflection into an AI service of your choice; that shares your answers with that service.',
     prompt:
       'Help me reflect on these choices. Ask one clarifying question at a time, compare tradeoffs and uncertainties, and do not infer a political identity or tell me how to vote.',
     return: 'Return to the app',
@@ -107,12 +107,12 @@ export const REFLECTION_COPY = {
     remove: 'Borrar reflexión guardada',
     failed: 'El almacenamiento no está disponible. Tus respuestas siguen en esta página.',
     note: 'Guardar es opcional. Quien use este perfil del navegador puede leerlo. Nada se sube; podés borrarlo acá.',
-    discuss: 'Explorar con Midnight',
+    discuss: 'Explorar con Cleisthenes',
     copy: 'Copiar un mensaje para IA',
     copied: 'Mensaje copiado',
     copyFailed: 'No hay acceso al portapapeles. Seleccioná y copiá el mensaje de abajo.',
     handoff:
-      'Midnight usa información del catálogo, no IA generativa. También podés copiar esta reflexión a una IA que elijas; eso comparte tus respuestas con ese servicio.',
+      'En este chat Cleisthenes usa información del catálogo, no IA generativa. También podés copiar esta reflexión a una IA que elijas; eso comparte tus respuestas con ese servicio.',
     prompt:
       'Ayudame a reflexionar sobre estas decisiones. Hacé una pregunta aclaratoria por vez, compará alternativas e incertidumbres y no infieras una identidad política ni me digas cómo votar.',
     return: 'Volver a la app',
@@ -125,12 +125,12 @@ export const REFLECTION_COPY = {
     remove: 'Supprimer la réflexion enregistrée',
     failed: 'Le stockage est indisponible. Vos réponses restent dans cette page.',
     note: 'L’enregistrement est facultatif. Toute personne utilisant ce profil de navigateur peut le lire. Rien n’est envoyé ; vous pouvez le supprimer ici.',
-    discuss: 'Explorer avec Midnight',
+    discuss: 'Explorer avec Cleisthenes',
     copy: 'Copier un message pour une IA',
     copied: 'Message copié',
     copyFailed: 'Le presse-papiers est indisponible. Sélectionnez et copiez le message ci-dessous.',
     handoff:
-      'Midnight utilise le catalogue, sans IA générative. Vous pouvez aussi copier cette réflexion dans une IA de votre choix ; vos réponses seront alors partagées avec ce service.',
+      'Dans ce chat, Cleisthenes utilise le catalogue, sans IA générative. Vous pouvez aussi copier cette réflexion dans une IA de votre choix ; vos réponses seront alors partagées avec ce service.',
     prompt:
       'Aidez-moi à réfléchir à ces choix. Posez une question à la fois, comparez les compromis et incertitudes, sans déduire mon identité politique ni me dire comment voter.',
     return: 'Retour à l’application',

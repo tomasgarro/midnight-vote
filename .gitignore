@@ -53,6 +53,8 @@ api/src/generated/credential-registry-v1/
 api/src/generated/referendum-v2/
 ui/public/managed/credential-registry-v1/
 ui/public/managed/referendum-v2/
+# Midnight's public parameter files, fetched and verified by `npm run zk:params`.
+ui/public/zk-params/
 
 # Third-party agent skills and local agent state: tooling, not project code.
 .agents/

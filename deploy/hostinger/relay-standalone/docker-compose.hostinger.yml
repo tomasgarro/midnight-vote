@@ -1,0 +1,160 @@
+name: midnight-civic-relay
+
+# Relayer, its database, its own proof server, and the optional voter proving
+# server (ADR-010). Runs beside or apart from midnight-rarimo-nfc. See README.
+
+x-hard: &hard
+  restart: unless-stopped
+  init: true
+  security_opt: [no-new-privileges:true]
+x-proof: &proof
+  <<: *hard
+  image: midnightntwrk/proof-server:8.1.0@sha256:801bbc0340e9e96f16735f77b523f23c7459e3359842f7c79c2c53f4e994d531
+  read_only: true
+  tmpfs: [/tmp]
+
+services:
+  secret-init:
+    image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+    restart: "no"
+    security_opt: [no-new-privileges:true]
+    command: [/bin/sh, -ec, "umask 027; f=/s/db-password; test -s $$f || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' >$$f; test $$(wc -c <$$f) -eq 64; chown 0:1000 $$f; chmod 0440 $$f"]
+    volumes: [relay-secrets:/s]
+    network_mode: none
+
+  relayer-postgres:
+    <<: *hard
+    image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    environment: {POSTGRES_DB: relayer, POSTGRES_USER: relayer, POSTGRES_PASSWORD_FILE: /run/relay-secrets/db-password}
+    volumes: [relay-secrets:/run/relay-secrets:ro, relayer-postgres-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U relayer -d relayer"], interval: 5s, timeout: 5s, retries: 30}
+    depends_on: {secret-init: {condition: service_completed_successfully}}
+    networks: [relay-internal]
+
+  # Proves the relayer's own fee transactions. It never sees an answer. It
+  # needs egress once, to fetch Midnight's public parameters at start.
+  relayer-proof:
+    <<: *proof
+    command: [midnight-proof-server, -v]
+    networks: [relay-internal, relay-egress]
+
+  relayer:
+    <<: *hard
+    image: ${RELAYER_IMAGE:?pin ghcr.io/tomasgarro/midnight-civic-relayer by digest}
+    user: "1000:1000"
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        p=
+        IFS= read -r p </run/relay-secrets/db-password || test -n "$$p"
+        case "$$p" in (*[!0-9a-f]*|'') exit 1;; esac
+        export RELAYER_V2_DATABASE_URL="postgres://relayer:$${p}@relayer-postgres:5432/relayer"
+        exec node relayer/dist/server.js
+    environment:
+      RELAYER_SEED: ${RELAYER_SEED:?required}
+      RELAYER_V2_CAPABILITY_SECRET: ${RELAYER_V2_CAPABILITY_SECRET:?required}
+      RELAYER_V2_ALLOWED_CONTRACTS: ${RELAYER_V2_ALLOWED_CONTRACTS:?required}
+      RELAYER_ALLOWED_ORIGINS: ${APP_ORIGIN:?required}
+      RELAYER_NETWORK_ID: preview
+      RELAYER_V2_ALLOWED_NETWORKS: preview
+      RELAYER_V2_ALLOWED_CIRCUITS: castVote,revealVote
+      RELAYER_V2_SUBMIT_DELAY_MAX_MS: 20000
+      RELAYER_PROOF_SERVER_URL: http://relayer-proof:6300
+      RELAYER_HOST: 0.0.0.0
+      RELAYER_PORT: 8790
+      RELAYER_V2_JOB_STORE_PATH: /var/lib/relayer/state/v2-actions.json
+      RELAYER_EXPLORER_BASE_URL: https://explorer.preview.midnight.network/tx
+      RELAYER_LEGACY_API_ENABLED: "false"
+    volumes: [relay-secrets:/run/relay-secrets:ro, relayer-state:/var/lib/relayer/state]
+    read_only: true
+    tmpfs: [/tmp]
+    healthcheck: {test: [CMD, node, -e, "fetch('http://127.0.0.1:8790/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 60, start_period: 5m}
+    depends_on: {relayer-postgres: {condition: service_healthy}, relayer-proof: {condition: service_started}}
+    networks: [relay-internal, relay-egress, relay-edge]
+
+  # Optional: builds proofs for people who chose it and accepted its
+  # disclosure. No verbose flag, no volume, no network but the edge.
+  voter-proof:
+    <<: *proof
+    profiles: [hosted-proving]
+    command: [midnight-proof-server]
+    networks: [prove-edge, prove-egress]
+
+  edge:
+    <<: *hard
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    entrypoint: [/bin/sh, -ec]
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN:?required}
+      PROVE_DOMAIN: ${PROVE_DOMAIN:-http://prove.invalid}
+      APP_ORIGIN: ${APP_ORIGIN:?required}
+    command:
+      - |
+        cat >/tmp/Caddyfile <<'CADDY'
+        (secure) {
+          header {
+            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+            X-Content-Type-Options nosniff
+            Referrer-Policy no-referrer
+            X-Frame-Options DENY
+            X-Robots-Tag "noindex, nofollow"
+          }
+        }
+        {$$RELAY_DOMAIN} {
+          import secure
+          request_body {
+            max_size 2MB
+          }
+          @relay path /keys /v2/*
+          handle @relay {
+            reverse_proxy relayer:8790
+          }
+          respond 404
+        }
+        {$$PROVE_DOMAIN} {
+          import secure
+          request_body {
+            max_size 16MB
+          }
+          @origin header Origin {$$APP_ORIGIN}
+          header @origin {
+            Access-Control-Allow-Origin {$$APP_ORIGIN}
+            Access-Control-Allow-Methods "POST, OPTIONS"
+            Access-Control-Allow-Headers Content-Type
+            Vary Origin
+          }
+          @preflight method OPTIONS
+          handle @preflight {
+            respond 204
+          }
+          @prove {
+            method POST
+            path /check /prove
+            header Origin {$$APP_ORIGIN}
+          }
+          handle @prove {
+            reverse_proxy voter-proof:6300
+          }
+          respond 404
+        }
+        CADDY
+        exec caddy run --config /tmp/Caddyfile
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes: [caddy-data:/data, caddy-config:/config]
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on: {relayer: {condition: service_started}}
+    networks: [relay-edge, prove-edge]
+
+networks:
+  relay-internal: {internal: true}
+  relay-egress: {}
+  relay-edge: {}
+  prove-edge: {}
+  prove-egress: {}
+volumes:
+  relay-secrets: {name: midnight-civic-relay-secrets}
+  relayer-postgres-data: {name: midnight-civic-relay-postgres-data}
+  relayer-state: {name: midnight-civic-relay-state}
+  caddy-data: {name: midnight-civic-relay-caddy-data}
+  caddy-config: {name: midnight-civic-relay-caddy-config}

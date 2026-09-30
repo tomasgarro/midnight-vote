@@ -28,6 +28,19 @@ interface ImportMetaEnv {
   readonly VITE_CICO_REFERENDA_JSON?: string;
   /** Set to run the wallet-less sponsored-relayer path. */
   readonly VITE_RELAYER_URL?: string;
+  /**
+   * HTTPS proving server for browsers without a wallet (ADR-010). It sees the
+   * answer while it proves, so the interface asks before using it.
+   */
+  readonly VITE_HOSTED_PROOF_SERVER_URL?: string;
+  /** Where the deliberation assistant answers. Defaults to `/Switzerland/api`. */
+  readonly VITE_ASSISTANT_API_URL?: string;
+  /** Public JSON: `{ "<referendumId>": { "objectId": "<vote object>" } }`. */
+  readonly VITE_ASSISTANT_SOURCES_JSON?: string;
+  /** `off` disables proving in the browser (ADR-011). On by default. */
+  readonly VITE_DEVICE_PROVING?: string;
+  /** Where `bls_midnight_2p<k>` is served. Defaults to `/zk-params` on this origin. */
+  readonly VITE_DEVICE_PARAMS_URL?: string;
 }
 
 interface ImportMeta {

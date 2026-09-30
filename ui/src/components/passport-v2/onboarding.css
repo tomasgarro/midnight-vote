@@ -1,20 +1,14 @@
-@font-face {
-  font-family: Outfit;
-  src: url("/fonts/outfit-variable.ttf") format("truetype");
-  font-weight: 100 900;
-  font-display: swap;
-}
+/* The onboarding wears the brand tokens. Its own names are kept, because
+   every rule below asks for them. */
 .onboarding-v3,
 .preview-journey.onboarding-v3 {
-  --onboarding-ground: #f6f3ec;
-  --onboarding-ink: #272333;
-  --onboarding-muted: #716b72;
-  --onboarding-line: #ddd7ce;
-  --onboarding-orange: #b7653b;
-  --onboarding-panel: #ffffff80;
-  --font-display: Outfit, sans-serif;
-  --font-body: Outfit, sans-serif;
-  font-family: Outfit, sans-serif;
+  --onboarding-ground: var(--ground);
+  --onboarding-ink: var(--ink);
+  --onboarding-muted: var(--ink-muted);
+  --onboarding-line: var(--line);
+  --onboarding-orange: var(--accent);
+  --onboarding-panel: color-mix(in srgb, var(--surface) 50%, transparent);
+  font-family: var(--font-body);
   color: var(--onboarding-ink);
   background: var(--onboarding-ground);
   min-height: 100svh;
@@ -54,9 +48,7 @@
 .onboarding-screen h1,
 .onboarding-v3 h2 {
   color: var(--onboarding-ink);
-  font:
-    500 clamp(28px, 7vw, 40px) / 1.13 Outfit,
-    sans-serif;
+  font: 400 clamp(28px, 7vw, 40px) / 1.13 var(--font-display);
   letter-spacing: -0.035em;
   white-space: pre-line;
   margin: 0;
@@ -98,9 +90,7 @@
 .onboarding-primary,
 .onboarding-secondary,
 .onboarding-demo-link {
-  font:
-    500 15px / 1.4 Outfit,
-    sans-serif;
+  font: 500 15px / 1.4 var(--font-body);
   min-height: 52px;
   border-radius: 999px;
   cursor: pointer;

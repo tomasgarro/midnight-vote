@@ -111,8 +111,14 @@ const lines = [
   `CICO_ACTION_CAPABILITY_SECRET=${randomBytes(32).toString('hex')}`,
   'CICO_ACTION_CAPABILITY_TTL_SECONDS=120',
   'CICO_ACTION_ALLOWED_NETWORKS=preview',
-  `CICO_ACTION_ALLOWED_CONTRACTS=${manifest.referenda?.[0]?.contractAddress ?? ''}`,
-  'CICO_ACTION_ALLOWED_CIRCUITS=castVote',
+  // Every referendum in the manifest, not only the first: a pass must be able
+  // to seal and count an answer in each consultation that is deployed.
+  `CICO_ACTION_ALLOWED_CONTRACTS=${(manifest.referenda ?? [])
+    .map((referendum) => referendum.contractAddress)
+    .filter(Boolean)
+    .join(',')}`,
+  // castVote seals an answer; revealVote lets the same device count it (ADR-009).
+  'CICO_ACTION_ALLOWED_CIRCUITS=castVote,revealVote',
   '',
 ];
 

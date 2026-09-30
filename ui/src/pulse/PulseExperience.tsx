@@ -17,7 +17,7 @@ import {
   type TradeoffId,
 } from 'midnight-referendum-api/pulse';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { OnboardingMascot } from '@/components/passport-v2/OnboardingMascot';
+import { CompanionFigure } from '@/components/companion';
 import { useJourneyHistory } from '@/components/passport-v2/useJourneyHistory';
 import type { CicoLocale } from '@/integration/locale';
 import { BUDGET_COPY } from './budget-copy';
@@ -318,7 +318,7 @@ export function PulseExperience({
         {stage === 'intro' ? (
           <section className="pulse-v4__welcome">
             <div className="pulse-v4__companion">
-              <OnboardingMascot pose="explain" />
+              <CompanionFigure pose="explain" />
             </div>
             {heading(t.introTitle)}
             <p>{t.introBody}</p>

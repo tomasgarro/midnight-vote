@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle, Lock } from '@phosphor-icons/react';
 import type { CivicPassportSession, PassportSessionPort } from 'midnight-referendum-api';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { CompanionFigure } from '@/components/companion';
 import { CountryFlag, CountryPicker, JourneyTopBar, Sheet } from '@/components/system';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import type { OnboardingStage } from '@/integration/civic-state';
@@ -10,7 +11,6 @@ import { passportErrorCopy } from '@/integration/passport-error-copy';
 import { PASSPORT_ACCOUNT_NETWORK } from '@/views/app-runtime';
 import { ConnectionStatus } from './ConnectionStatus';
 import { DocumentVerificationJourney } from './DocumentVerificationJourney';
-import { OnboardingMascot } from './OnboardingMascot';
 import { ONBOARDING_COPY } from './onboarding-copy';
 import { PassportPageArt } from './PassportPageArt';
 import { PreviewPassportJourney, type PreviewPassportJourneyPorts } from './PreviewPassportJourney';
@@ -235,7 +235,7 @@ export function UnifiedPassportOnboarding({
           </div>
           <div className="onboarding-welcome-art">
             <span className="onboarding-orbit" />
-            <OnboardingMascot pose="welcome" motion priority />
+            <CompanionFigure pose="welcome" motion priority />
             <span className="onboarding-art-label">
               <Lock size={12} /> midnight
             </span>
@@ -330,7 +330,7 @@ export function UnifiedPassportOnboarding({
           <details className="onboarding-details">
             <summary>{t.more}</summary>
             <div className="onboarding-explanation">
-              <OnboardingMascot pose="explain" motion />
+              <CompanionFigure pose="explain" motion />
               <p>{t.detail}</p>
             </div>
           </details>
@@ -478,7 +478,7 @@ export function UnifiedPassportOnboarding({
             <>
               <div className="onboarding-document-art">
                 <PassportPageArt />
-                <OnboardingMascot pose="passport" motion />
+                <CompanionFigure pose="passport" motion />
               </div>
               {title(t.documentTitle, 'onboarding-evidence-title')}
               <p className="onboarding-body">{t.documentBody}</p>
@@ -607,7 +607,7 @@ export function UnifiedPassportOnboarding({
               <span>DEMO</span>
               <ConnectionStatus state="success" />
             </div>
-            <OnboardingMascot pose="success" motion priority />
+            <CompanionFigure pose="success" motion priority />
           </div>
           <p className="onboarding-eyebrow">DEMO</p>
           {title(t.success, 'onboarding-success-title')}

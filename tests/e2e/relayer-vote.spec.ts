@@ -10,7 +10,13 @@ const runRelayer = process.env.CICO_E2E_RELAYER === '1';
 const fixtureSecretHex = process.env.CICO_E2E_FIXTURE_SECRET_HEX?.trim().toLowerCase() ?? '';
 const hasFixtureSecret = /^[0-9a-f]{64}$/u.test(fixtureSecretHex);
 
-test('submits a browser vote through the local sponsored relayer', async ({ page, context }) => {
+// The browser has no wallet in this lane, so the proof is built by the local
+// proving server named in VITE_HOSTED_PROOF_SERVER_URL (ADR-010). The journey
+// must pass through the disclosure before it can confirm.
+test('seals a browser answer through the local relayer and proving server', async ({
+  page,
+  context,
+}) => {
   test.skip(!runRelayer, 'Set CICO_E2E_RELAYER=1 for the opt-in local chain lane.');
   test.skip(
     !hasFixtureSecret,
@@ -56,8 +62,15 @@ test('submits a browser vote through the local sponsored relayer', async ({ page
   await page.getByRole('button', { name: /^Sí/ }).click();
   await page.getByRole('button', { name: /Revisar mi voto/i }).click();
   await page.getByRole('heading', { name: 'Revisá antes de confirmar' }).waitFor();
+  await expect(page.getByText(/puede ver tu respuesta y el secreto de tu pase/u)).toBeVisible();
+  await expect(page.getByRole('button', { name: /Confirmar acción real/i })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Entiendo, continuar' }).click();
   await page.getByRole('button', { name: /Confirmar acción real/i }).click();
   await page.getByRole('heading', { name: 'Preparando tu comprobante' }).waitFor();
-  await page.getByRole('heading', { name: 'Gracias por participar' }).waitFor({ timeout: 180_000 });
-  await expect(page.getByText('Comprobante Undeployed local')).toBeVisible();
+  await page
+    .getByRole('heading', { name: 'Tu respuesta está sellada' })
+    .waitFor({ timeout: 180_000 });
+  // The receipt of a sealed answer names no transaction.
+  await expect(page.locator('.flow__code')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /explorer/i })).toHaveCount(0);
 });

@@ -50,7 +50,7 @@ const COPY = {
     lockHint: 'Cierra la sesión; conserva pases y comprobantes cifrados localmente.',
     remove: 'Eliminar datos locales',
     removeHint:
-      'Borra de este navegador el pase y los comprobantes. No elimina tu cuenta Passport.',
+      'Borra de este navegador el pase, los comprobantes y las respuestas selladas. Una respuesta sellada que todavía no se contó no se contará nunca. No elimina tu cuenta Passport.',
     removeConfirm: 'Confirmar eliminación local',
     cancel: 'Cancelar',
   },
@@ -85,7 +85,7 @@ const COPY = {
     lockHint: 'Ends the session while keeping locally encrypted passes and receipts.',
     remove: 'Remove local data',
     removeHint:
-      'Deletes the pass and receipts from this browser. It does not delete your Passport account.',
+      'Deletes the pass, receipts and sealed answers from this browser. A sealed answer that was not counted yet will never be counted. It does not delete your Passport account.',
     removeConfirm: 'Confirm local deletion',
     cancel: 'Cancel',
   },
@@ -120,7 +120,7 @@ const COPY = {
     lockHint: 'Termine la session en conservant les laissez-passer et reçus chiffrés localement.',
     remove: 'Supprimer les données locales',
     removeHint:
-      'Efface le laissez-passer et les reçus de ce navigateur. Cela ne supprime pas votre compte Passport.',
+      'Efface le laissez-passer, les reçus et les réponses scellées de ce navigateur. Une réponse scellée pas encore comptée ne le sera jamais. Cela ne supprime pas votre compte Passport.',
     removeConfirm: 'Confirmer la suppression locale',
     cancel: 'Annuler',
   },

@@ -1,17 +1,19 @@
 import { ArrowRight, CheckCircle, X } from '@phosphor-icons/react';
 import type { CivicPassportSession, CredentialSummary } from 'midnight-referendum-api';
 import {
+  browserBallotOpeningVault,
   browserCivicCredentialVault,
   MidnightCivicActionAdapter,
   RarimoCivicCredentialAdapter,
 } from 'midnight-referendum-api';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PassportJourney } from '@/components/passport-v2/PassportJourney';
 import type { PreviewPassportJourneyPorts } from '@/components/passport-v2/PreviewPassportJourney';
 import { useWallet } from '@/hooks/use-wallet';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import type { OnboardingStage } from '@/integration/civic-state';
 import { ASSIGNED_COUNTRIES } from '@/integration/country-catalog';
+import { createAppAssistant } from '@/integration/deliberation';
 import { type CicoLocale, detectLocale, persistLocale } from '@/integration/locale';
 import { PassportIdentityBridge } from '@/integration/passport';
 import { MidnightPassportSessionAdapter } from '@/integration/passport-session-port';
@@ -33,6 +35,15 @@ import {
   loadPassportReceipts,
   savePassportReceipt,
 } from '@/integration/receipt-store';
+import { RUNTIME_COPY } from '@/integration/runtime-copy';
+import {
+  browserAnswerMarkerStore,
+  type CountOutcome,
+  countSealedAnswer,
+  listSealedAnswers,
+  type OnChainAnswerStatus,
+  type SealedAnswer,
+} from '@/integration/sealed-answers';
 import {
   applyTheme,
   detectThemePreference,
@@ -40,19 +51,23 @@ import {
   type ThemePreference,
   watchSystemTheme,
 } from '@/integration/theme';
+import { needsHostedConsent } from '@/integration/walletless-proving';
 import { MidnightProvidersProvider, useMidnightProviders } from '@/providers/midnight-providers';
 import { WalletProvider } from '@/providers/wallet-context';
 import { ActivityView } from '@/views/ActivityView';
 import {
   APP_MODE,
   APP_NETWORK_LABEL,
+  APP_ROUTE,
   CHAIN_RUNTIME_ENABLED,
   type FlowStage,
   ONBOARDING_SESSION_KEY,
   PASSPORT_ACCOUNT_NETWORK,
   PASSPORT_ORIGIN,
+  PULSE_ROUTE,
   shouldShowFirstRunOnboarding,
   type Tab,
+  type YouSection,
 } from '@/views/app-runtime';
 import { CatalogueChat, type CatalogueMessage } from '@/views/CatalogueChat';
 import { AppHeader, BottomNav } from '@/views/Chrome';
@@ -71,6 +86,7 @@ import {
 import { SettingsView } from '@/views/SettingsView';
 import { VoteFlow } from '@/views/VoteFlow';
 import { VotesView } from '@/views/VotesView';
+import { BackToYou, YouView } from '@/views/YouView';
 import '@/views/dashboard.css';
 
 /** Re-exported so the runtime-catalog conversion keeps its existing test entry point. */
@@ -96,6 +112,18 @@ function toDisplayCredential(summary: CredentialSummary): DemoCredentialSummary 
   };
 }
 
+/**
+ * Shown when the browser can keep nothing on disk, for example in a private
+ * window. Sealing there would produce an answer that can never be counted.
+ */
+const SEAL_STORAGE_BLOCKED: Record<CicoLocale, string> = {
+  es: 'Esta ventana no puede guardar tu respuesta sellada, así que nunca se podría contar. Abrí el sitio en una ventana normal, no privada.',
+  en: 'This window cannot keep your sealed answer, so it could never be counted. Open the site in a normal window, not a private one.',
+  fr: 'Cette fenêtre ne peut pas conserver votre réponse scellée ; elle ne pourrait donc jamais être comptée. Ouvrez le site dans une fenêtre normale, non privée.',
+};
+
+type CountNotice = Extract<CountOutcome, { state: 'waiting' }>['reason'];
+
 /** The tab title follows the chosen language like everything else. */
 const DOCUMENT_TITLE: Record<CicoLocale, string> = {
   es: 'Referéndum Cívico · Voto verificable',
@@ -108,12 +136,27 @@ function CivicApp() {
   // Spanish is the product's default; an explicit persisted choice still wins.
   const [locale, setLocale] = useState<CicoLocale>(() => detectLocale('es-AR'));
   const [theme, setTheme] = useState<ThemePreference>(detectThemePreference);
-  const [tab, setTab] = useState<Tab>('discover');
+  const [tab, setTab] = useState<Tab>('consultations');
+  const [youSection, setYouSection] = useState<YouSection>('hub');
   const [guideMessages, setGuideMessages] = useState<CatalogueMessage[]>([]);
   const [reflectionContext, setReflectionContext] = useState<string | null>(null);
   const [flowStage, setFlowStage] = useState<FlowStage | null>(null);
   const [passportJourneyOpen, setPassportJourneyOpen] = useState(initialOnboardingRequired);
-  const [pulseOpen, setPulseOpen] = useState(false);
+  // The civic pulse is outside the three steps, so no screen links to it. It
+  // is kept, and its own address opens it.
+  const [pulseOpen, setPulseOpen] = useState(() => window.location.hash === PULSE_ROUTE);
+  useEffect(() => {
+    const openFromAddress = () => {
+      if (window.location.hash === PULSE_ROUTE) setPulseOpen(true);
+    };
+    window.addEventListener('hashchange', openFromAddress);
+    return () => window.removeEventListener('hashchange', openFromAddress);
+  }, []);
+  const closePulse = () => {
+    setPulseOpen(false);
+    // Leave the address too, or a reload would open the pulse again.
+    if (window.location.hash === PULSE_ROUTE) window.history.replaceState(null, '', APP_ROUTE);
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialPanel, setSettingsInitialPanel] = useState<'root' | 'feedback' | 'help'>(
     'root',
@@ -168,7 +211,7 @@ function CivicApp() {
     window.sessionStorage.setItem(ONBOARDING_SESSION_KEY, '1');
     setOnboardingRequired(false);
     setPassportJourneyOpen(false);
-    setTab('discover');
+    setTab('consultations');
   };
   const replayOnboarding = () => {
     setPulseOpen(false);
@@ -194,6 +237,9 @@ function CivicApp() {
     setExecutionMode,
     sponsoredAvailable,
     sponsoredError,
+    walletlessProving,
+    provingParty,
+    deviceProofStartedAt,
     isReady,
     error: providersError,
   } = useMidnightProviders();
@@ -222,10 +268,23 @@ function CivicApp() {
         error:
           runtimeError instanceof Error
             ? runtimeError.message
-            : 'La configuración de Passport no es válida.',
+            : RUNTIME_COPY[detectLocale('es-AR')].passportConfigInvalid,
       };
     }
   }, []);
+  // Built from public values only. It is handed no pass and no session, and
+  // only the two values it reads, not the whole environment.
+  const assistant = useMemo(
+    () =>
+      createAppAssistant(
+        {
+          VITE_ASSISTANT_API_URL: import.meta.env.VITE_ASSISTANT_API_URL,
+          VITE_ASSISTANT_SOURCES_JSON: import.meta.env.VITE_ASSISTANT_SOURCES_JSON,
+        },
+        window.location.origin,
+      ),
+    [],
+  );
   const polls = useMemo(
     () =>
       CHAIN_RUNTIME_ENABLED && passportV2Runtime.config
@@ -240,6 +299,19 @@ function CivicApp() {
       setActivePollId(polls[0].id);
     }
   }, [activePollId, polls]);
+  // One scope for everything the device keeps about this deployment, so a
+  // pass, a sealed answer and its marker never cross into another one.
+  const deviceScope = passportV2Runtime.config
+    ? `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`
+    : null;
+  const ballotVault = useMemo(
+    () => (deviceScope ? browserBallotOpeningVault(deviceScope) : null),
+    [deviceScope],
+  );
+  const answerMarkers = useMemo(
+    () => (deviceScope ? browserAnswerMarkerStore(deviceScope) : null),
+    [deviceScope],
+  );
   const passportJourneyPorts = useMemo<PreviewPassportJourneyPorts>(() => {
     const base = { passport: passportSessionPort };
     if (passportV2Runtime.error) {
@@ -277,6 +349,7 @@ function CivicApp() {
           ...(referendumV2ActionContext
             ? { actionExecutionContext: referendumV2ActionContext }
             : {}),
+          ...(ballotVault ? { ballotOpenings: ballotVault } : {}),
         })
       : undefined;
     return {
@@ -286,8 +359,99 @@ function CivicApp() {
       referenda: passportV2Runtime.config.referenda,
       runtimeCatalogConfigured: true,
     };
-  }, [passportSessionPort, passportV2Runtime, referendumV2ActionContext, referendumV2Providers]);
+  }, [
+    ballotVault,
+    passportSessionPort,
+    passportV2Runtime,
+    referendumV2ActionContext,
+    referendumV2Providers,
+  ]);
   const runtimeContractAddress = passportV2Runtime.config?.referenda[0]?.contractAddress ?? null;
+
+  const [sealedAnswers, setSealedAnswers] = useState<SealedAnswer[]>([]);
+  const [countingId, setCountingId] = useState<string | null>(null);
+  const [countNotices, setCountNotices] = useState<Readonly<Record<string, CountNotice>>>({});
+  const autoCounted = useRef(new Set<string>());
+  const refreshSealedAnswers = useCallback(async () => {
+    const referenda = passportV2Runtime.config?.referenda;
+    if (!ballotVault || !answerMarkers || !referenda) {
+      setSealedAnswers([]);
+      return;
+    }
+    // Only the action adapter can read the ballot tree. Without it, an attempt
+    // whose outcome is unknown stays out of the list.
+    const actions = passportJourneyPorts.actions as
+      | { getSealedAnswerStatus?: (referendumId: string) => Promise<OnChainAnswerStatus> }
+      | undefined;
+    const readChain = actions?.getSealedAnswerStatus?.bind(actions);
+    try {
+      setSealedAnswers(
+        await listSealedAnswers({
+          referendumIds: referenda.map((entry) => entry.referendumId),
+          vault: ballotVault,
+          markers: answerMarkers,
+          ...(readChain ? { resolveOnChain: readChain } : {}),
+        }),
+      );
+    } catch {
+      // Storage could not be read. Showing nothing is safer than showing a guess.
+      setSealedAnswers([]);
+    }
+  }, [answerMarkers, ballotVault, passportJourneyPorts.actions, passportV2Runtime.config]);
+  useEffect(() => {
+    void refreshSealedAnswers();
+  }, [refreshSealedAnswers]);
+  const countAnswer = useCallback(
+    async (referendumId: string) => {
+      const actions = passportJourneyPorts.actions;
+      const credentialPort = passportJourneyPorts.credential;
+      if (!actions || !credentialPort || !answerMarkers) {
+        setCountNotices((previous) => ({ ...previous, [referendumId]: 'try-again' }));
+        return;
+      }
+      setCountingId(referendumId);
+      try {
+        const outcome = await countSealedAnswer({
+          referendumId,
+          actions,
+          credential: credentialPort,
+          markers: answerMarkers,
+        });
+        setCountNotices((previous) => {
+          const { [referendumId]: _settled, ...rest } = previous;
+          return outcome.state === 'waiting' ? { ...rest, [referendumId]: outcome.reason } : rest;
+        });
+      } finally {
+        setCountingId(null);
+        await refreshSealedAnswers();
+      }
+    },
+    [
+      answerMarkers,
+      passportJourneyPorts.actions,
+      passportJourneyPorts.credential,
+      refreshSealedAnswers,
+    ],
+  );
+  useEffect(() => {
+    // A wallet asks for approval, so the person starts that count. Without a
+    // wallet the returning device counts on its own, once per visit.
+    if ((provingParty !== 'device' && provingParty !== 'hosted-server') || countingId) return;
+    const due = sealedAnswers.find((answer) => {
+      if (answer.state !== 'sealed' || autoCounted.current.has(answer.referendumId)) return false;
+      const poll = polls.find((item) => item.id === answer.referendumId);
+      if (!poll) return false;
+      try {
+        const availability = getPollAvailability(poll);
+        return !availability.isOpen && availability.reason !== 'not-open';
+      } catch {
+        return false;
+      }
+    });
+    if (!due) return;
+    autoCounted.current.add(due.referendumId);
+    void countAnswer(due.referendumId);
+  }, [countAnswer, countingId, polls, provingParty, sealedAnswers]);
   useEffect(() => {
     let active = true;
     const credentialPort = passportJourneyPorts.credential;
@@ -303,16 +467,29 @@ function CivicApp() {
     };
   }, [passportJourneyPorts.credential]);
   const profileId = useMemo(() => deriveProfileId(passportSession), [passportSession]);
-  const previewReadiness = getPreviewReadiness({
-    appMode: APP_MODE === 'preview' ? 'preview' : APP_MODE === 'undeployed' ? 'undeployed' : 'demo',
-    contractAddress: runtimeContractAddress,
-    walletConnected: walletStatus === 'connected',
-    providersReady: isReady && (!passportV2Runtime.config || referendumV2Providers !== null),
-    providersError: providersError ?? passportV2Runtime.error,
-    relayerMode: executionMode === 'sponsored-wallet',
-    v2RuntimeConfigured: CHAIN_RUNTIME_ENABLED,
-    credentialVerified: credential?.kind === 'verified-credential',
-  });
+  const previewReadiness = getPreviewReadiness(
+    {
+      appMode:
+        APP_MODE === 'preview' ? 'preview' : APP_MODE === 'undeployed' ? 'undeployed' : 'demo',
+      contractAddress: runtimeContractAddress,
+      walletConnected: walletStatus === 'connected',
+      providersReady: isReady && (!passportV2Runtime.config || referendumV2Providers !== null),
+      providersError: providersError ?? passportV2Runtime.error,
+      relayerMode: executionMode !== 'direct-wallet',
+      walletlessProving: !walletlessProving.offered
+        ? 'not-offered'
+        : needsHostedConsent(walletlessProving)
+          ? 'needs-consent'
+          : walletlessProving.error
+            ? 'failed'
+            : walletlessProving.preparing
+              ? 'preparing'
+              : 'ready',
+      v2RuntimeConfigured: CHAIN_RUNTIME_ENABLED,
+      credentialVerified: credential?.kind === 'verified-credential',
+    },
+    locale,
+  );
   useEffect(() => {
     let active = true;
     if (!passportSession) {
@@ -361,14 +538,16 @@ function CivicApp() {
       });
       setPassportSession(session);
     } catch (error) {
-      setPassportError(error instanceof Error ? error.message : 'No se pudo conectar Passport');
+      setPassportError(
+        error instanceof Error ? error.message : RUNTIME_COPY[locale].passportConnectFailed,
+      );
     }
   };
 
   const startVote = async (pollId: string) => {
     const poll = polls.find((item) => item.id === pollId);
     if (!poll || !getPollAvailability(poll).isOpen) {
-      setPreviewError('Esta votación está cerrada y no acepta nuevas participaciones.');
+      setPreviewError(RUNTIME_COPY[locale].consultationClosed);
       return;
     }
     if (
@@ -406,20 +585,18 @@ function CivicApp() {
       }
       const poll = polls.find((item) => item.id === activePollId);
       if (!poll || !getPollAvailability(poll).isOpen) {
-        setPreviewError('Esta votación está cerrada y no acepta nuevas participaciones.');
+        setPreviewError(RUNTIME_COPY[locale].consultationClosed);
         return;
       }
       if (!choice) {
-        setPreviewError('Elegí una respuesta antes de firmar.');
+        setPreviewError(RUNTIME_COPY[locale].chooseFirst);
         return;
       }
       setPreviewError(null);
       setFlowStage('processing');
       try {
         if (passportV2Runtime.error) {
-          throw new Error(
-            `La configuración Passport v2 es inválida; el voto fue bloqueado: ${passportV2Runtime.error}`,
-          );
+          throw new Error(RUNTIME_COPY[locale].runtimeInvalid(passportV2Runtime.error));
         }
         if (passportV2Runtime.config) {
           const referendum = findRuntimeReferendum(
@@ -428,54 +605,56 @@ function CivicApp() {
           );
           const actionPort = passportJourneyPorts.actions;
           const credentialPort = passportJourneyPorts.credential;
-          const route = resolvePassportV2ActionRoute({
-            runtimeConfigured: true,
-            credentialVerified: credential?.kind === 'verified-credential',
-            actionPortAvailable: Boolean(actionPort && credentialPort),
-            referendumId: referendum?.referendumId ?? null,
-          });
+          const route = resolvePassportV2ActionRoute(
+            {
+              runtimeConfigured: true,
+              credentialVerified: credential?.kind === 'verified-credential',
+              actionPortAvailable: Boolean(actionPort && credentialPort),
+              referendumId: referendum?.referendumId ?? null,
+            },
+            locale,
+          );
           if (route.mode === 'blocked') throw new Error(route.message);
           if (route.mode !== 'v2' || !actionPort || !credentialPort) {
-            throw new Error('La acción v2 no está disponible; el voto fue bloqueado.');
+            throw new Error(RUNTIME_COPY[locale].actionUnavailable);
           }
           const authorization = await credentialPort.getActionAuthorization();
           if (!authorization) {
-            throw new Error(
-              'La credencial Passport no tiene autorización vigente para una acción cívica.',
-            );
+            throw new Error(RUNTIME_COPY[locale].authorizationMissing);
           }
+          if (!ballotVault || (await ballotVault.durability()) === 'memory') {
+            throw new Error(SEAL_STORAGE_BLOCKED[locale]);
+          }
+          // Weeks can pass between sealing and the count. Ask the browser not
+          // to evict the opening in the meantime; a refusal is not an error.
+          void ballotVault.requestPersistence();
           const confirmed = await actionPort.castVote({
             referendumId: route.referendumId,
             choice,
             authorization,
           });
+          // The sealed answer is tracked by the vault, not by a stored receipt.
+          // This one lives for the receipt screen only and names no transaction.
           const nextReceipt: VoteReceipt = {
-            id: confirmed.transactionId,
+            id: `sealed:${route.referendumId}`,
             pollId: activePollId,
             createdAt: new Date().toISOString(),
             status: 'confirmed',
             network: confirmed.network,
-            explorerUrl: confirmed.explorerUrl,
+            sealed: { provingParty: provingParty ?? 'wallet' },
           };
-          if (passportSession) {
-            const receiptProfileKey = await deriveReceiptProfileKey(passportSession);
-            await savePassportReceipt(receiptProfileKey, nextReceipt);
-          }
-          setReceipts((previous) => [
-            nextReceipt,
-            ...previous.filter((item) => item.id !== nextReceipt.id),
-          ]);
           setReceipt(nextReceipt);
+          await refreshSealedAnswers();
           setFlowStage('receipt');
           return;
         }
 
-        throw new Error(
-          `${APP_NETWORK_LABEL} requiere un manifiesto v2 completo; el flujo legado está deshabilitado.`,
-        );
+        throw new Error(RUNTIME_COPY[locale].manifestMissing(APP_NETWORK_LABEL));
       } catch (error) {
         setPreviewError(
-          error instanceof Error ? error.message : `Falló la transacción en ${APP_NETWORK_LABEL}`,
+          error instanceof Error
+            ? error.message
+            : RUNTIME_COPY[locale].transactionFailed(APP_NETWORK_LABEL),
         );
         setFlowStage('review');
       }
@@ -519,6 +698,17 @@ function CivicApp() {
     setGuideMessages([]);
     const credentialPort = passportJourneyPorts.credential;
     if (credentialPort) await credentialPort.clearCredential();
+    // Removing local data removes sealed answers too. Any that were not yet
+    // counted can never be counted; the settings screen says so before this runs.
+    if (ballotVault) {
+      for (const entry of passportV2Runtime.config?.referenda ?? []) {
+        await ballotVault.clear(entry.referendumId);
+      }
+    }
+    answerMarkers?.clear();
+    autoCounted.current.clear();
+    setSealedAnswers([]);
+    setCountNotices({});
     if (receiptProfileKey) await clearPassportReceipts(receiptProfileKey);
     await passportSessionPort.disconnect();
     setCredential(null);
@@ -528,14 +718,20 @@ function CivicApp() {
     setReceiptProfileKey('');
   };
 
+  const openAnswers = () => {
+    setTab('you');
+    setYouSection('answers');
+  };
+  const backToYou = <BackToYou onBack={() => setYouSection('hub')} locale={locale} />;
   const currentTabContent =
-    tab === 'assistant' ? (
+    tab === 'cleisthenes' ? (
       <CatalogueChat
         reflectionContext={reflectionContext}
         onClearReflection={() => setReflectionContext(null)}
         initialMessages={guideMessages}
         onMessagesChange={setGuideMessages}
         polls={polls}
+        briefIds={assistant ? polls.map((poll) => poll.id).filter(assistant.covers) : []}
         locale={locale}
         country={
           canUseCatalogueDialogue(credential, !CHAIN_RUNTIME_ENABLED)
@@ -544,27 +740,58 @@ function CivicApp() {
         }
         onOpenPolicy={setPolicyDetailId}
       />
-    ) : tab === 'credentials' ? (
-      <CredentialsView
-        credentials={credential ? [credential] : []}
-        onVerify={openVerification}
-        locale={locale}
-      />
-    ) : tab === 'activity' ? (
-      <ActivityView polls={polls} receipts={receipts} locale={locale} />
-    ) : tab === 'passport' ? (
-      <ProfileView
+    ) : tab === 'you' && youSection === 'pass' ? (
+      <>
+        {backToYou}
+        <CredentialsView
+          credentials={credential ? [credential] : []}
+          onVerify={openVerification}
+          locale={locale}
+        />
+      </>
+    ) : tab === 'you' && youSection === 'answers' ? (
+      <>
+        {backToYou}
+        <ActivityView
+          polls={polls}
+          receipts={receipts}
+          sealedAnswers={sealedAnswers}
+          countingId={countingId}
+          countNotices={countNotices}
+          onCount={(referendumId) => void countAnswer(referendumId)}
+          walletlessProving={walletlessProving}
+          deviceProofStartedAt={deviceProofStartedAt}
+          locale={locale}
+        />
+      </>
+    ) : tab === 'you' && youSection === 'account' ? (
+      <>
+        {backToYou}
+        <ProfileView
+          passportSession={passportSession}
+          profileId={profileId}
+          walletStatus={walletStatus}
+          onConnectPassport={() => void connectPassport()}
+          onOpenHelp={() => openSettings('help')}
+          onLockAndDisconnect={() => void lockAndDisconnect()}
+          onRemoveLocalData={removeLocalData}
+          locale={locale}
+          onLocaleChange={changeLocale}
+          theme={theme}
+          onThemeChange={changeTheme}
+        />
+      </>
+    ) : tab === 'you' ? (
+      <YouView
+        credential={credential}
         passportSession={passportSession}
-        profileId={profileId}
-        walletStatus={walletStatus}
-        onConnectPassport={() => void connectPassport()}
-        onOpenHelp={() => openSettings('help')}
-        onLockAndDisconnect={() => void lockAndDisconnect()}
-        onRemoveLocalData={removeLocalData}
+        sealedAnswers={sealedAnswers}
+        receipts={receipts}
+        onVerify={openVerification}
+        onOpen={setYouSection}
+        onOpenSettings={() => openSettings('root')}
+        onOpenFeedback={() => openSettings('feedback')}
         locale={locale}
-        onLocaleChange={changeLocale}
-        theme={theme}
-        onThemeChange={changeTheme}
       />
     ) : (
       <VotesView
@@ -574,8 +801,6 @@ function CivicApp() {
         onStartVote={startVote}
         onOpenPolicy={setPolicyDetailId}
         onOpenPassportJourney={openVerification}
-        onOpenPulse={() => setPulseOpen(true)}
-        onOpenGuide={() => setTab('assistant')}
         locale={locale}
       />
     );
@@ -587,6 +812,8 @@ function CivicApp() {
     setSettingsOpen(false);
     setSettingsInitialPanel('root');
     setTab(nextTab);
+    // Choosing a destination opens it at its start, `You` at its summary.
+    setYouSection('hub');
     setFlowStage(null);
     setPolicyDetailId(null);
     setReceiptToastVisible(false);
@@ -604,8 +831,6 @@ function CivicApp() {
           passportError={passportError}
           onConnectPassport={() => void connectPassport()}
           onDismissPassportError={() => setPassportError(null)}
-          onOpenFeedback={() => openSettings('feedback')}
-          onOpenSettings={() => openSettings('root')}
           locale={locale}
           onLocaleChange={changeLocale}
         />
@@ -641,13 +866,13 @@ function CivicApp() {
           <PulseExperience
             onDiscuss={(summary) => {
               setReflectionContext(summary);
-              setPulseOpen(false);
-              setTab('assistant');
+              closePulse();
+              setTab('cleisthenes');
             }}
             locale={locale}
             embedded
-            onExit={() => setPulseOpen(false)}
-            onExploreReferenda={() => setPulseOpen(false)}
+            onExit={closePulse}
+            onExploreReferenda={closePulse}
           />
         </Suspense>
       ) : settingsOpen ? (
@@ -671,14 +896,14 @@ function CivicApp() {
             return (
               <main className="page-content flow-page">
                 <section className="flow-card" role="alert">
-                  <h1>Consulta no disponible</h1>
-                  <p>El catálogo v2 cambió o todavía no está listo para esta acción.</p>
+                  <h1>{RUNTIME_COPY[locale].consultationMissingTitle}</h1>
+                  <p>{RUNTIME_COPY[locale].consultationMissingBody}</p>
                   <button
                     type="button"
                     className="secondary-button"
                     onClick={() => setFlowStage(null)}
                   >
-                    Volver a votaciones
+                    {RUNTIME_COPY[locale].backToConsultations}
                   </button>
                 </section>
               </main>
@@ -695,13 +920,16 @@ function CivicApp() {
               onConfirm={() => void confirmVote()}
               onViewReceipt={() => {
                 setFlowStage(null);
-                setTab('activity');
+                openAnswers();
               }}
               walletStatus={walletStatus}
               executionMode={executionMode}
               onExecutionModeChange={setExecutionMode}
               sponsoredAvailable={sponsoredAvailable}
               sponsoredError={sponsoredError}
+              walletlessProving={walletlessProving}
+              provingParty={provingParty}
+              deviceProofStartedAt={deviceProofStartedAt}
               previewError={previewError}
               receipt={receipt}
               dustBalance={dustBalance}
@@ -716,6 +944,7 @@ function CivicApp() {
           onStartVote={startVote}
           credential={credential}
           onOpenPassportJourney={() => setPassportJourneyOpen(true)}
+          assistant={assistant}
           locale={locale}
         />
       ) : (
@@ -723,9 +952,7 @@ function CivicApp() {
       )}
       {!passportJourneyOpen && !pulseOpen && !settingsOpen && !flowStage && !selectedPolicy ? (
         <BottomNav
-          dialogueReady={canUseCatalogueDialogue(credential, !CHAIN_RUNTIME_ENABLED)}
           tab={tab}
-          onVerify={openVerification}
           onChange={(nextTab) => {
             setPassportJourneyOpen(false);
             navigate(nextTab);
@@ -745,18 +972,16 @@ function CivicApp() {
             onClick={() => {
               setReceiptToastVisible(false);
               setFlowStage(null);
-              setTab('activity');
+              openAnswers();
             }}
           >
-            <CheckCircle size={18} />{' '}
-            {locale === 'es' ? 'Último comprobante listo' : 'Latest receipt ready'}{' '}
-            <ArrowRight size={16} />
+            <CheckCircle size={18} /> {RUNTIME_COPY[locale].receiptReady} <ArrowRight size={16} />
           </button>
           <button
             type="button"
             className="receipt-toast-close"
             onClick={() => setReceiptToastVisible(false)}
-            aria-label={locale === 'es' ? 'Cerrar notificación' : 'Dismiss notification'}
+            aria-label={RUNTIME_COPY[locale].dismissNotice}
           >
             <X size={15} />
           </button>
