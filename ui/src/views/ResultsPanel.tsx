@@ -17,39 +17,61 @@ import './results-panel.css';
  *
  * The COMMIT phase used to render a full results heading with an empty body,
  * which reads as results that failed to load. It is now stated as what it is:
- * a count of eligible people and a sentence saying totals do not exist yet.
+ * a count of sealed answers and a sentence saying totals do not exist yet.
+ *
+ * That count was labelled "eligible people". It is the contract's number of
+ * accepted commitments: answers that were sealed, not people who could answer.
+ *
+ * The contract stays in COMMIT after its closing time until someone closes it
+ * on chain. During that gap the panel said "Voting open" while every new
+ * answer was being refused. It now reads the schedule as well as the phase.
  */
 
 const PHASE_COPY = {
   es: {
     COMMIT: {
-      label: 'Votación abierta',
-      note: 'Los votos están sellados. Todavía no hay nada que contar.',
+      label: 'Respuestas abiertas',
+      note: 'Las respuestas están selladas. Todavía no hay nada que contar.',
+    },
+    CLOSED_WAITING: {
+      label: 'Respuestas cerradas',
+      note: 'Ya no se aceptan respuestas. El recuento empieza cuando la consulta se cierra en la cadena.',
     },
     REVEAL: {
       label: 'Recuento en curso',
-      note: 'Cada voto se suma a su total sin revelar de quién vino.',
+      note: 'Cada respuesta se suma a su total sin revelar de quién vino.',
     },
     FINALIZED: { label: 'Resultado final', note: 'El recuento está cerrado y publicado.' },
   },
   en: {
-    COMMIT: { label: 'Voting open', note: 'Votes are sealed. There is nothing to count yet.' },
+    COMMIT: {
+      label: 'Answers open',
+      note: 'Answers are sealed. There is nothing to count yet.',
+    },
+    CLOSED_WAITING: {
+      label: 'Answers closed',
+      note: 'No more answers are accepted. Counting starts once the consultation is closed on chain.',
+    },
     REVEAL: {
       label: 'Counting in progress',
-      note: 'Each vote is added without revealing who cast it.',
+      note: 'Each answer is added to its total without revealing who gave it.',
     },
     FINALIZED: { label: 'Final result', note: 'Counting is closed and published.' },
   },
   fr: {
     COMMIT: {
-      label: 'Vote ouvert',
-      note: "Les votes sont scellés. Il n'y a encore rien à compter.",
+      label: 'Réponses ouvertes',
+      note: "Les réponses sont scellées. Il n'y a encore rien à compter.",
+    },
+    CLOSED_WAITING: {
+      label: 'Réponses closes',
+      note: 'Aucune réponse n’est plus acceptée. Le décompte commence quand la consultation est close sur la chaîne.',
     },
     REVEAL: {
-      label: 'Dépouillement en cours',
-      note: "Chaque voix est ajoutée à son total sans révéler qui l'a exprimée.",
+      label: 'Décompte en cours',
+      note: "Chaque réponse est ajoutée à son total sans révéler qui l'a donnée.",
     },
-    FINALIZED: { label: 'Résultat final', note: 'Le dépouillement est clos et publié.' },
+    FINALIZED: { label: 'Résultat final', note: 'Le décompte est clos et publié.' },
   },
 } as const;
 
@@ -71,23 +93,23 @@ const SHELL_COPY = {
   es: {
     unreadable: 'Sin lectura del contrato',
     heading: 'Resultados públicos',
-    eligible: (n: bigint) => (n === 1n ? 'persona habilitada' : 'personas habilitadas'),
+    sealed: (n: bigint) => (n === 1n ? 'respuesta sellada' : 'respuestas selladas'),
     total: (counted: bigint, issued: bigint) =>
-      `${counted.toString()} de ${issued.toString()} habilitadas · leído del contrato`,
+      `${counted.toString()} contadas de ${issued.toString()} selladas · leído del contrato`,
   },
   en: {
     unreadable: 'Contract unreadable',
     heading: 'Public results',
-    eligible: (n: bigint) => (n === 1n ? 'eligible person' : 'eligible people'),
+    sealed: (n: bigint) => (n === 1n ? 'sealed answer' : 'sealed answers'),
     total: (counted: bigint, issued: bigint) =>
-      `${counted.toString()} of ${issued.toString()} eligible · read from contract`,
+      `${counted.toString()} counted of ${issued.toString()} sealed · read from the contract`,
   },
   fr: {
     unreadable: 'Contrat illisible',
     heading: 'Résultats publics',
-    eligible: (n: bigint) => (n === 1n ? 'personne éligible' : 'personnes éligibles'),
+    sealed: (n: bigint) => (n === 1n ? 'réponse scellée' : 'réponses scellées'),
     total: (counted: bigint, issued: bigint) =>
-      `${counted.toString()} sur ${issued.toString()} éligibles · lu depuis le contrat`,
+      `${counted.toString()} comptées sur ${issued.toString()} scellées · lu depuis le contrat`,
   },
 } as const;
 
@@ -101,6 +123,14 @@ function titleId(contractAddress: string | null, title?: string): string {
   return title
     ? `results-title-${contractAddress?.replace(/[^a-z0-9_-]/giu, '-') ?? 'runtime'}`
     : 'results-title';
+}
+
+/** True once the contract's own closing time has passed, whatever its phase says. */
+function isPastClose(
+  state: { readonly closesAtUnix: bigint } | null,
+  nowMs: number = Date.now(),
+): boolean {
+  return state !== null && BigInt(Math.floor(nowMs / 1000)) >= state.closesAtUnix;
 }
 
 export function ResultsPanel({ contractAddress, title, locale }: ResultsPanelProps) {
@@ -123,19 +153,18 @@ export function ResultsPanel({ contractAddress, title, locale }: ResultsPanelPro
   /* Before the state arrives, and while voting is open, the honest screen is
      the same one: there is nothing to count. */
   if (!state || state.phase === 'COMMIT') {
-    const eligible = state?.issuedVotes ?? null;
+    const sealed = state?.issuedVotes ?? null;
+    const before = isPastClose(state) ? copy.CLOSED_WAITING : copy.COMMIT;
     return (
       <Card className="results" aria-labelledby={headingId}>
-        <Eyebrow>{copy.COMMIT.label}</Eyebrow>
+        <Eyebrow>{before.label}</Eyebrow>
         <h2 className="results__title" id={headingId}>
           {title ?? shell.heading}
         </h2>
-        <p className="results__note">
-          {CHAIN_RUNTIME_ENABLED ? copy.COMMIT.note : DEMO_NOTE[locale]}
-        </p>
-        {eligible === null ? null : (
+        <p className="results__note">{CHAIN_RUNTIME_ENABLED ? before.note : DEMO_NOTE[locale]}</p>
+        {sealed === null ? null : (
           <p className="results__eligible">
-            <strong>{eligible.toString()}</strong> {shell.eligible(eligible)}
+            <strong>{sealed.toString()}</strong> {shell.sealed(sealed)}
           </p>
         )}
       </Card>

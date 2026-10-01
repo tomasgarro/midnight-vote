@@ -2,7 +2,11 @@
  * Prints the values that change when a consultation is deployed, for the two
  * Hostinger projects and for the app build. All of them are public.
  *
- *     node scripts/print-consultation-values.mjs [manifest ...]
+ *     node scripts/print-consultation-values.mjs [--write-app-env] [manifest ...]
+ *
+ * With --write-app-env it also writes ui/.env.preview.local, the complete
+ * public configuration of the app on Preview. Build it with
+ * `npm run build:preview --workspace midnight-referendum-ui`.
  *
  * Give every manifest whose consultations should be live. With none, it reads
  * the test consultation's manifest. Closed consultations are left out of the
@@ -14,9 +18,12 @@
  * | CICO_ACTION_ALLOWED_CONTRACTS, CICO_REFERENDA_JSON | project midnight-rarimo-nfc |
  * | VITE_* | ui/.env.preview.local, read by `vite build --mode preview` |
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-const paths = process.argv.slice(2);
+const COPY_PATH = 'deploy/passport-v2/consultation-copy.json';
+
+const writeAppEnv = process.argv.includes('--write-app-env');
+const paths = process.argv.slice(2).filter((argument) => !argument.startsWith('--'));
 if (paths.length === 0) paths.push('deploy/passport-v2/preview.test.manifest.json');
 
 const manifests = paths.map((path) => {
@@ -40,6 +47,10 @@ if (deployed.length === 0) throw new Error('No consultation in these manifests i
 // A consultation leaves the server values once its counting window is over.
 const live = deployed.filter((referendum) => Number(referendum.revealClosesAtUnix) > now);
 const addresses = live.map((referendum) => referendum.contractAddress).join(',');
+
+// The manifest holds one language. The other languages of each consultation
+// are kept beside it, by consultation id, and travel to the app only.
+const copy = existsSync(COPY_PATH) ? JSON.parse(readFileSync(COPY_PATH, 'utf8')) : {};
 
 const forPublisher = live.map((referendum) => ({
   contractAddress: referendum.contractAddress,
@@ -78,6 +89,7 @@ const forApp = deployed.map((referendum) => ({
   title: referendum.title,
   question: referendum.question,
   ...(referendum.description ? { description: referendum.description } : {}),
+  ...(copy[referendum.referendumId] ? { translations: copy[referendum.referendumId] } : {}),
 }));
 
 const section = (title, lines) => console.log(`\n# ${title}\n${lines.join('\n')}`);
@@ -87,7 +99,7 @@ section('Project midnight-rarimo-nfc', [
   `CICO_ACTION_ALLOWED_CONTRACTS=${addresses}`,
   `CICO_REFERENDA_JSON=${JSON.stringify(forPublisher)}`,
 ]);
-section('App build (ui/.env.preview.local)', [
+const appLines = [
   `VITE_PASSPORT_V2_API_URL=${first.runtime.apiUrl}`,
   `VITE_MIDNIGHT_NETWORK=${first.network}`,
   `VITE_CICO_ISSUER_ID=${first.registry.issuerId}`,
@@ -101,4 +113,32 @@ section('App build (ui/.env.preview.local)', [
   `VITE_CICO_FROZEN_ROOT_FIELD=${first.registry.frozenRootField ?? ''}`,
   `VITE_CICO_ENROLLMENT_MODEL=${first.registry.enrollmentModel}`,
   `VITE_CICO_REFERENDA_JSON=${JSON.stringify(forApp)}`,
-]);
+];
+section('App build (ui/.env.preview.local)', appLines);
+
+if (writeAppEnv) {
+  const out = 'ui/.env.preview.local';
+  writeFileSync(
+    out,
+    [
+      `# Written ${new Date().toISOString()} by scripts/print-consultation-values.mjs`,
+      `# from ${paths.join(', ')}. Public values only.`,
+      'VITE_APP_MODE=preview',
+      // The contract of the first prototype. Passport v2 consultations are
+      // listed in VITE_CICO_REFERENDA_JSON instead.
+      'VITE_MIDNIGHT_CONTRACT_ADDRESS=',
+      `VITE_MIDNIGHT_INDEXER_URL=${first.endpoints.indexerHttp}`,
+      `VITE_MIDNIGHT_INDEXER_WS_URL=${first.endpoints.indexerWs}`,
+      `VITE_MIDNIGHT_EXPLORER_BASE_URL=${first.endpoints.explorer}`,
+      'VITE_RELAYER_URL=https://relay.midnight.vote',
+      'VITE_HOSTED_PROOF_SERVER_URL=',
+      'VITE_ASSISTANT_API_URL=/Switzerland/api',
+      'VITE_PASSPORT_ORIGIN=https://midnightpassport.com',
+      'VITE_PASSPORT_NETWORK=stagenet',
+      ...appLines,
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  console.log(`\nwrote ${out}`);
+}

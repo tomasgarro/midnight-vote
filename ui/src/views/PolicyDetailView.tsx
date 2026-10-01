@@ -12,7 +12,7 @@ import {
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import { countryName as getCountryName } from '@/integration/country-catalog';
 import type { AppAssistant } from '@/integration/deliberation';
-import { formatDate } from '@/integration/format';
+import { formatDate, formatDateTime } from '@/integration/format';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability } from '@/integration/poll-lifecycle';
 import { ConsultationBrief } from '@/views/ConsultationBrief';
@@ -48,12 +48,26 @@ import { canUseDemoPass } from './discovery-presentation';
 const COPY = {
   es: {
     back: 'Volver',
-    open: 'Votación abierta',
-    closed: 'Votación cerrada',
+    open: 'Consulta abierta',
+    closed: 'Consulta cerrada',
     facts: 'De un vistazo',
     closes: 'Cierra',
+    closedOn: 'Cerró',
+    answersClose: 'Las respuestas cierran',
+    answersClosed: 'Las respuestas cerraron',
+    passesUntil: 'Se puede sumar un pase hasta',
+    countingUntil: 'Tu respuesta se puede contar hasta',
+    who: 'Quién puede responder',
+    whoAdult: 'Personas adultas',
+    whoAnyone: 'Cualquier persona',
+    withChip: 'con un pasaporte leído por chip',
+    withDocument: 'con un documento verificado',
+    withPass: 'con un pase',
+    ofCountry: (country: string) => `de ${country}`,
+    runtimeYes: 'Respondés que sí a la pregunta.',
+    runtimeNo: 'Respondés que no a la pregunta.',
+    runtimeAbstain: 'No tomás posición. Tu respuesta se cuenta como sin decidir.',
     eligible: 'Habilitadas',
-    contractState: 'Estado en el contrato',
     scope: 'Ámbito',
     about: 'De qué se trata',
     frame: 'Marco vigente',
@@ -79,12 +93,26 @@ const COPY = {
   },
   en: {
     back: 'Back',
-    open: 'Voting open',
-    closed: 'Voting closed',
+    open: 'Consultation open',
+    closed: 'Consultation closed',
     facts: 'At a glance',
     closes: 'Closes',
+    closedOn: 'Closed',
+    answersClose: 'Answers close',
+    answersClosed: 'Answers closed',
+    passesUntil: 'A pass can be added until',
+    countingUntil: 'Your answer can be counted until',
+    who: 'Who can answer',
+    whoAdult: 'Adults',
+    whoAnyone: 'Anyone',
+    withChip: 'with a passport read by its chip',
+    withDocument: 'with a verified document',
+    withPass: 'with a pass',
+    ofCountry: (country: string) => `from ${country}`,
+    runtimeYes: 'You answer yes to the question.',
+    runtimeNo: 'You answer no to the question.',
+    runtimeAbstain: 'You take no position. Your answer is counted as undecided.',
     eligible: 'Eligible',
-    contractState: 'Contract state',
     scope: 'Scope',
     about: 'What it is about',
     frame: 'Current framework',
@@ -110,12 +138,26 @@ const COPY = {
   },
   fr: {
     back: 'Retour',
-    open: 'Vote ouvert',
-    closed: 'Vote clos',
+    open: 'Consultation ouverte',
+    closed: 'Consultation close',
     facts: "En un coup d'oeil",
     closes: 'Clôture',
+    closedOn: 'Close le',
+    answersClose: 'Clôture des réponses',
+    answersClosed: 'Réponses closes le',
+    passesUntil: "Un laissez-passer peut être ajouté jusqu'au",
+    countingUntil: "Votre réponse peut être comptée jusqu'au",
+    who: 'Qui peut répondre',
+    whoAdult: 'Les adultes',
+    whoAnyone: 'Toute personne',
+    withChip: 'avec un passeport lu par sa puce',
+    withDocument: 'avec un document vérifié',
+    withPass: 'avec un laissez-passer',
+    ofCountry: (country: string) => `· ${country}`,
+    runtimeYes: 'Vous répondez oui à la question.',
+    runtimeNo: 'Vous répondez non à la question.',
+    runtimeAbstain: 'Vous ne prenez pas position. Votre réponse est comptée comme indécise.',
     eligible: 'Éligibles',
-    contractState: 'État du contrat',
     scope: 'Périmètre',
     about: "De quoi il s'agit",
     frame: 'Cadre actuel',
@@ -175,6 +217,22 @@ export function PolicyDetailView({
   const consultationCountryName = consultationCountry
     ? getCountryName(consultationCountry, locale)
     : null;
+  const runtime = poll.runtime ?? null;
+  /* The rule the contract checks, in a person's words. A country here is the
+     country of the document: nationality, never where someone lives. */
+  const whoCanAnswer = runtime
+    ? [
+        runtime.requireAdult ? copy.whoAdult : copy.whoAnyone,
+        runtime.minimumAssurance >= 2
+          ? copy.withChip
+          : runtime.minimumAssurance === 1
+            ? copy.withDocument
+            : copy.withPass,
+        consultationCountryName ? copy.ofCountry(consultationCountryName) : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : null;
 
   return (
     <Screen
@@ -218,26 +276,54 @@ export function PolicyDetailView({
       </header>
 
       <Card>
-        <StatGroup label={copy.facts}>
-          <StatRow
-            label={copy.closes}
-            value={formatDate(poll.closesAt, locale) ?? displayPoll.deadline}
-          />
-          <StatRow
-            label={copy.eligible}
-            value={runtimePoll ? copy.contractState : displayPoll.eligible}
-          />
-          {consultationCountryName ? (
-            <StatRow label={copy.scope} value={consultationCountryName} />
-          ) : null}
-        </StatGroup>
+        {runtime ? (
+          /* A deployed consultation states what its contract enforces: three
+             instants and one rule. Times matter here, so they are shown. */
+          <StatGroup label={copy.facts}>
+            <StatRow
+              label={isOpen ? copy.answersClose : copy.answersClosed}
+              value={formatDateTime(poll.closesAt, locale) ?? '—'}
+            />
+            {isOpen && runtime.passesUntil ? (
+              <StatRow
+                label={copy.passesUntil}
+                value={formatDateTime(runtime.passesUntil, locale) ?? '—'}
+              />
+            ) : null}
+            {runtime.countingUntil && Date.parse(runtime.countingUntil) > Date.now() ? (
+              <StatRow
+                label={copy.countingUntil}
+                value={formatDateTime(runtime.countingUntil, locale) ?? '—'}
+              />
+            ) : null}
+            <StatRow label={copy.who} value={whoCanAnswer ?? '—'} />
+          </StatGroup>
+        ) : (
+          <StatGroup label={copy.facts}>
+            <StatRow
+              label={isOpen ? copy.closes : copy.closedOn}
+              value={formatDate(poll.closesAt, locale) ?? displayPoll.deadline}
+            />
+            <StatRow label={copy.eligible} value={displayPoll.eligible} />
+            {consultationCountryName ? (
+              <StatRow label={copy.scope} value={consultationCountryName} />
+            ) : null}
+          </StatGroup>
+        )}
       </Card>
 
       {briefed ? (
         <ConsultationBrief assistant={briefed.port} consultationId={poll.id} locale={locale} />
       ) : null}
 
-      {briefed ? null : (
+      {briefed ? null : runtime ? (
+        displayPoll.description ? (
+          <section className="policy__section">
+            <Eyebrow>{copy.about}</Eyebrow>
+            <p className="policy__prose">{displayPoll.description}</p>
+          </section>
+        ) : null
+      ) : (
         <>
           <section className="policy__section">
             <Eyebrow>{copy.about}</Eyebrow>
@@ -289,11 +375,11 @@ export function PolicyDetailView({
         <Eyebrow>{copy.options}</Eyebrow>
         <dl className="policy__options">
           <dt>{copy.yes}</dt>
-          <dd>{copy.yesBody}</dd>
+          <dd>{runtime ? copy.runtimeYes : copy.yesBody}</dd>
           <dt>{copy.no}</dt>
-          <dd>{copy.noBody}</dd>
+          <dd>{runtime ? copy.runtimeNo : copy.noBody}</dd>
           <dt>{copy.abstain}</dt>
-          <dd>{copy.abstainBody}</dd>
+          <dd>{runtime ? copy.runtimeAbstain : copy.abstainBody}</dd>
         </dl>
       </section>
 

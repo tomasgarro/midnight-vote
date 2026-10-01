@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --config vite.dev.config.ts --configLoader runner",
     "build": "tsc -b && vite build --configLoader runner",
+    "build:preview": "tsc -b && vite build --mode preview --configLoader runner",
     "preview": "vite preview --config vite.config.ts --configLoader runner",
     "test": "vitest run --configLoader runner",
     "test:watch": "vitest",

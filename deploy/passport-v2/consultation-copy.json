@@ -1,0 +1,26 @@
+{
+  "preview-wave2-test-consultation": {
+    "es": {
+      "title": "Resultados después del cierre",
+      "question": "¿El resultado de una consulta debería quedar oculto hasta que cierre?",
+      "description": "Una consulta de prueba en Midnight Preview. Las respuestas cierran el 9 de octubre de 2026 a las 18:00, hora de Ginebra."
+    },
+    "fr": {
+      "title": "Les résultats après la clôture",
+      "question": "Le résultat d'une consultation doit-il rester caché jusqu'à sa clôture ?",
+      "description": "Une consultation de test sur Midnight Preview. Les réponses sont closes le 9 octobre 2026 à 18 h, heure de Genève."
+    }
+  },
+  "preview-open-verification-rules": {
+    "es": {
+      "title": "Reglas de verificación abiertas",
+      "question": "¿Debería esta plataforma publicar sus reglas de elegibilidad antes de abrir cada consulta?",
+      "description": "Una consulta global sobre publicar las reglas de elegibilidad antes de cada consulta."
+    },
+    "fr": {
+      "title": "Des règles de vérification ouvertes",
+      "question": "Cette plateforme doit-elle publier ses règles d'éligibilité avant l'ouverture de chaque consultation ?",
+      "description": "Une consultation mondiale sur la publication des règles d'éligibilité avant chaque consultation."
+    }
+  }
+}

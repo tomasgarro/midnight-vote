@@ -124,11 +124,15 @@ const SEAL_STORAGE_BLOCKED: Record<CicoLocale, string> = {
 
 type CountNotice = Extract<CountOutcome, { state: 'waiting' }>['reason'];
 
-/** The tab title follows the chosen language like everything else. */
+/**
+ * The tab title follows the chosen language like everything else. It names the
+ * product and says "consultation": the app tells people it is not an official
+ * referendum, and the tab said "Civic Referendum".
+ */
 const DOCUMENT_TITLE: Record<CicoLocale, string> = {
-  es: 'Referéndum Cívico · Voto verificable',
-  en: 'Civic Referendum · Verifiable vote',
-  fr: 'Référendum Citoyen · Vote vérifiable',
+  es: 'midnight.vote · Consultas privadas y verificables',
+  en: 'midnight.vote · Private, verifiable consultations',
+  fr: 'midnight.vote · Consultations privées et vérifiables',
 };
 
 function CivicApp() {
