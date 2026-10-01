@@ -112,7 +112,7 @@ export const REAL_TOPIC_FIXTURES: Poll[] = [
       opened: 'October 1, 2026',
       deadline: 'December 31, 2026',
       opensAt: '2026-10-01T00:00:00Z',
-      closesAt: '2026-12-31T23:59:59Z',
+      closesAt: '2026-12-31T23:59:59+01:00',
       participation: 'Demo',
       runtimeScope: 'global',
       milestone: { kind: 'proposal', date: '2026-09-17T12:00:00+02:00' },
