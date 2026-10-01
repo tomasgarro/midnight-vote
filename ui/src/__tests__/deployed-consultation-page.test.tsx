@@ -116,9 +116,7 @@ describe('the page of a deployed consultation', () => {
   it('reads in the language the person chose', () => {
     renderPage(deployed(), 'fr');
 
-    expect(
-      screen.getByRole('heading', { name: 'Les résultats après la clôture' }),
-    ).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Les résultats après la clôture' })).toBeTruthy();
     expect(screen.getByText('Une consultation de test sur Midnight Preview.')).toBeTruthy();
     expect(screen.getByText('Les adultes avec un passeport lu par sa puce')).toBeTruthy();
   });
@@ -126,9 +124,7 @@ describe('the page of a deployed consultation', () => {
   it('names the document country as a country of the document, never a residence', () => {
     renderPage(deployed({ runtimeScope: 'country', runtimeCountryCode: 'FR' }));
 
-    expect(
-      screen.getByText('Adults with a passport read by its chip from France'),
-    ).toBeTruthy();
+    expect(screen.getByText('Adults with a passport read by its chip from France')).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/resident|living in|lives in/i);
   });
 
