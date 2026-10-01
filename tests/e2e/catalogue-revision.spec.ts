@@ -16,25 +16,20 @@ test('one place at a time, source-backed chat and reduced motion', async ({ page
   await expect(page.locator('.votes__results h2')).toHaveText(['Global']);
   await places.getByRole('button', { name: 'Switzerland' }).click();
   await expect(page.locator('.votes__results h2')).toHaveText(['Switzerland']);
-  await expect(page.getByRole('heading', { name: 'Should the SNB hold Bitcoin?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Limiting fireworks' })).toBeVisible();
   await page.getByRole('button', { name: 'Cleisthenes', exact: true }).click();
-  await page.getByRole('textbox').fill('Summarize the Swiss Bitcoin initiative');
+  await page.getByRole('textbox').fill('Summarize the fireworks initiative');
   await page.getByRole('button', { name: 'Send question' }).click();
   await expect(page.getByRole('status')).toContainText('Finding catalogue context');
-  await expect(page.locator('.catalogue-chat__answer')).toContainText(
-    'constitutional reserve provision',
-  );
-  await page.screenshot({ path: 'outputs/cleisthenes-bitcoin-390.png' });
+  await expect(page.locator('.catalogue-chat__answer')).toContainText('loud fireworks');
+  await page.screenshot({ path: 'outputs/cleisthenes-fireworks-390.png' });
   await page.getByRole('button', { name: 'Sources', exact: true }).click();
-  await expect(page.getByRole('link', { name: /Swiss National Bank/ })).toHaveAttribute(
-    'href',
-    /snb.ch/,
-  );
+  await expect(page.getByRole('link', { name: /UVEK/ })).toHaveAttribute('href', /uvek\.admin\.ch/);
   await page.getByRole('button', { name: 'Clear chat' }).click();
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Topics', exact: true }).click();
   await page.getByRole('button', { name: 'Climate', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Repair more. Replace less?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Limiting fireworks' })).toBeVisible();
   await expect(page.getByRole('status')).toHaveCount(0);
 });
 test('budget reflection preserves choices on back and review editing', async ({ page }) => {

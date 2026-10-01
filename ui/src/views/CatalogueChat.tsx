@@ -6,12 +6,22 @@ import type { CicoLocale } from '@/integration/locale';
 import { REFLECTION_COPY } from '@/pulse/local-reflection';
 import { answerCatalogue, GUIDE_COPY, type GuideAnswer } from './catalogue-guide';
 import { CHAT_PROMPTS } from './chat-prompts';
-import { localizePoll, type Poll, pollCountryCode } from './poll-model';
+import { localizePoll, type Poll, pollPlaceCode } from './poll-model';
 import './catalogue-chat.css';
 export interface CatalogueMessage {
   id: number;
   question: string;
   answer: GuideAnswer;
+}
+
+/** The sources of one consultation, in the reader's language when it has them. */
+function localizedSources(
+  polls: readonly Poll[],
+  pollId: string,
+  locale: CicoLocale,
+): Poll['sources'] {
+  const poll = polls.find((item) => item.id === pollId);
+  return poll ? localizePoll(poll, locale).sources : [];
 }
 
 export function CatalogueChat({
@@ -54,7 +64,7 @@ export function CatalogueChat({
   };
   const scroll = useRef<HTMLDivElement>(null);
   const id = useRef(initialMessages[initialMessages.length - 1]?.id ?? 0);
-  const countries = [...new Set(polls.map(pollCountryCode).filter((c): c is string => Boolean(c)))];
+  const countries = [...new Set(polls.map(pollPlaceCode).filter((c): c is string => Boolean(c)))];
   const briefs = polls
     .filter((poll) => briefIds.includes(poll.id))
     .map((poll) => localizePoll(poll, locale));
@@ -239,19 +249,17 @@ export function CatalogueChat({
                 )}
                 {m.answer.selectedId &&
                   /source|fuente/i.test(m.question) &&
-                  polls
-                    .find((p) => p.id === m.answer.selectedId)
-                    ?.sources.map((source) => (
-                      <a
-                        className="chat-citation"
-                        key={source.href}
-                        href={source.href}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {source.label} ↗
-                      </a>
-                    ))}
+                  localizedSources(polls, m.answer.selectedId, locale).map((source) => (
+                    <a
+                      className="chat-citation"
+                      key={source.href}
+                      href={source.href}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {source.label} ↗
+                    </a>
+                  ))}
                 {m.answer.pollIds.map((pId) => {
                   const source = polls.find((p) => p.id === pId);
                   if (!source) return null;
@@ -260,8 +268,8 @@ export function CatalogueChat({
                     <article className="catalogue-chat__source" key={pId}>
                       <h2>{p.title}</h2>
                       <small>
-                        {pollCountryCode(p)
-                          ? countryName(pollCountryCode(p) ?? '', locale)
+                        {pollPlaceCode(p)
+                          ? countryName(pollPlaceCode(p) ?? '', locale)
                           : t.globalLabel}
                       </small>
                       <details className="chat-proposal-preview">

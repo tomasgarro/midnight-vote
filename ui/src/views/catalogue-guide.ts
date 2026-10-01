@@ -2,7 +2,13 @@ import type { DemoCredentialSummary } from '@/integration/cico-passport-journey'
 import { countryName } from '@/integration/country-catalog';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability } from '@/integration/poll-lifecycle';
-import { isCountryPoll, localizePoll, type Poll, pollCountryCode } from './poll-model';
+import {
+  isCountryPoll,
+  localizePoll,
+  type Poll,
+  pollCountryCode,
+  pollPlaceCode,
+} from './poll-model';
 
 export function hasValidatedPassport(
   credential: DemoCredentialSummary | null,
@@ -200,7 +206,7 @@ export function answerCatalogue(
             : poll.description;
     return { text: text || t.noData, pollIds: [poll.id], selectedId: poll.id };
   }
-  const countries = [...new Set(polls.map(pollCountryCode).filter((c): c is string => Boolean(c)))];
+  const countries = [...new Set(polls.map(pollPlaceCode).filter((c): c is string => Boolean(c)))];
   const explicit = countries.find((c) =>
     [c, ...(['en', 'es', 'fr'] as const).map((l) => countryName(c, l))].some((name) =>
       new RegExp(`(?:^|\\W)${normalize(name)}(?:$|\\W)`, 'u').test(q),
@@ -219,12 +225,15 @@ export function answerCatalogue(
   if (!explicit && !global && !/open|poll|consult|abierta|ouvert|para mi|for me|pour moi/.test(q))
     return { text: t.unknown, pollIds: [] };
   const scope = global ? undefined : (explicit ?? country);
+  // Global means the Global list. Otherwise a consultation qualifies when any
+  // pass may answer it (the World question, the Swiss open pulse), or when it
+  // is listed in the place asked about.
+  const inScope = (p: Poll) =>
+    global ? !isCountryPoll(p) : !pollCountryCode(p) || pollPlaceCode(p) === scope;
   const matches = polls.filter((p) => {
     try {
       return (
-        getPollAvailability(p, now).isOpen &&
-        (!subject || p.subject === subject) &&
-        (!isCountryPoll(p) || (!global && pollCountryCode(p) === scope))
+        getPollAvailability(p, now).isOpen && (!subject || p.subject === subject) && inScope(p)
       );
     } catch {
       return false;

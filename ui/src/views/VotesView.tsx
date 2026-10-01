@@ -18,8 +18,9 @@ import {
   isCountryPoll,
   isCountryPollForCountry,
   localizePoll,
+  meetsCountryPolicy,
   type Poll,
-  pollCountryCode,
+  pollPlaceCode,
 } from '@/views/poll-model';
 import { ResultsPanel } from '@/views/ResultsPanel';
 import { ConsultationRail } from './ConsultationRail';
@@ -159,7 +160,7 @@ export function VotesView({
     const codes = new Set<string>();
     for (const poll of polls) {
       if (!isCountryPoll(poll)) continue;
-      const code = pollCountryCode(poll);
+      const code = pollPlaceCode(poll);
       if (code && findAssignedCountry(code)) codes.add(code);
     }
     return [...codes].sort((left, right) =>
@@ -309,8 +310,7 @@ export function VotesView({
                 {visiblePolls.map((poll) => {
                   const displayPoll = localizePoll(poll, locale);
                   const eligibleForScope = Boolean(
-                    credential &&
-                      (!isCountryPoll(poll) || isCountryPollForCountry(poll, credential.country)),
+                    credential && meetsCountryPolicy(poll, credential.country),
                   );
                   const isOpen = getPollAvailability(poll, now).isOpen;
                   return (
