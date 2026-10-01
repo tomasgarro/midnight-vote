@@ -44,6 +44,11 @@ export interface MidnightIssuerRuntimeConfig {
   readonly relayUrl?: string;
   readonly explorerBaseUrl?: string;
   readonly balanceTtlMs?: number;
+  /**
+   * File that keeps the issuer wallet's synchronized state between starts, so
+   * a restart does not replay the chain. It holds no key. Omit to keep nothing.
+   */
+  readonly walletStatePath?: string;
 }
 
 /** Narrow seam around WalletFacade; production code supplies the SDK adapter. */

@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { padBytes32 } from 'midnight-referendum-api';
 
 /**
@@ -76,6 +76,7 @@ export interface CicoServiceConfig {
     readonly credentialEpoch: bigint;
     readonly relayUrl: string;
     readonly explorerBaseUrl?: string;
+    readonly walletStatePath: string;
   };
 }
 
@@ -122,11 +123,12 @@ export function loadCicoServiceConfig(
       'Action capability, issuer wallet, and issuer role secrets must be independent',
     );
   }
+  const stateDirectory = resolve(optional(env, 'CICO_STATE_DIRECTORY', '.cico-state'));
   return {
     host: optional(env, 'CICO_HOST', '127.0.0.1'),
     port: integer(env, 'CICO_PORT', 1, 65_535, 8791),
     allowedOrigins: list(required(env, 'CICO_ALLOWED_ORIGINS')),
-    stateDirectory: resolve(optional(env, 'CICO_STATE_DIRECTORY', '.cico-state')),
+    stateDirectory,
     rarimoBaseUrl,
     rarimoPrivateHeaders: stringRecord(env.CICO_RARIMO_PRIVATE_HEADERS_JSON),
     rarimoProofParamsAllowedOrigins: list(
@@ -208,6 +210,11 @@ export function loadCicoServiceConfig(
       credentialEpoch: BigInt(credentialEpoch),
       relayUrl: optional(env, 'CICO_NODE_URL', 'wss://rpc.preview.midnight.network'),
       ...(explorerBaseUrl ? { explorerBaseUrl } : {}),
+      // Beside the service's other durable state, so it needs no setting of
+      // its own where that directory is already a volume.
+      walletStatePath: resolve(
+        optional(env, 'CICO_WALLET_STATE_PATH', join(stateDirectory, 'issuer-wallet-state.json')),
+      ),
     },
   };
 }
