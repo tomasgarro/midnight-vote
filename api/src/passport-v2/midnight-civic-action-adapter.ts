@@ -7,8 +7,7 @@ import {
   padBytes32,
 } from './crypto.js';
 import {
-  assertReferendumRegistryBinding,
-  createFrozenCredentialRegistryReference,
+  assertCanonicalReferendumBinding,
   findBallotPath,
   findCredentialPath,
   isBallotRevealed,
@@ -462,24 +461,16 @@ function createCanonicalStateResolver(
         entry.config.registry.registryContractAddress,
       );
       if (!registryState) throw new Error('Credential registry has no canonical state');
-      const reference = createFrozenCredentialRegistryReference(
-        entry.config.registry.registryContractAddress,
-        parseCredentialRegistryV1(registryState.data),
-      );
-      assertReferendumRegistryBinding(reference, {
-        registryContractBinding: entry.config.registry.registryContractBinding,
-        registryId: entry.config.registry.registryId,
-        issuerId: entry.config.registry.issuerId,
-        credentialEpoch: entry.config.registry.credentialEpoch,
-        initialCredentialRoot: entry.config.registry.frozenRoot,
-      });
-
       const referendumState = await providers.publicDataProvider.queryContractState(
         entry.contractAddress,
       );
       if (!referendumState) throw new Error('Referendum has no canonical state');
       const referendum = parseReferendumV2(referendumState.data);
-      assertReferendumRegistryBinding(reference, referendum);
+      assertCanonicalReferendumBinding(
+        entry.config.registry,
+        parseCredentialRegistryV1(registryState.data),
+        referendum,
+      );
       if (referendum.phase !== 'COMMIT' || referendum.closed) {
         throw new Error('Referendum is not accepting votes');
       }

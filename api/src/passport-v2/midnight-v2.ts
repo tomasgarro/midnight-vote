@@ -229,6 +229,78 @@ export function createFrozenCredentialRegistryReference(
   };
 }
 
+/**
+ * The registry reference of a consultation whose registry keeps enrolling.
+ *
+ * Such a registry never freezes, so it has no frozen root to pin. The root
+ * here is the one the consultation recorded when it was deployed. The
+ * registry's own root moves on with every pass that is issued.
+ */
+export function createOpenCredentialRegistryReference(
+  registryContractAddress: string,
+  state: CredentialRegistryV1State,
+  initialCredentialRoot: MerkleTreeDigest,
+): FrozenCredentialRegistryReference {
+  if (state.frozen) {
+    throw new Error('Credential registry is frozen; its frozen root must be pinned instead');
+  }
+  return {
+    registryContractAddress,
+    registryContractBinding: deriveRegistryContractBinding(registryContractAddress),
+    registryId: new Uint8Array(state.registryId),
+    issuerId: new Uint8Array(state.issuerId),
+    credentialEpoch: state.credentialEpoch,
+    frozenRoot: { field: initialCredentialRoot.field },
+  };
+}
+
+/** What a consultation says on chain about its registry and the roots it admits. */
+export type ReferendumV2AdmissionState = ReferendumV2RegistryBinding &
+  Pick<ReferendumV2State, 'acceptedCredentialRoots' | 'revokedCredentialRoots'>;
+
+/**
+ * Checked on the person's device before a proof is built: the consultation on
+ * chain is bound to the registry the catalogue names, and it admits the passes
+ * that registry holds now.
+ *
+ * A frozen registry is pinned by its frozen root. An open one is pinned by its
+ * address, its ID, its issuer and its epoch, and the consultation must have
+ * admitted the registry's current root: a pass issued after the last admitted
+ * root cannot be proven yet, and a proof built now would be refused on chain.
+ */
+export function assertCanonicalReferendumBinding(
+  catalogRegistry: FrozenCredentialRegistryReference,
+  registry: CredentialRegistryV1State,
+  referendum: ReferendumV2AdmissionState,
+): void {
+  const reference = registry.frozen
+    ? createFrozenCredentialRegistryReference(catalogRegistry.registryContractAddress, registry)
+    : createOpenCredentialRegistryReference(
+        catalogRegistry.registryContractAddress,
+        registry,
+        referendum.initialCredentialRoot,
+      );
+  assertReferendumRegistryBinding(reference, {
+    registryContractBinding: catalogRegistry.registryContractBinding,
+    registryId: catalogRegistry.registryId,
+    issuerId: catalogRegistry.issuerId,
+    credentialEpoch: catalogRegistry.credentialEpoch,
+    initialCredentialRoot: catalogRegistry.frozenRoot,
+  });
+  assertReferendumRegistryBinding(reference, referendum);
+  if (registry.frozen) return;
+
+  const current = registry.currentRoot.field;
+  const admitted =
+    referendum.acceptedCredentialRoots.some((root) => root.field === current) &&
+    !referendum.revokedCredentialRoots.some((root) => root.field === current);
+  if (!admitted) {
+    throw new Error(
+      'This consultation has not admitted the latest passes yet. Try again in a few minutes.',
+    );
+  }
+}
+
 /** Prevents deploying a referendum against an arbitrary or stale registry root. */
 export function assertReferendumRegistryBinding(
   reference: FrozenCredentialRegistryReference,
