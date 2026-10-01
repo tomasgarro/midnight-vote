@@ -1,0 +1,146 @@
+# Preview runbook
+
+How midnight.vote runs on Midnight Preview during Wave 2: what runs where, how
+a consultation goes on chain, what an operator pastes and where, and how a
+consultation is closed and counted. Written 2 October 2026.
+
+The addresses of a deployment are not repeated here. They are in the manifests
+under `deploy/passport-v2/`, and `node scripts/print-consultation-values.mjs`
+prints every value derived from them.
+
+## What runs where
+
+| Place | What | Holds a secret |
+| --- | --- | --- |
+| Web host (`midnight.vote`) | The app, as static files. The Cleisthenes page and its bridge under `/Switzerland` | No |
+| VPS project `midnight-rarimo-nfc` | Passport verifier, credential service (CICO) with its proof server, and the HTTPS edge for every `*.midnight.vote` service name | Issuer wallet seed, two role secrets, the capability secret |
+| VPS project `midnight-civic-relay` | Relayer, its database and its proof server. No port of its own: it joins the edge network of the project above | Relayer wallet seed, the capability secret |
+| VPS project `swiss-civic-pilot` | Cleisthenes API. Joins the same edge network | Model keys |
+| Operator's machine | The deploy script and the operator wallet. Used to deploy, close and finalize | Operator fee seed, organizer and issuer role secrets |
+| Midnight Preview | `credential-registry-v1` (one) and `referendum-v2` (one per consultation) | No |
+
+Public names, all served by the one edge:
+
+| Name | Routes | Goes to |
+| --- | --- | --- |
+| `cico.midnight.vote` | `/v1/*` | Credential service |
+| `rarimo.midnight.vote` | proof parameters and callback only | Passport verifier |
+| `relay.midnight.vote` | `/keys`, `/ready`, `/v2/*` | Relayer |
+| `cico.cardanoschool.org` | `/Switzerland/api/*` | Cleisthenes. Kept only until the bridge on the web host is repointed |
+
+Nothing on a developer machine serves the live site. Local Docker holds one
+container with a function, `referendum-proof-server`, which the deploy script
+uses.
+
+## Three things that cost time
+
+| Fact | Consequence |
+| --- | --- |
+| A wallet that starts with nothing replays the whole chain. On 1 October 2026 that took about 85 minutes on a laptop, longer on a busy one | The first start of the relayer, of the credential service's new image, and of the operator wallet each cost that once. After it, each keeps its state (see below) and a restart takes minutes |
+| The relayer holds one DUST coin | It serves one action at a time. Do not restart it during a demonstration |
+| A consultation's contract stays in its first phase until someone closes it | After the closing time, run the deploy command again, or nobody can count their answer |
+
+## Wallet state
+
+The relayer, the credential service and the deploy script save what their
+wallet has learned from the chain, and start from it the next time.
+
+| Wallet | Where its state is kept |
+| --- | --- |
+| Relayer | `/var/lib/relayer/state/wallet-state.json`, in the volume `midnight-civic-relay-state` |
+| Credential service (issuer) | `issuer-wallet-state.json` in its state directory, in the volume `midnight-rarimo-nfc-cico-state` |
+| Operator (deploy script) | `.state/operator-wallet.preview.json` on the operator's machine, not in the repository |
+
+The file holds no key: keys are derived from the seed at every start. It does
+show what the wallet owns, so treat it as private. It is saved every five
+minutes, once when the wallet is synchronized, and at shutdown. A file that is
+damaged, or that belongs to another wallet or network, is ignored and the
+wallet replays the chain as before. To force a replay, delete the file.
+
+## Put a consultation on chain
+
+Needs Docker Desktop running (for `referendum-proof-server`) and the files
+`.env.v2.preview` and `relayer/.env`, which hold the operator's secrets and
+are not in the repository.
+
+```bash
+npm run deploy:preview:test
+```
+
+The command writes the consultation's inputs once (`.env.v2.preview.test`),
+then deploys against the registry that already exists and publishes the
+current credential root to the new consultation. It casts no answer.
+
+It can be run again at any time. It reads its manifest and does what is due:
+it admits a newer credential root while the consultation still enrols, closes
+the consultation once answers are over, and finalizes it once counting is
+over. Before a deadline it prints when to come back.
+
+```bash
+node scripts/print-consultation-values.mjs --write-app-env
+```
+
+This prints the values for the two VPS projects and writes
+`ui/.env.preview.local` for the app build.
+
+## The hPanel sitting
+
+All changes go in together, because each restart costs a wallet replay.
+
+| Step | Where | What |
+| --- | --- | --- |
+| 1 | hPanel → VPS → Docker Manager → `midnight-civic-relay` → Manage → environment | `RELAYER_SEED` and `RELAYER_V2_CAPABILITY_SECRET` from `relayer/.env`; `RELAYER_V2_ALLOWED_CONTRACTS` as printed. Save and restart |
+| 2 | same place → `midnight-rarimo-nfc` → environment | Add `CICO_ACTION_CAPABILITY_SECRET` (the same value as the relay's capability secret), `CICO_ACTION_ALLOWED_CONTRACTS` and `CICO_REFERENDA_JSON` as printed |
+| 3 | `midnight-rarimo-nfc` → compose editor | Replace the content with `deploy/hostinger/rarimo-standalone/docker-compose.hostinger.preview.yml`. Save and deploy |
+| 4 | Wait | Both wallets replay, this first time. Expect two to three hours on the two-core server. Later restarts take minutes |
+| 5 | Web host | Upload the `preview` build of the app |
+
+Copy a secret to the clipboard without printing it:
+
+```bash
+node -e "const m=require('fs').readFileSync('relayer/.env','utf8').match(/^RELAYER_SEED=(.*)$/m);process.stdout.write(m[1].trim())" | clip
+```
+
+```bash
+node -e "const m=require('fs').readFileSync('relayer/.env','utf8').match(/^RELAYER_V2_CAPABILITY_SECRET=(.*)$/m);process.stdout.write(m[1].trim())" | clip
+```
+
+Never send these values through the Hostinger API or a connector. The API
+returns a project's environment in plain text.
+
+## Check it from outside
+
+| Check | Expect |
+| --- | --- |
+| `curl https://relay.midnight.vote/ready` | 200 once the relayer's wallet has replayed and holds DUST |
+| `curl -H "Origin: https://midnight.vote" https://cico.midnight.vote/v1/enrollment/status` | 200 with the root publisher's counters. 503 means no consultation is configured |
+| `curl https://midnight.vote/Switzerland/api/health` | 200. If not, restart `swiss-civic-pilot`: it lost the edge network |
+| The relayer's log | Its wallet address, then "listening". Before that: "Set RELAYER_SEED…" means a secret is missing |
+| The credential service's log | Its issuer wallet and a DUST balance above zero. It pays for every pass and every root it publishes |
+
+## Close, count, finalize
+
+The schedule is enforced on chain. The contract changes phase only when asked.
+
+| When | Who | What |
+| --- | --- | --- |
+| After the closing time | Operator | `npm run deploy:preview:test` again. It closes the consultation: answers can now be counted |
+| Until the counting deadline | Each person | Opens the app on the device that sealed the answer, and counts it. The app does this through the relayer |
+| After the counting deadline | Operator | `npm run deploy:preview:test` once more. It finalizes: the tally is fixed |
+
+Before a deadline the command prints the date and ends normally.
+
+## Known limits
+
+- A pass is valid for 24 hours. A person seals their answer in the same sitting
+  as the passport scan. Counting later needs no pass.
+- The registry is shared by every consultation and keeps enrolling. A person's
+  proof is built against the registry's current state, so a consultation has
+  to have admitted the latest root. The credential service admits each new
+  root within about a minute. Once a consultation's own enrolment has closed,
+  later passes move the registry on, and people who have not yet sealed their
+  answer in that consultation can no longer do so. Close enrolment late.
+- The app builds the proof on the person's device. On a laptop the seal took
+  about two minutes. A phone is not measured yet.
+- One language is stored with the deployment. The other languages of a
+  consultation are in `deploy/passport-v2/consultation-copy.json`.
