@@ -35,6 +35,8 @@ services:
   # needs egress once, to fetch Midnight's public parameters at start.
   relayer-proof:
     <<: *proof
+    # Midnight's public parameters are kept here; the root stays read-only.
+    volumes: [relayer-proof-cache:/.cache]
     command: [midnight-proof-server, -v]
     networks: [relay-internal, relay-egress]
 
@@ -77,6 +79,8 @@ services:
   voter-proof:
     <<: *proof
     profiles: [hosted-proving]
+    # Its parameters live in memory and are fetched again at each start.
+    tmpfs: [/tmp, /.cache]
     command: [midnight-proof-server]
     networks: [prove-edge, prove-egress]
 
@@ -156,5 +160,6 @@ volumes:
   relay-secrets: {name: midnight-civic-relay-secrets}
   relayer-postgres-data: {name: midnight-civic-relay-postgres-data}
   relayer-state: {name: midnight-civic-relay-state}
+  relayer-proof-cache: {name: midnight-civic-relay-proof-cache}
   caddy-data: {name: midnight-civic-relay-caddy-data}
   caddy-config: {name: midnight-civic-relay-caddy-config}

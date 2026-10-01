@@ -36,6 +36,9 @@ services:
     mem_limit: 1500m
     read_only: true
     tmpfs: [/tmp]
+    # The server keeps Midnight's public parameters here. Without a writable
+    # place for them it stops at start.
+    volumes: [relayer-proof-cache:/.cache]
     command: [midnight-proof-server, -v]
     networks: [relay-internal, relay-egress]
 
@@ -94,3 +97,4 @@ volumes:
   relay-secrets: {name: midnight-civic-relay-secrets}
   relayer-postgres-data: {name: midnight-civic-relay-postgres-data}
   relayer-state: {name: midnight-civic-relay-state}
+  relayer-proof-cache: {name: midnight-civic-relay-proof-cache}
