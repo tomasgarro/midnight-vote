@@ -37,6 +37,49 @@ Run `node validate-project.mjs` before rendering or deploying the project. DNS,
 TLS, public ports, and the physical NFC run are a separate, explicitly approved
 morning cutover.
 
+## The four manifests
+
+| File | Stage | Public |
+| --- | --- | --- |
+| `docker-compose.hostinger.yml` | Verifier only, built from source | No |
+| `docker-compose.hostinger.registry.yml` | The same services, image pulled | No |
+| `docker-compose.hostinger.cutover.yml` | Adds CICO and the HTTPS edge. Issues passes; mints no vote capability | Yes |
+| `docker-compose.hostinger.preview.yml` | What runs for Wave 2. See below | Yes |
+
+## `docker-compose.hostinger.preview.yml`
+
+The cutover manifest, plus what a person without a wallet needs to seal and
+count an answer:
+
+- the credential service from `midnight-civic-cico-service`, with the
+  capability issuer and the root publisher switched on;
+- every public name under `midnight.vote`: `cico.`, `rarimo.` and `relay.`.
+  `cico.cardanoschool.org` is still answered, because the Cleisthenes bridge on
+  the web host calls it. Remove it here once that bridge is repointed;
+- the route to the Cleisthenes project, which joins this project's edge
+  network (`/Switzerland/api`);
+- the route to the relay project, which joins the same network under the name
+  `relayer` (`deploy/hostinger/relay-standalone/docker-compose.shared-edge.yml`).
+
+The verifier's public origin and the app's origin are written in the file, so
+`RARIMO_CALLBACK_ORIGIN` and `CICO_ALLOWED_ORIGINS` are no longer read from the
+project environment. Three values are new there:
+
+| Name | Secret | Value |
+| --- | --- | --- |
+| `CICO_ACTION_CAPABILITY_SECRET` | **Yes** | Equal to the relay's `RELAYER_V2_CAPABILITY_SECRET` |
+| `CICO_ACTION_ALLOWED_CONTRACTS` | No | Printed by `node scripts/print-consultation-values.mjs` |
+| `CICO_REFERENDA_JSON` | No | Printed by the same script, on one line |
+
+A new pass reaches every listed consultation as soon as it is issued
+(`CICO_ROOT_PUBLISH_MIN_BATCH: 1`). That is one registry attestation and one
+transaction per consultation for each pass, from the issuer wallet, which
+therefore needs DUST. Raise the batch size before a pilot with many people.
+
+The file is 8,189 characters; Hostinger's API refuses more than 8,192.
+
+## Local runs
+
 The tracked local override uses ports `28080` and `28081` so it can be tested
 without stopping the earlier `rarimo-verificator` scratch stack:
 
