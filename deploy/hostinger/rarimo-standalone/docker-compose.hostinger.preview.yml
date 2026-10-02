@@ -9,7 +9,6 @@ x-rarimo-env: &rarimo-env
   RARIMO_EVENT_ID: ${RARIMO_EVENT_ID:?required}
 x-rarimo: &rarimo
   image: ghcr.io/tomasgarro/midnight-rarimo-verificator:v0.3.12-cico-delete-204-22c3c68@sha256:c617e38b457d488dce937741ee3ce395b1d4d9749fcc254cadbb8eefe408aa40
-  restart: "no"
   security_opt: [no-new-privileges:true]
   entrypoint: [/bin/sh, -ec]
   command:
@@ -37,7 +36,6 @@ x-rarimo: &rarimo
 services:
   secret-init:
     image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
-    restart: "no"
     security_opt: [no-new-privileges:true]
     command: [/bin/sh, -ec, "umask 077; f=/s/db-password; test -s $$f || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \\n' >$$f; test $$(wc -c <$$f) -eq 64"]
     volumes: [rarimo-secrets:/s]
@@ -76,7 +74,6 @@ services:
     init: true
     user: "1000:1000"
     environment:
-      CICO_NETWORK: preview
       CICO_HOST: 0.0.0.0
       CICO_ALLOWED_ORIGINS: https://midnight.vote
       CICO_STATE_DIRECTORY: /var/lib/cico-passport
@@ -99,6 +96,7 @@ services:
       CICO_ACTION_ALLOWED_NETWORKS: preview
       CICO_ACTION_ALLOWED_CONTRACTS: ${CICO_ACTION_ALLOWED_CONTRACTS:?required}
       CICO_ACTION_ALLOWED_CIRCUITS: castVote,revealVote
+      CICO_DOCUMENT_UNIQUENESS: ${CICO_DOCUMENT_UNIQUENESS:-}
     volumes: [cico-state:/var/lib/cico-passport]
     read_only: true
     tmpfs: [/tmp]

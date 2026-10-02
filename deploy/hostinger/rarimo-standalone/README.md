@@ -71,6 +71,12 @@ project environment. Three values are new there:
 | `CICO_ACTION_ALLOWED_CONTRACTS` | No | Printed by `node scripts/print-consultation-values.mjs` |
 | `CICO_REFERENDA_JSON` | No | Printed by the same script, on one line |
 
+One more is read and may stay unset:
+
+| Name | Secret | Value |
+| --- | --- | --- |
+| `CICO_DOCUMENT_UNIQUENESS` | No | Unset or empty: `enforce`, a document has one holder. `observe` logs and refuses nothing. `off` drops the rule. See ADR-012 |
+
 A new pass reaches every listed consultation as soon as it is issued
 (`CICO_ROOT_PUBLISH_MIN_BATCH: 1`). That is one registry attestation and one
 transaction per consultation for each pass, from the issuer wallet, which
