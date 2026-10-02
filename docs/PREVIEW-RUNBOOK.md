@@ -103,7 +103,7 @@ All changes go in together, because each restart costs a wallet replay.
 | 2 | same place → `midnight-rarimo-nfc` → environment | Add `CICO_ACTION_CAPABILITY_SECRET` (the same value as the relay's capability secret), `CICO_ACTION_ALLOWED_CONTRACTS` and `CICO_REFERENDA_JSON` as printed |
 | 3 | `midnight-rarimo-nfc` → compose editor | Replace the content with `deploy/hostinger/rarimo-standalone/docker-compose.hostinger.preview.yml`. Save and deploy |
 | 4 | Wait | Both wallets replay, this first time. Expect two to three hours on the two-core server. Later restarts take minutes |
-| 5 | Web host | Upload the `preview` build of the app |
+| 5 | Web host | Publish the `preview` build of the app, as described below |
 
 Copy a secret to the clipboard without printing it:
 
@@ -117,6 +117,28 @@ node -e "const m=require('fs').readFileSync('relayer/.env','utf8').match(/^RELAY
 
 Never send these values through the Hostinger API or a connector. The API
 returns a project's environment in plain text.
+
+## Publish the app
+
+The app on the web host is a folder of static files. Build it against the
+consultations that are deployed, and pack it:
+
+```bash
+node scripts/print-consultation-values.mjs --write-app-env
+npm run build:preview --workspace midnight-referendum-ui
+python scripts/package-app.py ui/dist outputs/midnight-vote-preview.zip
+```
+
+Pack it with that script, not with PowerShell's `Compress-Archive`: that one
+writes Windows path separators, and the host then unpacks every file into one
+flat folder with backslashes in its names.
+
+In hPanel's file manager, upload the archive to `public_html` and extract it
+there, over the existing files. **Do not delete the `Switzerland` folder**: it
+holds the Cleisthenes page and its bridge, and it is not part of this build.
+
+Publish only after the three checks below answer as expected. A Preview build
+in front of servers that are not ready shows a consultation nobody can answer.
 
 ## Check it from outside
 
