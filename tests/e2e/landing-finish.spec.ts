@@ -66,7 +66,7 @@ for (const width of [320, 1440]) {
     );
     const panel = page.locator('.future-panel');
     await expect(panel.getByText('On the horizon · Selective disclosure')).toBeVisible();
-    await expect(panel.getByText('On the horizon · AI for civic understanding')).toBeVisible();
+    await expect(panel.getByText('Starting now · AI for civic understanding')).toBeVisible();
     await expect(page.locator('.disclosure-proof')).toBeVisible();
     await page.locator('.disclosure-scene').scrollIntoViewIfNeeded();
     await expect(page.locator('.disclosure-proof')).toHaveCSS('opacity', '1');
