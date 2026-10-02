@@ -198,6 +198,22 @@ export async function createMidnightIssuerWalletAdapter(
       // replay then continues from the last save instead of from nothing.
       saveTimer = setInterval(() => void saveState('periodic'), WALLET_STATE_SAVE_INTERVAL_MS);
       saveTimer.unref();
+      // The address derives from the seed, so the first state already has
+      // it. It is said now, not after the replay: it is what an operator
+      // needs in order to fund the wallet, and the replay takes over an hour.
+      // Public addresses only. Never any key material.
+      let announced = false;
+      const subscription = facade.state().subscribe({
+        next: (state) => {
+          if (announced) return;
+          announced = true;
+          console.log(
+            `[cico] issuer wallet address, to fund with NIGHT: ${MidnightBech32m.encode(configuration.networkId, state.unshielded.address).asString()}`,
+          );
+          queueMicrotask(() => subscription.unsubscribe());
+        },
+        error: () => undefined,
+      });
     },
     async waitUntilSynced() {
       const state = await facade.waitForSyncedState();
@@ -211,6 +227,17 @@ export async function createMidnightIssuerWalletAdapter(
       // Exercise the network-specific codec here so a bad network config fails
       // before any credential transaction is constructed.
       MidnightBech32m.encode(configuration.networkId, state.shielded.address).asString();
+      // Every pass and every published root is a transaction this wallet pays
+      // for. An empty one failed silently, at the first pass, with nothing in
+      // the log to say why.
+      const dust = state.dust.balance(new Date());
+      console.log(`[cico] issuer wallet synchronized. DUST: ${dust.toString()}`);
+      if (dust <= 0n) {
+        console.warn(
+          '[cico] the issuer wallet holds no DUST. It cannot issue a pass or publish a root. ' +
+            'Send NIGHT to its address and register it for DUST generation.',
+        );
+      }
       await saveState('synchronized');
     },
     async stop() {
