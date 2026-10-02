@@ -52,7 +52,6 @@ function renderVotes(polls: readonly Poll[], onStartVote = vi.fn()) {
     <VotesView
       polls={polls}
       credential={credential}
-      publicContractAddress={null}
       onStartVote={onStartVote}
       onOpenPolicy={vi.fn()}
       onOpenPassportJourney={vi.fn()}

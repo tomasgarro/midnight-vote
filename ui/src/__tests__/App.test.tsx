@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CivicRuntime as App } from '../CivicRuntime';
 
 /**
@@ -44,7 +44,11 @@ describe('App', () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.history.replaceState(null, '', '#app');
+    // Which consultations are open depends on the date, so the date is fixed.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-02T12:00:00Z'));
   });
+  afterEach(() => vi.useRealTimers());
 
   it('opens the first visit on Welcome instead of the dashboard', async () => {
     render(<App />);
@@ -334,9 +338,10 @@ describe('App', () => {
   it('keeps one receipt per simulated vote, in the answers', async () => {
     render(<App />);
     const user = userEvent.setup();
-    // Argentina is the scope with several open consultations, so it is where
-    // two distinct receipts can be produced.
-    await completeDemoCredential(user, /Argentina/i);
+    // Two distinct receipts need two open consultations nothing else in this
+    // file has answered. Receipts outlive each test, and a consultation this
+    // device answered offers no second vote.
+    await completeDemoCredential(user, /Suiza/i);
 
     const castVote = async (index: number, answer: RegExp) => {
       const open = screen.getAllByRole('button', { name: /Participar/i });
@@ -352,8 +357,8 @@ describe('App', () => {
     };
 
     await castVote(0, /^Sí/);
-    // Completed consultations leave the open list, so the next distinct one
-    // becomes the first available action.
+    // An answered consultation offers no vote, so the next distinct one is
+    // the first available action.
     await castVote(0, /^No/);
     await openYou(user);
     expect(screen.getByText(/comprobantes/)).toBeTruthy();
@@ -374,7 +379,8 @@ describe('App', () => {
   it('verifies a receipt from the answers without leaving the device', async () => {
     render(<App />);
     const user = userEvent.setup();
-    await completeDemoCredential(user);
+    // France was answered by an earlier test, and receipts outlive a test.
+    await completeDemoCredential(user, /Italia/i);
     const [voteButton] = screen.getAllByRole('button', { name: /Participar/i });
     if (!voteButton) throw new Error('Expected at least one available consultation action');
     await user.click(voteButton);

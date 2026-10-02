@@ -55,59 +55,27 @@
 }
 .dashboard-v4 .discovery-rail .poll {
   overflow: hidden;
-  padding: 0 20px 20px;
+  padding: 20px;
   height: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 .poll-media {
-  position: relative;
-  height: 180px;
-  margin: 0 -20px 6px;
+  flex: none;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #dddcd4;
-  color: #5a605a;
+  border-radius: 14px;
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
 }
-.poll-media--housing {
-  background: #ded7cc;
-  color: #7a685b;
-}
-.poll-media--climate {
-  background: #dce2d6;
-  color: #61725b;
-}
-.poll-media--mobility {
-  background: #d6dfe0;
-  color: #566a70;
-}
-.poll-media--governance {
-  background: #d9dddc;
-  color: #555d5d;
-}
-.poll-media img,
-.poll-media video {
+.poll-media img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-.poll-media > span {
-  position: absolute;
-  left: 16px;
-  bottom: 14px;
-  border-radius: 20px;
-  padding: 6px 11px;
-  background: #fcfcfaf0;
-  color: #363837;
-  font-size: 12px;
-  font-weight: 500;
-}
-.poll-media:has(video) > span {
-  top: 12px;
-  bottom: auto;
-  pointer-events: none;
 }
 .dashboard-v4 .discovery-rail .poll__actions {
   margin-top: auto;
@@ -209,9 +177,6 @@
   }
   .discovery-carousel-nav {
     display: flex;
-  }
-  .poll-media {
-    height: 190px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

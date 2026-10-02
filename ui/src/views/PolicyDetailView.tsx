@@ -1,14 +1,5 @@
 import { ArrowLeft, ArrowUpRight } from '@phosphor-icons/react';
-import {
-  Button,
-  Callout,
-  Card,
-  Display,
-  Eyebrow,
-  Screen,
-  StatGroup,
-  StatRow,
-} from '@/components/system';
+import { Button, Callout, Card, Display, Screen, StatGroup, StatRow } from '@/components/system';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import { countryName as getCountryName } from '@/integration/country-catalog';
 import type { AppAssistant } from '@/integration/deliberation';
@@ -17,6 +8,7 @@ import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability } from '@/integration/poll-lifecycle';
 import { ConsultationBrief } from '@/views/ConsultationBrief';
 import { localizePoll, type Poll, pollPlaceCode } from '@/views/poll-model';
+import { ResultsPanel } from '@/views/ResultsPanel';
 import './policy-detail-view.css';
 import { passBlock, passBlockLine } from './pass-fit';
 
@@ -73,15 +65,15 @@ const COPY = {
     about: 'De qué se trata',
     frame: 'Marco vigente',
     perspectives: 'Perspectivas',
-    forIt: 'A favor de la propuesta',
-    againstIt: 'A favor de revisar o limitar',
+    forIt: 'A favor',
+    againstIt: 'En contra',
     uncertainty: 'Incertidumbre',
     options: 'Qué expresa cada opción',
     yes: 'Sí',
     no: 'No',
     abstain: 'Sin decidir',
-    yesBody: 'Apoyás priorizar la propuesta en los términos de esta consulta.',
-    noBody: 'No apoyás priorizarla en estos términos.',
+    yesBody: 'Apoyás la propuesta tal como se pregunta.',
+    noBody: 'No apoyás la propuesta tal como se pregunta.',
     abstainBody: 'Todavía no tomaste una posición.',
     sources: 'Fuentes primarias',
     vote: 'Votá ahora',
@@ -119,15 +111,15 @@ const COPY = {
     about: 'What it is about',
     frame: 'Current framework',
     perspectives: 'Perspectives',
-    forIt: 'In favour of the proposal',
-    againstIt: 'In favour of reviewing or limiting it',
+    forIt: 'For',
+    againstIt: 'Against',
     uncertainty: 'Uncertainty',
     options: 'What each option expresses',
     yes: 'Yes',
     no: 'No',
     abstain: 'Undecided',
-    yesBody: 'You support prioritising the proposal on these terms.',
-    noBody: 'You do not support prioritising it on these terms.',
+    yesBody: 'You support the proposal as it is asked.',
+    noBody: 'You do not support the proposal as it is asked.',
     abstainBody: 'You have not taken a position yet.',
     sources: 'Primary sources',
     vote: 'Vote now',
@@ -165,15 +157,15 @@ const COPY = {
     about: "De quoi il s'agit",
     frame: 'Cadre actuel',
     perspectives: 'Points de vue',
-    forIt: 'En faveur de la proposition',
-    againstIt: 'Pour la réexaminer ou la limiter',
+    forIt: 'Pour',
+    againstIt: 'Contre',
     uncertainty: 'Incertitude',
     options: 'Ce que chaque option exprime',
     yes: 'Oui',
     no: 'Non',
     abstain: 'Ne se prononce pas',
-    yesBody: 'Vous soutenez la priorité donnée à la proposition dans ces termes.',
-    noBody: 'Vous ne soutenez pas cette priorité dans ces termes.',
+    yesBody: 'Vous soutenez la proposition telle qu’elle est posée.',
+    noBody: 'Vous ne soutenez pas la proposition telle qu’elle est posée.',
     abstainBody: "Vous n'avez pas encore pris position.",
     sources: 'Sources primaires',
     vote: 'Voter maintenant',
@@ -320,14 +312,14 @@ export function PolicyDetailView({
       {briefed ? null : runtime ? (
         displayPoll.description ? (
           <section className="policy__section">
-            <Eyebrow>{copy.about}</Eyebrow>
+            <h2 className="policy__heading">{copy.about}</h2>
             <p className="policy__prose">{displayPoll.description}</p>
           </section>
         ) : null
-      ) : (
+      ) : runtimePoll ? null : (
         <>
           <section className="policy__section">
-            <Eyebrow>{copy.about}</Eyebrow>
+            <h2 className="policy__heading">{copy.about}</h2>
             <p className="policy__prose">{displayPoll.whyNow}</p>
             <Card tone="sunken" className="policy__evidence">
               <p className="policy__evidence-label">{displayPoll.evidenceLabel}</p>
@@ -336,13 +328,12 @@ export function PolicyDetailView({
           </section>
 
           <section className="policy__section">
-            <Eyebrow>{copy.frame}</Eyebrow>
+            <h2 className="policy__heading">{copy.frame}</h2>
             <p className="policy__prose">{displayPoll.legalFrame}</p>
           </section>
 
           <section className="policy__section" aria-labelledby="policy-perspectives">
-            <Eyebrow>{copy.perspectives}</Eyebrow>
-            <h2 className="sr-only" id="policy-perspectives">
+            <h2 className="policy__heading" id="policy-perspectives">
               {copy.perspectives}
             </h2>
             <div className="policy__args">
@@ -366,14 +357,18 @@ export function PolicyDetailView({
           </section>
 
           <section className="policy__section">
-            <Eyebrow>{copy.uncertainty}</Eyebrow>
+            <h2 className="policy__heading">{copy.uncertainty}</h2>
             <p className="policy__prose">{displayPoll.uncertainty}</p>
           </section>
         </>
       )}
 
+      {poll.runtimeContractAddress ? (
+        <ResultsPanel contractAddress={poll.runtimeContractAddress} locale={locale} />
+      ) : null}
+
       <section className="policy__section">
-        <Eyebrow>{copy.options}</Eyebrow>
+        <h2 className="policy__heading">{copy.options}</h2>
         <dl className="policy__options">
           <dt>{copy.yes}</dt>
           <dd>{runtime ? copy.runtimeYes : copy.yesBody}</dd>
@@ -386,7 +381,7 @@ export function PolicyDetailView({
 
       {displayPoll.sources.length ? (
         <section className="policy__section">
-          <Eyebrow>{copy.sources}</Eyebrow>
+          <h2 className="policy__heading">{copy.sources}</h2>
           <ul className="policy__sources">
             {displayPoll.sources.map((source) => (
               <li key={source.href}>

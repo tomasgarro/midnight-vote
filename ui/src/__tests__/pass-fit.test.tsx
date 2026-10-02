@@ -135,7 +135,6 @@ describe('the demo catalogue, pass by pass', () => {
       <VotesView
         polls={POLLS}
         credential={pass(code)}
-        publicContractAddress={null}
         onStartVote={onStartVote}
         onOpenPolicy={vi.fn()}
         onOpenPassportJourney={vi.fn()}
@@ -173,7 +172,6 @@ describe('the demo catalogue, pass by pass', () => {
       <VotesView
         polls={[world, swiss]}
         credential={pass('CH')}
-        publicContractAddress={null}
         onStartVote={vi.fn()}
         onOpenPolicy={vi.fn()}
         onOpenPassportJourney={vi.fn()}

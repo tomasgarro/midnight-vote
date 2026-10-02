@@ -96,6 +96,8 @@ const SHELL_COPY = {
     sealed: (n: bigint) => (n === 1n ? 'respuesta sellada' : 'respuestas selladas'),
     total: (counted: bigint, issued: bigint) =>
       `${counted.toString()} ${counted === 1n ? 'contada' : 'contadas'} de ${issued.toString()} ${issued === 1n ? 'sellada' : 'selladas'} · leído del contrato`,
+    none: 'Todavía no se contó ninguna respuesta.',
+    few: 'Con menos de 100 respuestas contadas se muestran los números, sin porcentajes.',
   },
   en: {
     unreadable: 'Contract unreadable',
@@ -103,6 +105,8 @@ const SHELL_COPY = {
     sealed: (n: bigint) => (n === 1n ? 'sealed answer' : 'sealed answers'),
     total: (counted: bigint, issued: bigint) =>
       `${counted.toString()} counted of ${issued.toString()} sealed · read from the contract`,
+    none: 'No answer has been counted yet.',
+    few: 'Below 100 counted answers, the numbers are shown without percentages.',
   },
   fr: {
     unreadable: 'Contrat illisible',
@@ -110,6 +114,8 @@ const SHELL_COPY = {
     sealed: (n: bigint) => (n === 1n ? 'réponse scellée' : 'réponses scellées'),
     total: (counted: bigint, issued: bigint) =>
       `${counted.toString()} ${counted === 1n ? 'comptée' : 'comptées'} sur ${issued.toString()} ${issued === 1n ? 'scellée' : 'scellées'} · lu depuis le contrat`,
+    none: 'Aucune réponse n’a encore été comptée.',
+    few: 'Sous 100 réponses comptées, les nombres sont affichés sans pourcentage.',
   },
 } as const;
 
@@ -178,6 +184,9 @@ export function ResultsPanel({ contractAddress, title, locale }: ResultsPanelPro
     count: state.tally.get(key) ?? 0n,
   }));
   const total = votes.reduce((sum, vote) => sum + vote.count, 0n);
+  // A percentage of a handful reads as a trend it is not, and a 0% bar claims
+  // an observation. Below 100 the counts stand alone; at 0 there is a sentence.
+  const showShare = total >= 100n;
 
   return (
     <Card className="results" aria-labelledby={headingId}>
@@ -186,7 +195,9 @@ export function ResultsPanel({ contractAddress, title, locale }: ResultsPanelPro
         {title ?? shell.heading}
       </h2>
       <p className="results__note">{phase.note}</p>
-      <div className="results__tally">
+      {total === 0n ? <p className="results__note">{shell.none}</p> : null}
+      {total > 0n && !showShare ? <p className="results__note">{shell.few}</p> : null}
+      <div className="results__tally" hidden={total === 0n}>
         {votes.map(({ key, label, count }) => {
           const pct = total === 0n ? 0 : Number((count * 1000n) / total) / 10;
           return (
@@ -194,19 +205,21 @@ export function ResultsPanel({ contractAddress, title, locale }: ResultsPanelPro
               <div className="results__head">
                 <span className="results__label">{label}</span>
                 <span className="results__figure">
-                  {count.toString()} · {pct.toFixed(1)}%
+                  {showShare ? `${pct.toFixed(1)}% (${count.toString()})` : count.toString()}
                 </span>
               </div>
-              <div
-                className="results__track"
-                role="progressbar"
-                aria-label={label}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Number(pct.toFixed(1))}
-              >
-                <div className="results__fill" style={{ width: `${pct}%` }} />
-              </div>
+              {showShare ? (
+                <div
+                  className="results__track"
+                  role="progressbar"
+                  aria-label={label}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Number(pct.toFixed(1))}
+                >
+                  <div className="results__fill" style={{ width: `${pct}%` }} />
+                </div>
+              ) : null}
             </div>
           );
         })}
