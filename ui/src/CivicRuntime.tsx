@@ -685,6 +685,9 @@ function CivicApp() {
         throw new Error(RUNTIME_COPY[locale].manifestMissing(APP_NETWORK_LABEL));
       } catch (error) {
         setPreviewError(sealRefusalMessage(error, locale, APP_NETWORK_LABEL));
+        // An attempt may have just learned from the chain that an earlier one
+        // landed. The answers list should show it at once.
+        void refreshSealedAnswers();
         setFlowStage('review');
       }
       return;

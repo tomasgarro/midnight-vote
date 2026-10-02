@@ -329,9 +329,33 @@ describe('sealing an answer', () => {
 
     await expect(
       actions.castVote({ referendumId: entry.referendumId, choice: 'NO', authorization }),
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    ).rejects.toMatchObject({ code: 'ANSWER_ALREADY_SEALED' });
     expect(calls.joined).toHaveLength(0);
     expect(vault.openings).toHaveLength(1);
+  });
+
+  it('notices an attempt that landed without the device seeing it, before a second proof', async () => {
+    // The page was dropped while it waited for the relay. The vault still says
+    // "sealing"; the chain holds the commitment.
+    const vault = new MemoryVault();
+    const earlier = opening('YES', 8, 'sealing');
+    await vault.save(earlier);
+    const calls: Calls = { joined: [], revealed: [], scopes: [] };
+    const landed = resolver({
+      phase: 'COMMIT',
+      closed: false,
+      onChain: [earlier.ballotCommitment],
+    });
+    const actions = adapter({ vault, stateResolver: landed, calls });
+
+    await expect(
+      actions.castVote({ referendumId: entry.referendumId, choice: 'NO', authorization }),
+    ).rejects.toMatchObject({ code: 'ANSWER_ALREADY_SEALED' });
+    // No proof, no relay. The first answer stands, and the vault now says so.
+    expect(calls.joined).toHaveLength(0);
+    expect(calls.scopes).toHaveLength(0);
+    expect(vault.openings.map((held) => [held.choice, held.status])).toEqual([['YES', 'sealed']]);
+    await expect(actions.getSealedAnswerStatus(entry.referendumId)).resolves.toBe('sealed');
   });
 
   it('still seals without a vault, as before', async () => {

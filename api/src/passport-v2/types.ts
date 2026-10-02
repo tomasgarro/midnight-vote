@@ -196,6 +196,11 @@ export type CivicCredentialErrorCode =
   | 'ISSUANCE_FAILED'
   | 'ADAPTER_UNAVAILABLE'
   | 'CONFLICT'
+  /**
+   * This device already sealed an answer for this referendum. A consultation
+   * takes one answer per pass, so there is nothing to seal again.
+   */
+  | 'ANSWER_ALREADY_SEALED'
   /** This device holds no opening for a sealed answer on this referendum. */
   | 'BALLOT_OPENING_NOT_FOUND'
   /** The referendum is not in its counting phase, or the count has closed. */

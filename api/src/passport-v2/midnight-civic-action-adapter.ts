@@ -237,9 +237,31 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
     if (held.some((opening) => opening.status === 'sealed')) {
       // The contract would refuse the repeat anyway, but only after a proof was built.
       throw new CivicCredentialError(
-        'CONFLICT',
+        'ANSWER_ALREADY_SEALED',
         'This device already sealed an answer for this referendum',
       );
+    }
+    // An earlier attempt may have reached the chain without this device ever
+    // seeing the confirmation: the page was dropped, or the wait gave up. Only
+    // the chain can say. If it did land, that is the person's answer, and a
+    // second proof would be built for nothing.
+    const unsettled = ownOpenings(held, entry).filter((opening) => opening.status === 'sealing');
+    if (unsettled.length > 0 && this.ballotOpenings) {
+      const context = await this.resolveRevealContext(
+        entry,
+        unsettled.map((opening) => opening.ballotCommitment),
+      );
+      const landed = context.ballots.findIndex(
+        (ballot) => ballot.revealed || ballot.revealPath !== null,
+      );
+      const opening = landed < 0 ? undefined : unsettled[landed];
+      if (opening) {
+        await this.ballotOpenings.save({ ...opening, status: 'sealed' });
+        throw new CivicCredentialError(
+          'ANSWER_ALREADY_SEALED',
+          'This device already sealed an answer for this referendum',
+        );
+      }
     }
 
     await this.stateResolver.assertCanonicalBinding(entry);
