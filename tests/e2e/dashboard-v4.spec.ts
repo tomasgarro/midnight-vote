@@ -96,6 +96,9 @@ test('catalogue answers, follow-ups and consultation return preserve the convers
   const input = page.getByRole('textbox', { name: 'Ask about a consultation' });
   await input.fill('What are the arguments?');
   await input.press('Enter');
+  // Wait for this answer itself: the summary above already has the same parts.
+  await expect(page.locator('.catalogue-chat__answer')).toHaveCount(3);
+  await expect(page.locator('.catalogue-chat__answer').last()).toContainText('What each side says');
   await expect(page.locator('.catalogue-chat__answer').last()).toContainText(
     'What I can’t tell you',
   );
