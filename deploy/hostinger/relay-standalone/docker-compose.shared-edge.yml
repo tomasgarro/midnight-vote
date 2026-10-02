@@ -46,7 +46,7 @@ services:
   # the relayer grows past it, the relayer is restarted and nothing else.
   relayer:
     <<: *hard
-    image: ghcr.io/tomasgarro/midnight-civic-relayer:0.2.2-dde542a@sha256:d7efe8df770fa38d2318f1d3df068fdab266fe91f28ff7d5fa599612476c594c
+    image: ghcr.io/tomasgarro/midnight-civic-relayer:0.2.3-14164ea@sha256:c0dc17429ae01e833cdf45e2446ed5ba2e6c1989693d37a123e681d2def13e6d
     mem_limit: 3500m
     user: "1000:1000"
     entrypoint: [/bin/sh, -ec]
