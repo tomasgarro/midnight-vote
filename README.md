@@ -2,130 +2,168 @@
 
 **Understand more. Disclose less. Participate as yourself.**
 
-midnight.vote is a Passport-first civic participation project built on Midnight. Its vision brings together **selective disclosure**, **verified citizen participation** and **AI-assisted understanding**: prove that you meet a participation rule without handing over your whole identity, understand the proposal, then make your own choice.
+[![Test suite](https://github.com/tomasgarro/midnight-vote/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tomasgarro/midnight-vote/actions/workflows/test.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-**Submission status:** a working simulated product and reviewable Compact contracts and integration services. Midnight Passport is in its stagenet-beta phase; the physical NFC-to-counted-vote journey is an integration milestone, not a completed public deployment. Consultations are non-binding.
+midnight.vote is a civic consultation app built on [Midnight](https://midnight.network). A person proves, from the chip of their passport, that they are an adult, and gets a pass with no name on it. With that pass they answer a consultation once. The count is public and anyone can check it on chain. The operator never receives the person's name or document number, so there is no list of who answered.
 
-[Try midnight.vote](https://midnight.vote) · [Public Docs](https://midnight.vote/docs) · [Submission brief](docs/SUBMISSION.md) · [Run locally](docs/QUICKSTART.md) · [All documentation](docs/README.md)
+[Try it](https://midnight.vote) · [Public docs](https://midnight.vote/docs) · [How it works](docs/HOW-IT-WORKS.md) · [Run it locally](docs/QUICKSTART.md) · [All documentation](docs/README.md)
 
-## On Midnight Preview
+## Contents
 
-A credential registry and a consultation that is open now are deployed on Midnight's public test network. Beside them stand rehearsal consultations, each taken to a final tally by the operator, without a passport and without a person.
+- [What it does](#what-it-does)
+- [Where it stands](#where-it-stands)
+- [Live on Midnight Preview](#live-on-midnight-preview)
+- [How an answer travels](#how-an-answer-travels)
+- [What is private, and what is not](#what-is-private-and-what-is-not)
+- [Repository](#repository)
+- [Run and verify](#run-and-verify)
+- [Documentation](#documentation)
+
+## What it does
+
+| | For the person | For whoever asks the question |
+| --- | --- | --- |
+| **Understand** | A short brief of the question, each sentence tied to its official source. Cleisthenes, the app's guide, sets out each side and never says how to answer | A consultation people can read before they answer |
+| **Prove** | The passport's chip proves an age and a citizenship. The name and the document number are not sent to the service | Answers from verified adults, one per passport |
+| **Answer** | The answer is sealed on the person's own device and counted after the consultation closes | A public count, a result anyone can check, and no personal data to store |
+
+Consultations are non-binding. The app works in English, Spanish and French, and has three destinations: **Consultations**, **Cleisthenes** and **You**.
+
+## Where it stands
+
+State on 2 October 2026.
+
+| Part | State |
+| --- | --- |
+| Contracts (`credential-registry-v1`, `referendum-v2`, in Compact) | Deployed on Midnight Preview. Compiled and simulator-tested in CI |
+| A consultation's whole life on chain | Rehearsed on Preview: sealed, closed, counted and finalized |
+| Credential service and relay | Rehearsed on Preview end to end, with a stand-in for the passport scan. Published as pinned images; not yet switched on at `midnight.vote` |
+| Proofs built on the person's device | Working in the browser. Measured on a laptop; a phone is not measured yet |
+| One answer per passport | Enforced by the credential service and the contract ([ADR-012](docs/adr/ADR-012-one-holder-per-document.md)). Rehearsed on Preview; not yet observed with a real document |
+| Midnight Passport | Sign-in with a Passport account works ([first real session](docs/evidence/passport-live/2026-08-31-first-real-session.md)). Passport cannot hold a credential yet; a [proposal for an external issuer](docs/proposals/PASSPORT-ISSUER-PROPOSAL.md) is drafted |
+| Cleisthenes | The guide answers from an authored catalogue, not a generative model. A consultation shows a reviewed, sourced brief once its evidence is connected |
+| The public site | A working demo with simulated passes and receipts, clearly labelled |
+| **An answer sealed and counted by a real person with a real passport** | **Not yet.** This is the next milestone |
+
+Every claim above has a dated record under [docs/evidence](docs/evidence/preview-2026-10-02/README.md), which also names what was not observed.
+
+## Live on Midnight Preview
 
 | Contract | Address | Deployed |
 | --- | --- | --- |
 | `credential-registry-v1` | `9f8fe7c54d9907543cbcde82943c2be35ccb20f404e477ca2c29b8fc84a52132` | 2 September 2026, block 683016 |
 | `referendum-v2`: "Should the result of a consultation stay hidden until it closes?" | `862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4` | 2 October 2026, block 1113403 |
-| `referendum-v2`: rehearsal 1, finalized | `1a01b1afe280aab0c08fabe5a3699ed7b0ff0d80b8a20d0983b03948fbbe5030` | 2 October 2026, block 1114976 |
-| `referendum-v2`: rehearsal 2, finalized | `9f7ebe9d972a8d0794ee1448317ad619970713fb1f62f7c30263795299f90be8` | 2 October 2026, block 1115944 |
-| `credential-registry-v1` of the dress rehearsal | `bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387` | 2 October 2026, block 1116397 |
-| `referendum-v2`: the dress rehearsal, finalized | `8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17` | 2 October 2026, block 1116410 |
-| Dress run 2 (a dropped page): registry and consultation, finalized | `bccc75ad9415aaa46ad1fa5a3727ab7375562c0c1579ca651a3b6a245165cfde`, `ac59a5352ade50f7b4029e00a63ed696a36af5715c79ecceaa63235cdf58c5ae` | 2 October 2026, blocks 1117309 and 1117327 |
-| Dress run 3 (one document, one holder): registry and consultation, finalized | `862e3d7c5662830ae5096478ef707acf8d74d8cc138a785b896473743be7c74b`, `4ada263de79bae15f42fb7aeb9b5afa408b0073e01843e5848de62461d8845e2` | 2 October 2026, blocks 1118190 and 1118203 |
 
-Check either one against the network's own indexer, not against this repository:
+The consultation takes answers until 9 October 2026, 16:00 UTC, from any adult with a passport read by its chip.
+
+Check either address against the network's own indexer, not against this repository:
 
 ```bash
-curl -s https://indexer.preview.midnight.network/api/v4/graphql -H 'content-type: application/json' -d '{"query":"{ contractAction(address: \"862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4\") { __typename transaction { hash block { height } } } }"}'
+curl -s https://indexer.preview.midnight.network/api/v4/graphql \
+  -H 'content-type: application/json' \
+  -d '{"query":"{ contractAction(address: \"862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4\") { __typename transaction { hash block { height } } } }"}'
 ```
 
-| | State on 2 October 2026 |
+Six rehearsal consultations stand beside it, each taken to a final tally by the operator, without a passport and without a person. Their addresses, blocks and transaction hashes are in the [evidence record](docs/evidence/preview-2026-10-02/README.md#rehearsal-contracts).
+
+| Rehearsal | What it showed |
 | --- | --- |
-| The consultation | Open until 9 October 2026, 16:00 UTC. Any adult with a passport read by its chip may answer |
-| The app in Preview mode | Reads the consultation and its count of sealed answers from the chain |
-| The whole life of a consultation on chain | Rehearsed: sealed, closed, counted and finalized, with a fixture pass held by the operator. [Its five transactions](docs/evidence/preview-2026-10-02/REHEARSAL.md) |
-| A pass answering after later passes changed the registry | Rehearsed: the proof is built against the newest root the consultation admitted that holds the pass. [What happened, in order](docs/evidence/preview-2026-10-02/REHEARSAL-2.md) |
-| The credential service and the relay, end to end | Rehearsed on the operator's machine, on a registry of its own: two passes issued on chain by the credential service, admitted, sealed with its permission, counted. Only the passport scan was a stand-in. [The sixteen transactions](docs/evidence/preview-2026-10-02/DRESS-REHEARSAL.md) |
-| A sealed and counted answer by a real person | **Not yet.** It needs the relay and the credential service to be switched on, and a passport |
+| [A consultation from seal to final tally](docs/evidence/preview-2026-10-02/REHEARSAL.md) | The five transactions of a consultation's life |
+| [A pass answering after the registry moved on](docs/evidence/preview-2026-10-02/REHEARSAL-2.md) | The proof is built against the newest admitted root that holds the pass |
+| [The credential service and the relay, three runs](docs/evidence/preview-2026-10-02/DRESS-REHEARSAL.md) | Passes issued on chain and answers sealed with the service's permission; a page dropped mid-way; one document refused on a second device |
 
-What was observed, and what was not, is recorded in [docs/evidence/preview-2026-10-02](docs/evidence/preview-2026-10-02/README.md). How it is operated is in the [Preview runbook](docs/PREVIEW-RUNBOOK.md).
-
-## The four pillars
-
-| Pillar | What we are building | What exists today |
-| --- | --- | --- |
-| **Midnight Passport at the core** | Privacy on your own terms: prove 18+ without a name, or citizenship without a residential address. | Session/profile integration; selective-proof experience remains in progress. |
-| **Real passport → NFC → ZK attestation** | Count participation by real, eligible citizens while keeping identity evidence separate from ballots. | Rarimo evidence and issuer adapters; public participation is simulated. |
-| **AI for informed deliberation** | Browse sources, simplify dense proposals and understand different perspectives. | In the app, Cleisthenes answers from the authored catalogue. A consultation shows a reviewed, sourced brief once its evidence is connected; none is connected on the public site yet. |
-| **Midnight.city exploration** | Research how AI agents might participate in civic experiments. | Exploratory; separate agent and human result lanes are a design requirement. |
-
-The registry and referendum contracts already use **Compact**. The future migration concerns passport verification now approached through Rarimo; it is a separate engineering challenge.
-
-Read the [project vision](docs/VISION.md), [Passport and proof model](docs/PASSPORT-AND-PROOFS.md), and [AI and deliberation plan](docs/AI-AND-DELIBERATION.md).
-
-## The participant experience
-
-Explore a question that affects your community. Read the proposal and its sources. Ask for context, reflect on the tradeoffs, and review your response before confirming it.
+## How an answer travels
 
 ```mermaid
 flowchart LR
-  discover[Find a consultation] --> understand[Understand the proposal]
-  understand --> choose[Choose a response]
-  choose --> review[Review before confirming]
-  review --> receipt[Keep a simulated receipt]
+  read[Read the brief] --> scan[Passport chip proves<br/>adult and citizenship]
+  scan --> pass[Pass issued:<br/>a commitment on chain]
+  pass --> seal[Answer sealed:<br/>proof built on the device]
+  seal --> close[Consultation closes]
+  close --> count[The device counts<br/>its own answer]
+  count --> tally[Public tally]
 ```
 
-The app has three destinations: **Consultations**, **Cleisthenes** and **You**. The demo works in English, Spanish and French. **In his chat, Cleisthenes provides authored catalogue answers**, not generated AI responses. Demo credentials and receipts are explicitly labelled as simulated.
-
-Civic Pulse, a private reflection, is outside those three steps. No screen links to it; it is kept at `/#app/pulse`. It keeps drafts in memory by default and offers an explicit device-only save, review and delete. Saving uses browser storage readable by others using that browser profile; answers are not uploaded.
-
-## What works today
-
-Status baseline: **16 September 2026**, application source from merged [PR #35](https://github.com/tomasgarro/midnight-vote/pull/35). The [documentation release record](docs/releases/2026-09-16-final-documentation.md) records this release separately from historical deployment evidence.
-
-| Capability | What you can inspect | Evidence level |
+| Step | Who does it | What goes on chain |
 | --- | --- | --- |
-| Consultations, onboarding, guidance and the pass | A complete mobile demo with multilingual copy | Working demo |
-| Review and receipt | A deliberate confirmation followed by a local simulated receipt | Working demo; no chain transaction |
-| Credential Registry V1 | Issuer-authorized admission of commitments to eligibility claims | Compiled and simulator-tested source |
-| Referendum V2 | Eligibility checks, repeat-use prevention, ballot commitment, reveal and tally | Compiled and simulator-tested source |
-| Passport session | Account consent and display-profile integration | Source plus a dated [real-session record](docs/evidence/passport-live/2026-08-31-first-real-session.md) |
-| NFC verification and live participation | Provider, issuer, relay and receipt interfaces | Integration source; physical end-to-end acceptance pending |
-| Sourced briefs from Cleisthenes | The assistant boundary, and the brief inside the consultation page | Integration source; not connected on the public site |
+| Verify | The RariMe app reads the passport's chip and builds a zero-knowledge proof | Nothing on Midnight |
+| Issue the pass | The credential service checks the proof and adds a commitment to the registry | A commitment. No name, no document number |
+| Seal the answer | The person's browser proves that it holds an admitted pass, and commits to an answer | A nullifier and a commitment. Not the answer |
+| Count | After the close, the same browser opens its commitment | The answer, which the tally adds |
 
-## Three things that should stay separate
+A relay pays the network fee, so the person needs no wallet and no tokens.
 
-| Concept | In everyday language | What it does not establish by itself |
-| --- | --- | --- |
-| Midnight Passport session | How you enter the application and consent to profile sharing | Permission to vote |
-| Identity-document evidence | A verification process for facts from a supported document | A unique, live human or freedom from coercion |
-| Eligibility credential | Evidence that the holder meets a consultation's published rule | Eligibility for every other consultation |
+## What is private, and what is not
 
-For example, a Swiss citizens' consultation may require citizenship and an age threshold. A local residents' consultation needs separate evidence of residence. A zero-knowledge proof can establish a defined rule without publishing all its private inputs; the rule itself can still reveal a fact about the participant.
+| Kept from everyone | Public |
+| --- | --- |
+| Who answered. The registry holds commitments, and nothing on chain ties an answer to a pass | That an answer was sealed, and when |
+| The name and document number, which never reach the credential service | The pass's country and age class, to the credential service |
+| The answer, until it is counted | **The answer once it is counted.** The contract uses commit and reveal: counting publishes the choice, though not who made it |
 
-Read the [illustrated explanation](docs/HOW-IT-WORKS.md) for the intended NFC-to-Midnight path and the [architecture](docs/ARCHITECTURE.md) for implementation responsibilities.
+Five limits are stated plainly, because the project depends on being believed:
 
-## The privacy boundary
+- A passport proves a document. It does not prove residence, the right to vote, or that nobody is watching.
+- The credential issuer and the root publisher are trusted roles. The issuer could issue a pass that no passport backs; an auditor could detect it, and the chain does not prevent it.
+- The operator's services see more than the chain shows. The credential service signs the permission the relay asks for, so the operator could tie a sealed answer to a pass. A pass carries no name. A blind permission would remove that link; it is not built.
+- A pass lives in one browser. It cannot move to another device, and a browser that clears its storage loses it.
+- Signing in, holding a pass and being eligible are three different things. A Passport session is not permission to answer, and a pass for one consultation's rule says nothing about another's.
 
-The current contract uses **commit–reveal**: the choice is hidden during commit and **becomes public during reveal**, when the tally updates. This is not permanent secret-ballot confidentiality. A receipt that omits the choice does not make the underlying reveal private.
+The [Compact review](docs/COMPACT-REVIEW-2026-09-16.md) and the [decision records](docs/README.md#architecture-decisions) give the reasoning and the remaining risks.
 
-The issuer and accepted-root publisher remain trusted roles. Repeat-use prevention applies to the same bound secret in the same consultation; it does not prove one person across all documents. The [Compact review](docs/COMPACT-REVIEW-2026-09-16.md) explains the implementation, remaining risks and live-release gates.
-
-## Run and review
-
-Start with the [quick start](docs/QUICKSTART.md). A clean source build needs Linux or WSL, Node from [`.nvmrc`](.nvmrc), npm 10 and Compact toolchain 0.31.1 because generated contract assets are not tracked. The resulting **demo** needs no wallet, funds or physical document.
-
-For a submission review, follow this route:
-
-1. [Submission brief](docs/SUBMISSION.md): contribution, walkthrough and evidence.
-2. [Product specification](docs/specs/PRODUCT-SPEC.md): requirements and acceptance scenarios.
-3. [How it works](docs/HOW-IT-WORKS.md): participant journey and privacy boundaries.
-4. [Verification record](docs/releases/2026-09-16-final-documentation.md): exactly what was checked.
-5. [Roadmap and release plan](docs/SUBMISSION-PLAN.md): measurable next steps.
-
-## Repository map
+## Repository
 
 | Directory | Responsibility |
 | --- | --- |
-| [`ui/`](ui/) | Participant experience, local state and simulated journey |
-| [`contracts/`](contracts/) | Compact credential registry and referendum rules |
-| [`api/`](api/) | Domain interfaces, witnesses and network adapters |
-| [`cico-service/`](cico-service/) | Verification boundary and credential issuance |
-| [`relayer/`](relayer/) | Authorized transaction submission and confirmation |
-| [`scripts/`](scripts/) | Build, deployment and evidence procedures |
-| [`docs/`](docs/) | Specifications, decisions, reviews and dated evidence |
+| [`contracts/`](contracts/) | The Compact contracts: the credential registry and the consultation |
+| [`api/`](api/) | Domain interfaces, witnesses, and the adapters that build proofs and transactions |
+| [`ui/`](ui/) | The app: consultations, the passport journey, sealing and counting on the device |
+| [`cico-service/`](cico-service/) | The credential service: checks a verification, issues the pass, publishes registry roots |
+| [`relayer/`](relayer/) | Pays for and submits a person's proven transaction |
+| [`scripts/`](scripts/) | Deployment, rehearsals, and checks of the running services |
+| [`deploy/`](deploy/) | Server manifests, pinned by image digest |
+| [`docs/`](docs/) | Specifications, decision records, reviews and dated evidence |
 
-Changes start with a [small specification](docs/specs/CHANGE-TEMPLATE.md) and follow the [contribution guide](CONTRIBUTING.md). Historical evidence remains available with its original source revision and environment.
+## Run and verify
+
+A clean build needs Linux or WSL, Node from [`.nvmrc`](.nvmrc), npm 10 and the Midnight Compact toolchain 0.31.1, because generated contract assets are not tracked. The demo needs no wallet, no funds and no document.
+
+```bash
+git clone https://github.com/tomasgarro/midnight-vote.git
+cd midnight-vote
+nvm use && npm ci
+
+npm run validate:contract                           # compile the contracts, run the simulator tests
+npm run build --workspace midnight-referendum-api
+npm test                                            # every unit suite
+
+VITE_APP_MODE=demo npm run build --workspace midnight-referendum-ui -- --mode demo
+npm run preview --workspace midnight-referendum-ui -- --host localhost --port 4173 --strictPort
+```
+
+Open `http://localhost:4173`. The [quick start](docs/QUICKSTART.md) has the walkthrough and troubleshooting.
+
+| To check | Run |
+| --- | --- |
+| Everything CI checks, on Linux or WSL | `npm run verify:linux -- demo` |
+| The browser journeys | `CI=true npm run test:e2e` |
+| The services behind `midnight.vote`, from outside, without any secret | `npm run check:preview` |
+| The whole journey on Preview without a passport | `npm run rehearse:dress`, described in the [Preview runbook](docs/PREVIEW-RUNBOOK.md#rehearse-without-a-passport) |
+
+## Documentation
+
+| If you want | Read |
+| --- | --- |
+| The idea, and where it is going | [Vision](docs/VISION.md) · [Roadmap](docs/ROADMAP.md) · [Business model](docs/BUSINESS-MODEL.md) |
+| How it works, without the code | [How it works](docs/HOW-IT-WORKS.md) · [Passport and proofs](docs/PASSPORT-AND-PROOFS.md) · [Glossary](docs/GLOSSARY.md) |
+| The design, and why | [Architecture](docs/ARCHITECTURE.md) · [Decision records](docs/README.md#architecture-decisions) · [Compact review](docs/COMPACT-REVIEW-2026-09-16.md) |
+| The guide and the brief | [AI and deliberation](docs/AI-AND-DELIBERATION.md) · [Cleisthenes, the companion](docs/COMPANION.md) |
+| What was observed on chain | [Preview evidence, 2 October 2026](docs/evidence/preview-2026-10-02/README.md) |
+| To operate it | [Preview runbook](docs/PREVIEW-RUNBOOK.md) |
+| To review the submission | [Submission brief](docs/SUBMISSION.md) · [Product specification](docs/specs/PRODUCT-SPEC.md) |
+
+Changes start with a [small specification](docs/specs/CHANGE-TEMPLATE.md) and follow the [contribution guide](CONTRIBUTING.md).
 
 ## License
 

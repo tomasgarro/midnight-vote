@@ -19,6 +19,26 @@ answers is a person's, and none is in this consultation.
 | [REHEARSAL-2.md](REHEARSAL-2.md) | A pass answering after later passes changed the registry's root; a pass that is too new, and one that is too late, refused before a proof. It also records the root this consultation was given afterwards |
 | [DRESS-REHEARSAL.md](DRESS-REHEARSAL.md) | The credential service and the relay end to end, on a registry of its own, with a stand-in for the passport scan. Three runs: the whole journey; a page dropped while the pass was being issued; one document on two devices, and a renewed pass |
 
+## Rehearsal contracts
+
+Each was deployed, used and finalized by the operator on 2 October 2026. None
+holds a person's answer.
+
+| Rehearsal | Contract | Address | Block |
+| --- | --- | --- | --- |
+| 1 | `referendum-v2` | `1a01b1afe280aab0c08fabe5a3699ed7b0ff0d80b8a20d0983b03948fbbe5030` | 1114976 |
+| 2 | `referendum-v2` | `9f7ebe9d972a8d0794ee1448317ad619970713fb1f62f7c30263795299f90be8` | 1115944 |
+| 3, no answer | `referendum-v2` | `01605dc5536d6c61497c23b6c96536bae38d205a62545469803e19d513beae80` | 1115975 |
+| Dress, run 1 | `credential-registry-v1` | `bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387` | 1116397 |
+| Dress, run 1 | `referendum-v2` | `8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17` | 1116410 |
+| Dress, run 2 | `credential-registry-v1` | `bccc75ad9415aaa46ad1fa5a3727ab7375562c0c1579ca651a3b6a245165cfde` | 1117309 |
+| Dress, run 2 | `referendum-v2` | `ac59a5352ade50f7b4029e00a63ed696a36af5715c79ecceaa63235cdf58c5ae` | 1117327 |
+| Dress, run 3 | `credential-registry-v1` | `862e3d7c5662830ae5096478ef707acf8d74d8cc138a785b896473743be7c74b` | 1118190 |
+| Dress, run 3 | `referendum-v2` | `4ada263de79bae15f42fb7aeb9b5afa408b0073e01843e5848de62461d8845e2` | 1118203 |
+
+Rehearsals 1 to 3 use the shared registry. Each dress run has a registry of
+its own.
+
 After the second rehearsal the registry this consultation uses holds two
 passes. Both are fixtures held by the operator. This consultation admits the
 root that holds both.
