@@ -26,13 +26,45 @@ Measured on the current VPS on 29 September 2026 (8.3 GB, 2 cores):
 | A relayer, expected (it is a second wallet) | about 3 GB |
 | One proof while it is built | up to about 1 GB |
 
-**The current VPS does not hold this project beside what it already runs.**
-Choose one before deploying:
+With everything else running, the current VPS does not hold this project.
+There are two ways to run it:
 
-1. A second VPS for this project. Nothing changes on the live one.
-2. A larger plan for the current VPS. Ports 80 and 443 are taken there, so the
-   two projects must then share one edge. That is a change to the live project
-   and needs its own review.
+1. A second VPS, with `docker-compose.hostinger.yml`. Nothing changes on the
+   live one.
+2. The same VPS, with `docker-compose.shared-edge.yml`, once about 3 GB are
+   free there (on 30 September the `hermes-agent` project was stopped for
+   this). See the next section.
+
+## On the same server: `docker-compose.shared-edge.yml`
+
+Ports 80 and 443 belong to the edge of `midnight-rarimo-nfc`, so this variant
+has no edge and publishes no port. The relayer joins that project's edge
+network, `midnight-rarimo-nfc_rarimo-edge`, under the name `relayer`, the same
+way the Cleisthenes project does. The live Caddyfile then needs one block:
+
+```
+relay.midnight.vote {
+  @relay path /keys /v2/*
+  handle @relay {
+    reverse_proxy relayer:8790
+  }
+  respond 404
+}
+```
+
+What differs from the standalone file:
+
+- No `edge` and no `voter-proof`. Hosted proving is not offered from this
+  server: it has two cores, and one proof takes both.
+- Memory limits: 3.5 GB for the relayer, 1.5 GB for its proof server, 256 MB
+  for its database. If the relayer outgrows its limit it is restarted, and the
+  credential service is not touched.
+- The image reference and the app's origin are written in the file. Only
+  three inputs remain: `RELAYER_SEED`, `RELAYER_V2_CAPABILITY_SECRET` and
+  `RELAYER_V2_ALLOWED_CONTRACTS`.
+- The project can be created before its secrets exist. Until both are 64 hex
+  characters, the relayer waits and says so in its log, instead of restarting
+  in a loop. Set them in hPanel and restart the project.
 
 ## Inputs
 
@@ -46,8 +78,8 @@ API: it returns environment values in plain text.
 | `RELAYER_IMAGE` | No | The reference printed by the `Publish service images` workflow, with its digest |
 | `RELAYER_V2_ALLOWED_CONTRACTS` | No | Every referendum address, separated by commas |
 | `APP_ORIGIN` | No | `https://midnight.vote` |
-| `RELAY_DOMAIN` | No | For example `relay.cardanoschool.org` |
-| `PROVE_DOMAIN` | No | Only with hosted proving. For example `prove.cardanoschool.org` |
+| `RELAY_DOMAIN` | No | `relay.midnight.vote` |
+| `PROVE_DOMAIN` | No | Only with hosted proving. For example `prove.midnight.vote` |
 
 ## Steps
 
@@ -68,7 +100,7 @@ sees an answer before the count.
 
 ## What the validator enforces
 
-`validate-project.mjs` reads the manifest and refuses it when any of these
+`validate-project.mjs` reads `docker-compose.hostinger.yml` and refuses it when any of these
 fails. Each rule was tested against a manifest that breaks it.
 
 - Every image is pinned by digest, and nothing is built on the server.

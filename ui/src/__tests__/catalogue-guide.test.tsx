@@ -5,7 +5,7 @@ import { BottomNav } from '@/views/Chrome';
 import { answerCatalogue, hasValidatedPassport } from '@/views/catalogue-guide';
 import { localizePoll, POLLS } from '@/views/poll-model';
 
-const now = new Date('2026-09-15T12:00:00Z');
+const now = new Date('2026-10-02T12:00:00Z');
 describe('catalogue guide boundaries', () => {
   it('returns open global and verified-country projects, not another country', () => {
     const answer = answerCatalogue(
@@ -16,12 +16,12 @@ describe('catalogue guide boundaries', () => {
       undefined,
       now,
     );
-    expect(answer.pollIds).toContain('reglas-de-verificacion');
+    expect(answer.pollIds).toContain('world-social-media-age');
     expect(answer.pollIds).toContain('france-mobilite');
     expect(answer.pollIds).not.toContain('tierras-rurales');
     expect(
       answerCatalogue('Show global consultations', POLLS, 'en', 'FR', undefined, now).pollIds,
-    ).toEqual(['reglas-de-verificacion', 'global-repair']);
+    ).toEqual(['world-social-media-age']);
   });
   it('allows explicit country browsing without pretending to establish identity', () => {
     const answer = answerCatalogue('Open polls in France', POLLS, 'en', undefined, undefined, now);
@@ -61,7 +61,7 @@ describe('catalogue guide boundaries', () => {
       issuer: 'test',
       epoch: '1',
       ageClass: '18+',
-      validUntil: '2026-10-01',
+      validUntil: '2026-12-01',
     };
     expect(hasValidatedPassport(c, now)).toBe(true);
     expect(hasValidatedPassport({ ...c, kind: 'synthetic-demo-credential' }, now)).toBe(false);

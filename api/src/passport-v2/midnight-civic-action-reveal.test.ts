@@ -329,9 +329,80 @@ describe('sealing an answer', () => {
 
     await expect(
       actions.castVote({ referendumId: entry.referendumId, choice: 'NO', authorization }),
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    ).rejects.toMatchObject({ code: 'ANSWER_ALREADY_SEALED' });
     expect(calls.joined).toHaveLength(0);
     expect(vault.openings).toHaveLength(1);
+  });
+
+  it('notices an attempt that landed without the device seeing it, before a second proof', async () => {
+    // The page was dropped while it waited for the relay. The vault still says
+    // "sealing"; the chain holds the commitment.
+    const vault = new MemoryVault();
+    const earlier = opening('YES', 8, 'sealing');
+    await vault.save(earlier);
+    const calls: Calls = { joined: [], revealed: [], scopes: [] };
+    const landed = resolver({
+      phase: 'COMMIT',
+      closed: false,
+      onChain: [earlier.ballotCommitment],
+    });
+    const actions = adapter({ vault, stateResolver: landed, calls });
+
+    await expect(
+      actions.castVote({ referendumId: entry.referendumId, choice: 'NO', authorization }),
+    ).rejects.toMatchObject({ code: 'ANSWER_ALREADY_SEALED' });
+    // No proof, no relay. The first answer stands, and the vault now says so.
+    expect(calls.joined).toHaveLength(0);
+    expect(calls.scopes).toHaveLength(0);
+    expect(vault.openings.map((held) => [held.choice, held.status])).toEqual([['YES', 'sealed']]);
+    await expect(actions.getSealedAnswerStatus(entry.referendumId)).resolves.toBe('sealed');
+  });
+
+  it('says so when the contract finds the holder already answered and the device has no record', async () => {
+    // A renewed pass has the holder of the pass it replaced. If the record of
+    // the first answer is gone, only the contract knows; it refuses while the
+    // circuit runs on the device, and the runtime wraps that refusal.
+    const vault = new MemoryVault();
+    const calls: Calls = { joined: [], revealed: [], scopes: [] };
+    const actions = adapter({
+      vault,
+      stateResolver: open,
+      calls,
+      castVote: async () => {
+        const assertion = new Error(
+          'failed assert: This voter has already voted in this referendum',
+        );
+        const runtime = new Error("Error executing circuit 'castVote'", { cause: assertion });
+        throw new Error(
+          "Unexpected error executing scoped transaction '<unnamed>': Error: failed assert",
+          { cause: new Error('failed assert', { cause: runtime }) },
+        );
+      },
+    });
+
+    await expect(
+      actions.castVote({ referendumId: entry.referendumId, choice: 'NO', authorization }),
+    ).rejects.toMatchObject({ code: 'HOLDER_ALREADY_ANSWERED', retryable: false });
+    // Nothing on chain is this device's, so it reports no sealed answer.
+    await expect(actions.getSealedAnswerStatus(entry.referendumId)).resolves.toBe('none');
+  });
+
+  it('leaves every other failure of the cast as it came', async () => {
+    const actions = adapter({
+      vault: new MemoryVault(),
+      stateResolver: open,
+      castVote: async () => {
+        throw new Error('Credential policy not satisfied', {
+          cause: new Error('failed assert: Credential policy not satisfied'),
+        });
+      },
+    });
+    await expect(
+      actions.castVote({ referendumId: entry.referendumId, choice: 'NO', authorization }),
+    ).rejects.toThrow('Credential policy not satisfied');
+    await expect(
+      actions.castVote({ referendumId: entry.referendumId, choice: 'NO', authorization }),
+    ).rejects.not.toMatchObject({ code: 'HOLDER_ALREADY_ANSWERED' });
   });
 
   it('still seals without a vault, as before', async () => {

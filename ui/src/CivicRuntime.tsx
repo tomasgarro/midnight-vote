@@ -3,6 +3,10 @@ import type { CivicPassportSession, CredentialSummary } from 'midnight-referendu
 import {
   browserBallotOpeningVault,
   browserCivicCredentialVault,
+  browserHolderKeyVault,
+  browserRarimoEnrollmentVault,
+  createIndexerRegistryHistory,
+  deriveRarimoEventId,
   MidnightCivicActionAdapter,
   RarimoCivicCredentialAdapter,
 } from 'midnight-referendum-api';
@@ -35,7 +39,8 @@ import {
   loadPassportReceipts,
   savePassportReceipt,
 } from '@/integration/receipt-store';
-import { RUNTIME_COPY } from '@/integration/runtime-copy';
+import { RUNTIME_COPY, sealRefusalMessage } from '@/integration/runtime-copy';
+import { sealWhenAdmitted } from '@/integration/seal-admission';
 import {
   browserAnswerMarkerStore,
   type CountOutcome,
@@ -52,7 +57,11 @@ import {
   watchSystemTheme,
 } from '@/integration/theme';
 import { needsHostedConsent } from '@/integration/walletless-proving';
-import { MidnightProvidersProvider, useMidnightProviders } from '@/providers/midnight-providers';
+import {
+  MidnightProvidersProvider,
+  PUBLIC_INDEXER_URL,
+  useMidnightProviders,
+} from '@/providers/midnight-providers';
 import { WalletProvider } from '@/providers/wallet-context';
 import { ActivityView } from '@/views/ActivityView';
 import {
@@ -73,9 +82,9 @@ import { CatalogueChat, type CatalogueMessage } from '@/views/CatalogueChat';
 import { AppHeader, BottomNav } from '@/views/Chrome';
 import { CredentialsView } from '@/views/CredentialsView';
 import { canUseCatalogueDialogue } from '@/views/catalogue-guide';
-import { canUseDemoPass } from '@/views/discovery-presentation';
 import { PolicyDetailView } from '@/views/PolicyDetailView';
 import { ProfileView } from '@/views/ProfileView';
+import { passBlock, passBlockLine } from '@/views/pass-fit';
 import {
   type Choice,
   DEFAULT_POLL,
@@ -88,6 +97,14 @@ import { VoteFlow } from '@/views/VoteFlow';
 import { VotesView } from '@/views/VotesView';
 import { BackToYou, YouView } from '@/views/YouView';
 import '@/views/dashboard.css';
+
+/**
+ * Lets a pass be proven against the newest registry root a consultation
+ * admitted that already held it. The lookup names the registry only.
+ */
+const REGISTRY_HISTORY = PUBLIC_INDEXER_URL
+  ? createIndexerRegistryHistory({ indexerUri: PUBLIC_INDEXER_URL })
+  : null;
 
 /** Re-exported so the runtime-catalog conversion keeps its existing test entry point. */
 export { toRuntimePolls };
@@ -124,11 +141,15 @@ const SEAL_STORAGE_BLOCKED: Record<CicoLocale, string> = {
 
 type CountNotice = Extract<CountOutcome, { state: 'waiting' }>['reason'];
 
-/** The tab title follows the chosen language like everything else. */
+/**
+ * The tab title follows the chosen language like everything else. It names the
+ * product and says "consultation": the app tells people it is not an official
+ * referendum, and the tab said "Civic Referendum".
+ */
 const DOCUMENT_TITLE: Record<CicoLocale, string> = {
-  es: 'Referéndum Cívico · Voto verificable',
-  en: 'Civic Referendum · Verifiable vote',
-  fr: 'Référendum Citoyen · Vote vérifiable',
+  es: 'midnight.vote · Consultas privadas y verificables',
+  en: 'midnight.vote · Private, verifiable consultations',
+  fr: 'midnight.vote · Consultations privées et vérifiables',
 };
 
 function CivicApp() {
@@ -334,7 +355,24 @@ function CivicApp() {
       issuerId: passportV2Runtime.config.issuerId,
       credentialEpoch: passportV2Runtime.config.credentialEpoch,
       credentialTtlMs: passportV2Runtime.config.credentialTtlMs,
+      // Time to finish the scan. A first scan includes registering the
+      // document in the scanning app, which ten minutes did not always cover.
+      enrollmentTtlMs: 30 * 60 * 1_000,
       vault: browserCivicCredentialVault(
+        `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`,
+      ),
+      // A scan in progress survives the phone dropping this page.
+      pendingVault: browserRarimoEnrollmentVault(
+        `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`,
+      ),
+      // One document, one holder: every verification is made under the
+      // registry's own event, and this device keeps one holder secret for all
+      // the passes it is issued there.
+      verificationEventId: deriveRarimoEventId(
+        passportV2Runtime.config.registry.registryContractAddress,
+        passportV2Runtime.config.credentialEpoch,
+      ),
+      holderKeyVault: browserHolderKeyVault(
         `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`,
       ),
       countryMapper: rarimoIsoCountryMapper,
@@ -350,6 +388,7 @@ function CivicApp() {
             ? { actionExecutionContext: referendumV2ActionContext }
             : {}),
           ...(ballotVault ? { ballotOpenings: ballotVault } : {}),
+          ...(REGISTRY_HISTORY ? { registryHistory: REGISTRY_HISTORY } : {}),
         })
       : undefined;
     return {
@@ -368,6 +407,8 @@ function CivicApp() {
   ]);
   const runtimeContractAddress = passportV2Runtime.config?.referenda[0]?.contractAddress ?? null;
 
+  /** True while a sealing waits for the person's pass to be admitted. */
+  const [admissionWaiting, setAdmissionWaiting] = useState(false);
   const [sealedAnswers, setSealedAnswers] = useState<SealedAnswer[]>([]);
   const [countingId, setCountingId] = useState<string | null>(null);
   const [countNotices, setCountNotices] = useState<Readonly<Record<string, CountNotice>>>({});
@@ -550,18 +591,13 @@ function CivicApp() {
       setPreviewError(RUNTIME_COPY[locale].consultationClosed);
       return;
     }
-    if (
-      !CHAIN_RUNTIME_ENABLED &&
-      credential?.kind === 'synthetic-demo-credential' &&
-      !canUseDemoPass(poll, credential)
-    ) {
-      setPreviewError(
-        locale === 'es'
-          ? 'Esta consulta requiere un pase de prueba vigente, del país correspondiente y de 18 años o más.'
-          : locale === 'fr'
-            ? 'Cette consultation exige un pass de test valide, du pays concerné, et un âge de 18 ans ou plus.'
-            : 'This consultation requires a current test pass for the matching country and age 18 or older.',
-      );
+    // A simulated pass that cannot answer says exactly why, as the card did.
+    const block =
+      !CHAIN_RUNTIME_ENABLED && credential?.kind === 'synthetic-demo-credential'
+        ? passBlock(poll, credential)
+        : null;
+    if (block) {
+      setPreviewError(passBlockLine(block, locale));
       return;
     }
     setActivePollId(pollId);
@@ -628,10 +664,14 @@ function CivicApp() {
           // Weeks can pass between sealing and the count. Ask the browser not
           // to evict the opening in the meantime; a refusal is not an error.
           void ballotVault.requestPersistence();
-          const confirmed = await actionPort.castVote({
-            referendumId: route.referendumId,
-            choice,
-            authorization,
+          // A pass issued a moment ago may not be admitted to this consultation
+          // yet. The app waits for that itself; the person taps once.
+          const askAdmission = actionPort.getPassAdmission?.bind(actionPort);
+          const confirmed = await sealWhenAdmitted({
+            seal: () =>
+              actionPort.castVote({ referendumId: route.referendumId, choice, authorization }),
+            ...(askAdmission ? { admission: () => askAdmission(route.referendumId) } : {}),
+            onWaiting: setAdmissionWaiting,
           });
           // The sealed answer is tracked by the vault, not by a stored receipt.
           // This one lives for the receipt screen only and names no transaction.
@@ -651,11 +691,10 @@ function CivicApp() {
 
         throw new Error(RUNTIME_COPY[locale].manifestMissing(APP_NETWORK_LABEL));
       } catch (error) {
-        setPreviewError(
-          error instanceof Error
-            ? error.message
-            : RUNTIME_COPY[locale].transactionFailed(APP_NETWORK_LABEL),
-        );
+        setPreviewError(sealRefusalMessage(error, locale, APP_NETWORK_LABEL));
+        // An attempt may have just learned from the chain that an earlier one
+        // landed. The answers list should show it at once.
+        void refreshSealedAnswers();
         setFlowStage('review');
       }
       return;
@@ -936,6 +975,7 @@ function CivicApp() {
               walletlessProving={walletlessProving}
               provingParty={provingParty}
               deviceProofStartedAt={deviceProofStartedAt}
+              admissionWaiting={admissionWaiting}
               previewError={previewError}
               receipt={receipt}
               dustBalance={dustBalance}

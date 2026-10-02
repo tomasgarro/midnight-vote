@@ -175,6 +175,37 @@ describe('v2 walletless action service', () => {
     });
   });
 
+  /* A write to the action store failed once during a rehearsal on Preview.
+     The rejection went unhandled and ended the process, taking the relay down
+     for every other person. */
+  it('survives a store that fails in the middle of an action', async () => {
+    const store = new InMemoryV2ActionStore();
+    const reserveDust = vi
+      .spyOn(store, 'reserveDust')
+      .mockRejectedValueOnce(new Error('store unavailable'));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const executor = {
+      balanceAndFinalize: vi.fn(async (tx: string) => `finalized-${tx}`),
+      submit: vi.fn(async () => 'tx-1'),
+    };
+    const { service } = makeService(store, executor);
+    const body = { ...baseRequest };
+
+    await service.accept(body, headersFor(body));
+    // Resolves instead of rejecting: nothing is left unhandled.
+    await expect(service.waitForIdle('action-1')).resolves.toBeUndefined();
+
+    expect(reserveDust).toHaveBeenCalledTimes(1);
+    expect(executor.submit).not.toHaveBeenCalled();
+    // Left where a restart would leave it: the device asks again.
+    expect(await store.get('action-1')).toMatchObject({
+      status: 'recovery_required',
+      errorCode: 'recovery_required',
+    });
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('store unavailable'));
+    errors.mockRestore();
+  });
+
   it('rejects request-hash and allowlist mismatches before wallet work', async () => {
     const executor = {
       balanceAndFinalize: vi.fn(async (tx: string) => tx),

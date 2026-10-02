@@ -6,6 +6,7 @@ import {
 } from '@midnight-ntwrk/wallet-sdk-address-format';
 import { loadConfig, type RelayerConfig } from './config.js';
 import { evaluateRelayerReadiness } from './readiness.js';
+import { capabilityKeyId } from './v2-capability.js';
 import { handleV2Route } from './v2-http.js';
 import { MidnightIndexerReceiptResolver } from './v2-indexer.js';
 import { createConfiguredV2Store } from './v2-runtime.js';
@@ -116,6 +117,11 @@ function hexField(body: Json, field: string): string {
   return value.toLowerCase();
 }
 
+/** How often the wallet's state is saved while the relayer runs. */
+const WALLET_STATE_SAVE_INTERVAL_MS = 5 * 60 * 1_000;
+/** A stopping container is killed after its grace period; the last save must fit in it. */
+const SHUTDOWN_SAVE_LIMIT_MS = 15_000;
+
 /** Serialises relayer work: two concurrent balances would pick the same coins. */
 function createQueue() {
   let tail: Promise<unknown> = Promise.resolve();
@@ -133,7 +139,10 @@ export async function startServer(): Promise<void> {
 
   let wallet: RelayerWallet;
   try {
-    wallet = await startRelayerWallet(config);
+    wallet = await startRelayerWallet(config, {
+      statePath: config.walletStatePath,
+      log: (line) => console.log(`[relayer] ${line}`),
+    });
   } catch (error) {
     console.error('[relayer] wallet failed to start:', (error as Error).message);
     process.exitCode = 1;
@@ -147,12 +156,41 @@ export async function startServer(): Promise<void> {
   // minutes — a status endpoint that hangs for that long is useless precisely
   // when you need it to tell you what is going on.
   let latest: Awaited<ReturnType<typeof wallet.facade.waitForSyncedState>> | null = null;
+  let savedOnceSynced = false;
+  let saving = false;
+  // Saving must never disturb the relayer: a failure is logged and forgotten.
+  const saveWalletState = (reason: string): void => {
+    if (!config.walletStatePath || saving) return;
+    saving = true;
+    wallet
+      .saveState()
+      .then((saved) => {
+        if (saved) console.log(`[relayer] wallet state saved (${reason})`);
+      })
+      .catch((error: unknown) =>
+        console.error('[relayer] wallet state not saved:', (error as Error).message),
+      )
+      .finally(() => {
+        saving = false;
+      });
+  };
   wallet.facade.state().subscribe({
     next: (state) => {
       latest = state;
+      if (state.isSynced && !savedOnceSynced) {
+        savedOnceSynced = true;
+        saveWalletState('synchronized');
+      }
     },
     error: (error: unknown) => console.error('[relayer] state stream error:', error),
   });
+  // Also while it is still replaying: a restart in the middle of a long
+  // replay then continues from the last save instead of from nothing.
+  const walletStateTimer = setInterval(
+    () => saveWalletState('periodic'),
+    WALLET_STATE_SAVE_INTERVAL_MS,
+  );
+  walletStateTimer.unref();
 
   let v2Service: V2ActionService | null = null;
   let closeV2Store: (() => Promise<void>) | undefined;
@@ -296,6 +334,16 @@ export async function startServer(): Promise<void> {
           });
           send(response, readiness.ready ? 200 : 503, {
             ...readiness,
+            // What this relay sponsors, and a fingerprint of the secret it
+            // shares with the credential service. All of it is public.
+            v2: v2Service
+              ? {
+                  capabilityKeyId: capabilityKeyId(config.v2CapabilitySecret),
+                  networks: config.v2AllowedNetworks,
+                  contracts: config.v2AllowedContracts,
+                  circuits: config.v2AllowedCircuits,
+                }
+              : null,
             networkId: config.networkId,
             dustBalance: state?.dust.balance(dustAt).toString() ?? '0',
             dustEvaluationTime: dustAt.toISOString(),
@@ -356,6 +404,19 @@ export async function startServer(): Promise<void> {
   const shutdown = async () => {
     console.log('\n[relayer] shutting down…');
     server.close();
+    clearInterval(walletStateTimer);
+    // A last save, so the next start resumes from now. It is bounded: the
+    // process is about to be killed, and the periodic save is recent enough.
+    if (config.walletStatePath) {
+      await Promise.race([
+        wallet.saveState().then(
+          () => console.log('[relayer] wallet state saved (shutdown)'),
+          (error: unknown) =>
+            console.error('[relayer] wallet state not saved:', (error as Error).message),
+        ),
+        new Promise((resolve) => setTimeout(resolve, SHUTDOWN_SAVE_LIMIT_MS)),
+      ]);
+    }
     await wallet.stop().catch(() => undefined);
     process.exit(0);
   };

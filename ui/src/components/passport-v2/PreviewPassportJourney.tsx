@@ -111,6 +111,17 @@ const ENROLLMENT_STATUS_LABEL = {
     failed: 'la vérification a échoué',
   },
 } as const;
+/**
+ * A document has one holder for as long as the registry's epoch lasts: the
+ * device and browser that first got a pass for it. Said in the person's own
+ * language, because there is something they can do about it.
+ */
+const DOCUMENT_ALREADY_ENROLLED = {
+  es: 'Este documento ya tiene un pase en otro dispositivo o navegador. Un documento da una sola respuesta por consulta: usá el dispositivo donde lo verificaste primero.',
+  en: 'This document already has a pass on another device or browser. A document gives one answer per consultation: use the device where you first verified it.',
+  fr: 'Ce document a déjà un laissez-passer sur un autre appareil ou navigateur. Un document donne une seule réponse par consultation : utilisez l’appareil sur lequel vous l’avez vérifié en premier.',
+} as const;
+
 const PREVIEW_STAGE_LABEL = {
   es: { consent: 'Passport', provider: 'Sesión', enrollment: 'Evidencia', credential: 'Lista' },
   en: { consent: 'Passport', provider: 'Session', enrollment: 'Evidence', credential: 'Ready' },
@@ -341,7 +352,11 @@ export function PreviewPassportJourney({
       setEnrollmentStatus(status);
       if (status.status === 'pending') return;
       if (status.status !== 'issued') {
-        setError(`La verificación terminó con estado ${status.status}.`);
+        setError(
+          status.errorCode === 'DOCUMENT_ALREADY_ENROLLED'
+            ? DOCUMENT_ALREADY_ENROLLED[locale]
+            : `La verificación terminó con estado ${status.status}.`,
+        );
         return;
       }
       clearPassportAttempt();

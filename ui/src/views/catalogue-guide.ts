@@ -1,8 +1,15 @@
+import { asksHowToAnswer } from 'midnight-referendum-api/deliberation';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import { countryName } from '@/integration/country-catalog';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability } from '@/integration/poll-lifecycle';
-import { isCountryPoll, localizePoll, type Poll, pollCountryCode } from './poll-model';
+import {
+  isCountryPoll,
+  localizePoll,
+  type Poll,
+  pollCountryCode,
+  pollPlaceCode,
+} from './poll-model';
 
 export function hasValidatedPassport(
   credential: DemoCredentialSummary | null,
@@ -64,6 +71,15 @@ export const GUIDE_COPY = {
     balanced: 'Arguments and uncertainties',
     noProfile: 'Choose a country',
     reset: 'Chat cleared.',
+    inShort: 'In short',
+    sides: 'What each side says',
+    forLabel: 'For',
+    againstLabel: 'Against',
+    source: 'Sources',
+    cannot: 'What I can’t tell you',
+    notAdvice: 'How to answer. That is yours to decide.',
+    declined: 'I don’t say how to answer. That choice is yours, and it stays yours.',
+    declinedOffer: 'Here is what each side says, and who says it.',
   },
   es: {
     name: 'Cleisthenes',
@@ -98,6 +114,15 @@ export const GUIDE_COPY = {
     balanced: 'Argumentos e incertidumbres',
     noProfile: 'Elegí un país',
     reset: 'Chat borrado.',
+    inShort: 'En pocas palabras',
+    sides: 'Qué dice cada parte',
+    forLabel: 'A favor',
+    againstLabel: 'En contra',
+    source: 'Fuentes',
+    cannot: 'Lo que no puedo decirte',
+    notAdvice: 'Cómo responder. Eso lo decidís vos.',
+    declined: 'No digo cómo responder. Esa decisión es tuya, y sigue siendo tuya.',
+    declinedOffer: 'Esto es lo que dice cada parte, y quién lo dice.',
   },
   fr: {
     name: 'Cleisthenes',
@@ -133,13 +158,61 @@ export const GUIDE_COPY = {
     balanced: 'Arguments et incertitudes',
     noProfile: 'Choisir un pays',
     reset: 'Chat effacé.',
+    inShort: 'En bref',
+    sides: 'Ce que dit chaque camp',
+    forLabel: 'Pour',
+    againstLabel: 'Contre',
+    source: 'Sources',
+    cannot: 'Ce que je ne peux pas vous dire',
+    notAdvice: 'Comment répondre. C’est à vous d’en décider.',
+    declined: 'Je ne dis pas comment répondre. Ce choix vous appartient, et il le reste.',
+    declinedOffer: 'Voici ce que dit chaque camp, et qui le dit.',
   },
 } as const;
+/** One part of a structured answer, always in the same order. */
+export interface GuideSection {
+  readonly kind: 'short' | 'sides' | 'source' | 'limits';
+  readonly title: string;
+  readonly lines: readonly string[];
+}
 export interface GuideAnswer {
   text: string;
   pollIds: string[];
   selectedId?: string;
   scope?: string;
+  /** In short, each side and who says it, the source, and what the guide cannot say. */
+  sections?: GuideSection[];
+  /** The question asked how to answer. The guide declined. */
+  declined?: boolean;
+}
+
+type GuideCopy = (typeof GUIDE_COPY)[CicoLocale];
+
+function sidesSection(poll: Poll, t: GuideCopy): GuideSection[] {
+  const lines = [
+    ...poll.argumentsFor.map((line) => `${t.forLabel} — ${line}`),
+    ...poll.argumentsAgainst.map((line) => `${t.againstLabel} — ${line}`),
+  ];
+  return lines.length ? [{ kind: 'sides', title: t.sides, lines }] : [];
+}
+
+function limitsSection(poll: Poll, t: GuideCopy): GuideSection {
+  return {
+    kind: 'limits',
+    title: t.cannot,
+    lines: [poll.uncertainty, t.notAdvice].filter(Boolean),
+  };
+}
+
+/** The answer about one consultation: short, both sides, the source, the limits. */
+function structured(poll: Poll, t: GuideCopy): GuideSection[] {
+  const sources = poll.sources.map((source) => `${source.label} — ${source.detail}`);
+  return [
+    { kind: 'short', title: t.inShort, lines: [poll.description] },
+    ...sidesSection(poll, t),
+    ...(sources.length ? [{ kind: 'source' as const, title: t.source, lines: sources }] : []),
+    limitsSection(poll, t),
+  ];
 }
 const normalize = (s: string) =>
   s
@@ -164,6 +237,16 @@ export function answerCatalogue(
       q === normalize(p.id) ||
       p.aliases?.some((alias) => new RegExp(`(?:^|\\W)${normalize(alias)}(?:$|\\W)`, 'u').test(q)),
   );
+  // Asked how to answer: decline, and offer both sides of the consultation in view.
+  if (asksHowToAnswer(question)) {
+    const poll = named ?? localized.find((p) => p.id === lastPollId);
+    return {
+      text: poll ? `${t.declined}\n\n${t.declinedOffer}` : t.declined,
+      pollIds: poll ? [poll.id] : [],
+      ...(poll ? { selectedId: poll.id, sections: sidesSection(poll, t) } : {}),
+      declined: true,
+    };
+  }
   const summary =
     /summari|resum|explain|expliq|argument|uncertain|incertid|incertitude|pros|cons\b/.test(q);
   if (summary || named) {
@@ -198,9 +281,24 @@ export function answerCatalogue(
                 .filter(Boolean)
                 .join('\n\n')
             : poll.description;
-    return { text: text || t.noData, pollIds: [poll.id], selectedId: poll.id };
+    // A plain summary or a named consultation gets the whole structure; a
+    // narrower question gets its part, still with what cannot be said.
+    const sections =
+      sourceRequest || evidenceRequest
+        ? undefined
+        : uncertaintyRequest
+          ? [limitsSection(poll, t)]
+          : balanced
+            ? [...sidesSection(poll, t), limitsSection(poll, t)]
+            : structured(poll, t);
+    return {
+      text: text || t.noData,
+      pollIds: [poll.id],
+      selectedId: poll.id,
+      ...(sections ? { sections } : {}),
+    };
   }
-  const countries = [...new Set(polls.map(pollCountryCode).filter((c): c is string => Boolean(c)))];
+  const countries = [...new Set(polls.map(pollPlaceCode).filter((c): c is string => Boolean(c)))];
   const explicit = countries.find((c) =>
     [c, ...(['en', 'es', 'fr'] as const).map((l) => countryName(c, l))].some((name) =>
       new RegExp(`(?:^|\\W)${normalize(name)}(?:$|\\W)`, 'u').test(q),
@@ -219,12 +317,15 @@ export function answerCatalogue(
   if (!explicit && !global && !/open|poll|consult|abierta|ouvert|para mi|for me|pour moi/.test(q))
     return { text: t.unknown, pollIds: [] };
   const scope = global ? undefined : (explicit ?? country);
+  // Global means the Global list. Otherwise a consultation qualifies when any
+  // pass may answer it (the World question, the Swiss open pulse), or when it
+  // is listed in the place asked about.
+  const inScope = (p: Poll) =>
+    global ? !isCountryPoll(p) : !pollCountryCode(p) || pollPlaceCode(p) === scope;
   const matches = polls.filter((p) => {
     try {
       return (
-        getPollAvailability(p, now).isOpen &&
-        (!subject || p.subject === subject) &&
-        (!isCountryPoll(p) || (!global && pollCountryCode(p) === scope))
+        getPollAvailability(p, now).isOpen && (!subject || p.subject === subject) && inScope(p)
       );
     } catch {
       return false;

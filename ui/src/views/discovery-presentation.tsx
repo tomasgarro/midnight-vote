@@ -1,12 +1,15 @@
 import {
   Buildings,
-  CurrencyBtc,
-  Drop,
+  DeviceMobile,
   GlobeHemisphereWest,
   Leaf,
+  type Icon as PhosphorIcon,
+  PiggyBank,
   Scales,
+  Shield,
+  Sparkle,
   Train,
-  Wrench,
+  Users,
 } from '@phosphor-icons/react';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
 import { type Poll, pollCountryCode } from './poll-model';
@@ -42,11 +45,9 @@ export function pollSubject(poll: Poll): NonNullable<Poll['subject']> {
     poll.subject ??
     (poll.id === 'france-mobilite'
       ? 'mobility'
-      : poll.id === 'reglas-de-verificacion'
-        ? 'governance'
-        : poll.id === 'energia-renovable'
-          ? 'climate'
-          : 'economy')
+      : poll.id === 'energia-renovable'
+        ? 'climate'
+        : 'economy')
   );
 }
 export function canUseDemoPass(
@@ -61,6 +62,21 @@ export function canUseDemoPass(
       (!pollCountryCode(poll) || pollCountryCode(poll) === credential.country),
   );
 }
+/** A line icon names the subject. It is not card art, which waits for approval. */
+const SUBJECT_ICONS: Readonly<Record<string, PhosphorIcon>> = {
+  'world-social-media-age': DeviceMobile,
+  'ch-ahv-vat': PiggyBank,
+  'ch-war-materiel': Shield,
+  'ch-married-couples-tax': Users,
+  'ch-fireworks': Sparkle,
+};
+const DEFAULT_ICONS: Readonly<Record<NonNullable<Poll['subject']>, PhosphorIcon>> = {
+  mobility: Train,
+  housing: Buildings,
+  climate: Leaf,
+  governance: GlobeHemisphereWest,
+  economy: Scales,
+};
 /**
  * The subject as a small tile beside the meta line. It was a 180px tinted
  * block in its own palette: civic topics rarely have an honest picture, and
@@ -68,20 +84,7 @@ export function canUseDemoPass(
  */
 export function ConsultationMedia({ poll }: { poll: Poll }) {
   const subject = pollSubject(poll);
-  const Icon =
-    poll.id === 'switzerland-bitcoin'
-      ? CurrencyBtc
-      : poll.id === 'global-repair'
-        ? Wrench
-        : poll.id === 'spain-water-data'
-          ? Drop
-          : {
-              mobility: Train,
-              housing: Buildings,
-              climate: Leaf,
-              governance: GlobeHemisphereWest,
-              economy: Scales,
-            }[subject];
+  const Icon = SUBJECT_ICONS[poll.id] ?? DEFAULT_ICONS[subject];
   return (
     <div className={`poll-media poll-media--${subject}`} aria-hidden="true">
       {poll.media?.image ? (

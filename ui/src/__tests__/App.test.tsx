@@ -238,18 +238,18 @@ describe('App', () => {
     await choosePlace(user, 'Argentina');
     expect(screen.getByText(/Esto no acredita elegibilidad/i)).toBeTruthy();
     expect(screen.queryByText(/Pase registrado para/i)).toBeNull();
-    // Every open Argentine consultation offers the way in, and none offers a vote.
-    expect(screen.getAllByRole('button', { name: /Añadir elegibilidad/i }).length).toBeGreaterThan(
-      0,
-    );
+    // A French pass cannot answer there: every Argentine card says why in one
+    // line (which passport it needs, or that it has closed), and none offers
+    // a button to press.
+    const argentina = screen.getByRole('region', { name: 'Argentina' });
+    const cards = argentina.querySelectorAll('.poll');
+    expect(cards.length).toBeGreaterThan(0);
+    expect(argentina.querySelectorAll('.poll__reason')).toHaveLength(cards.length);
     expect(
-      screen
-        .getByRole('region', { name: 'Argentina' })
-        .querySelectorAll('.poll__actions button[data-variant="primary"]'),
-    ).not.toHaveLength(0);
-    expect(screen.getByRole('region', { name: 'Argentina' }).textContent).not.toContain(
-      'Participar',
-    );
+      argentina.querySelectorAll('.poll__actions button[data-variant="primary"]'),
+    ).toHaveLength(0);
+    expect(argentina.textContent).not.toContain('Participar');
+    expect(within(argentina).queryByRole('button', { name: /Añadir elegibilidad/i })).toBeNull();
 
     await choosePlace(user, /Francia|France/i);
     expect(screen.getByText(/DEMO ·/i)).toBeTruthy();
@@ -453,7 +453,7 @@ describe('App', () => {
     ).toEqual(['Consultations', 'Cleisthenes', 'You']);
     expect(screen.getByRole('heading', { name: 'Consultations' })).toBeTruthy();
     expect(document.documentElement.lang).toBe('en');
-    expect(document.title).toMatch(/Civic Referendum/i);
+    expect(document.title).toMatch(/midnight\.vote · Private, verifiable consultations/i);
   });
 
   it('reads public results without a credential or a Passport session', async () => {

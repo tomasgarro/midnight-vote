@@ -85,7 +85,7 @@ export function LandingFinale({ onStart }: { onStart: () => void }) {
                     <Check size={18} />
                     <span>
                       <strong>Try it today</strong>Learn about privacy, explore a demo consultation,
-                      and discover Civic Pulse.
+                      and ask Cleisthenes what it is about.
                     </span>
                   </li>
                   <li>
@@ -100,8 +100,9 @@ export function LandingFinale({ onStart }: { onStart: () => void }) {
                   <li>
                     <ChatCircle size={18} />
                     <span>
-                      <strong>On the horizon · AI for civic understanding</strong>Sourced summaries,
-                      presentations, and research on local politicians and national issues.
+                      <strong>Starting now · AI for civic understanding</strong>Cleisthenes explains
+                      a consultation from its sources and never says how to answer. Research on
+                      politicians and wider issues comes later.
                     </span>
                   </li>
                 </>

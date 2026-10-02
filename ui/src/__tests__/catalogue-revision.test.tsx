@@ -6,15 +6,17 @@ import { POLLS } from '@/views/poll-model';
 
 afterEach(() => vi.unstubAllGlobals());
 describe('source-backed catalogue guide', () => {
-  it('recognises the Bitcoin initiative and keeps sources and uncertainty grounded', () => {
-    expect(answerCatalogue('Summarize the Swiss Bitcoin initiative', POLLS, 'en').selectedId).toBe(
-      'switzerland-bitcoin',
+  it('recognises a federal object by name and keeps sources and uncertainty grounded', () => {
+    expect(answerCatalogue('Summarize the fireworks initiative', POLLS, 'en').selectedId).toBe(
+      'ch-fireworks',
     );
-    expect(answerCatalogue('Sources: bitcoin', POLLS, 'en').text).toContain('Swiss National Bank');
-    expect(answerCatalogue('What is uncertain? bitcoin', POLLS, 'en').text).toContain(
-      'procedural status',
+    expect(answerCatalogue('Sources: fireworks', POLLS, 'en').text).toContain('UVEK');
+    expect(answerCatalogue('What is uncertain? fireworks', POLLS, 'en').text).toContain('enforced');
+    expect(answerCatalogue('Context: fireworks', POLLS, 'en').text).toContain('sparklers');
+    expect(answerCatalogue('Resumir: AHV', POLLS, 'es').selectedId).toBe('ch-ahv-vat');
+    expect(answerCatalogue('Résumer : réseaux sociaux', POLLS, 'fr').selectedId).toBe(
+      'world-social-media-age',
     );
-    expect(answerCatalogue('Context: bitcoin', POLLS, 'en').text).toContain('does not assert');
   });
   it('filters topics without broadening country eligibility', () => {
     const result = answerCatalogue(
@@ -23,22 +25,19 @@ describe('source-backed catalogue guide', () => {
       'en',
       'CH',
       undefined,
-      new Date('2026-09-15'),
+      new Date('2026-10-02T12:00:00Z'),
     );
-    expect(result.pollIds).toContain('global-repair');
-    expect(result.pollIds).toContain('switzerland-nature');
-    expect(result.pollIds).not.toContain('spain-water-data');
-    expect(result.pollIds).not.toContain('switzerland-bitcoin');
+    expect(result.pollIds).toEqual(['ch-fireworks']);
   });
   it('reveals immediately for reduced motion and exposes source links', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }));
     render(<CatalogueChat polls={POLLS} locale="en" onOpenPolicy={vi.fn()} />);
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Sources: bitcoin' } });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Sources: fireworks' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send question' }));
     expect(screen.queryByRole('status')).toBeNull();
-    expect(
-      screen.getByRole('link', { name: /Swiss National Bank/ }).getAttribute('href'),
-    ).toContain('snb.ch');
+    expect(screen.getByRole('link', { name: /UVEK/ }).getAttribute('href')).toContain(
+      'uvek.admin.ch',
+    );
   });
   it('clearing a pending response prevents it returning later', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }));

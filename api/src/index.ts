@@ -44,7 +44,9 @@ export type {
 export {
   browserBallotOpeningVault,
   browserCivicCredentialVault,
+  browserHolderKeyVault,
   browserPrivateStateProvider,
+  browserRarimoEnrollmentVault,
   createBallotOpeningVault,
   deserializePrivateStateFromStorage,
   inMemoryPrivateStateProvider,

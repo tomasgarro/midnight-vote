@@ -1,3 +1,4 @@
+export { asksHowToAnswer } from './advice.js';
 export {
   type CleisthenesAssistantOptions,
   type CleisthenesConsultationSource,

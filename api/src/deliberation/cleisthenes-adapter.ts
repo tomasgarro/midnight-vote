@@ -9,6 +9,7 @@
  * cookies, so a Cleisthenes account in the same browser is never attached to a
  * question asked from the app.
  */
+import { asksHowToAnswer } from './advice.js';
 import {
   type AskProgress,
   type AskRequest,
@@ -363,6 +364,11 @@ export function createCleisthenesAssistant(
       const asked = question.trim();
       if (!asked || asked.length > MAX_QUESTION_LENGTH) {
         throw new DeliberationError('INVALID_QUESTION', 'The question is empty or too long');
+      }
+      // Declined here, before anything is read or sent: the assistant explains
+      // what is at stake and never says how to answer.
+      if (asksHowToAnswer(asked)) {
+        throw new DeliberationError('ADVICE_DECLINED', 'The assistant does not say how to answer');
       }
       const object = await loadObject(consultationId);
       const businessId = object ? text(object.businessId) : null;

@@ -121,6 +121,17 @@ export class CredentialEpochCoordinator implements CredentialEpochMutationBounda
     });
   }
 
+  /**
+   * Runs one transaction that is neither an issuance nor a freeze, in the same
+   * queue. The service pays for everything from one wallet, and two
+   * transactions built at the same moment would spend the same DUST. The
+   * registry executor also holds one private state, which each caller sets
+   * before its own circuit.
+   */
+  runWalletMutation<T>(operation: () => Promise<T>): Promise<T> {
+    return this.exclusive(operation);
+  }
+
   closeAndFreeze(): Promise<CredentialEpochFreezeResult> {
     return this.exclusive(async () => {
       const before = await this.readExpectedRegistry();

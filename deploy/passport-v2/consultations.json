@@ -1,0 +1,72 @@
+{
+  "registryManifest": "deploy/passport-v2/preview.manifest.json",
+  "apiUrl": "https://cico.midnight.vote",
+  "consultations": {
+    "test": {
+      "referendumId": "preview-wave2-test-consultation",
+      "country": null,
+      "passesUntil": "2026-10-09T17:00:00+02:00",
+      "answersClose": "2026-10-09T18:00:00+02:00",
+      "countingUntil": "2026-10-12T18:00:00+02:00",
+      "text": {
+        "en": {
+          "title": "Results after the close",
+          "question": "Should the result of a consultation stay hidden until it closes?",
+          "description": "A test consultation on Midnight Preview. Answers close on 9 October 2026 at 18:00, Geneva time."
+        },
+        "es": {
+          "title": "Resultados después del cierre",
+          "question": "¿El resultado de una consulta debería quedar oculto hasta que cierre?",
+          "description": "Una consulta de prueba en Midnight Preview. Las respuestas cierran el 9 de octubre de 2026 a las 18:00, hora de Ginebra."
+        },
+        "fr": {
+          "title": "Les résultats après la clôture",
+          "question": "Le résultat d'une consultation doit-il rester caché jusqu'à sa clôture ?",
+          "description": "Une consultation de test sur Midnight Preview. Les réponses sont closes le 9 octobre 2026 à 18 h, heure de Genève."
+        }
+      }
+    },
+    "rehearsal-1": {
+      "referendumId": "rehearsal-2026-10-02-fixture",
+      "country": null,
+      "passesUntil": "2026-10-02T02:58:00Z",
+      "answersClose": "2026-10-02T03:02:00Z",
+      "countingUntil": "2026-10-02T03:32:00Z",
+      "text": {
+        "en": {
+          "title": "Rehearsal with a fixture pass",
+          "question": "Does the journey run from sealing an answer to counting it?",
+          "description": "A rehearsal by the operator, with the fixture pass. No person answered. It is not shown in the app."
+        }
+      }
+    },
+    "rehearsal-2": {
+      "referendumId": "rehearsal-2026-10-02-earlier-root",
+      "country": null,
+      "passesUntil": "2026-10-02T04:30:00Z",
+      "answersClose": "2026-10-02T04:42:00Z",
+      "countingUntil": "2026-10-02T04:58:00Z",
+      "text": {
+        "en": {
+          "title": "Rehearsal: an earlier pass after the registry moved on",
+          "question": "Can a pass still answer after later passes changed the registry's root?",
+          "description": "A rehearsal by the operator, with fixture passes. No person answered. It is not shown in the app."
+        }
+      }
+    },
+    "rehearsal-3": {
+      "referendumId": "rehearsal-2026-10-02-second-pass",
+      "country": null,
+      "passesUntil": "2026-10-02T04:30:00Z",
+      "answersClose": "2026-10-02T04:42:00Z",
+      "countingUntil": "2026-10-02T04:58:00Z",
+      "text": {
+        "en": {
+          "title": "Rehearsal: a second fixture pass",
+          "question": "Does a consultation deployed after a second pass admit both?",
+          "description": "A rehearsal by the operator. Deploying it added a second fixture pass to the registry. No person answered. It is not shown in the app."
+        }
+      }
+    }
+  }
+}

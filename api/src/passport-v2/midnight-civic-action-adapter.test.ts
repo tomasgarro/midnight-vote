@@ -16,7 +16,7 @@ import type {
   CivicCredentialPrivateMaterial,
   CivicCredentialPrivateStatePort,
 } from './ports.js';
-import { isoNumericCountry } from './types.js';
+import { CivicCredentialError, isoNumericCountry } from './types.js';
 
 const path = { __testPath: true } as unknown as MerkleTreePath<Uint8Array>;
 const claims = {
@@ -341,5 +341,57 @@ describe('Midnight browser civic action adapter', () => {
       value: { contractAddress: secondEntry.contractAddress },
     });
     expect(joined).toEqual([entry.contractAddress, secondEntry.contractAddress]);
+  });
+});
+
+describe('asking whether a pass can answer, before any proof', () => {
+  const adapterWith = (
+    resolveCredentialPath: () => Promise<MerkleTreePath<Uint8Array>>,
+    credential: CivicCredentialPort & CivicCredentialPrivateStatePort = new FakeCredential(),
+  ) =>
+    new MidnightCivicActionAdapter({
+      providers: {} as ReferendumV2Providers,
+      credential,
+      referenda: [entry],
+      stateResolver: { assertCanonicalBinding: async () => undefined, resolveCredentialPath },
+      executorFactory: () => makeExecutor({}),
+    });
+
+  it('says admitted when a path against an admitted root exists', async () => {
+    const resolveCredentialPath = vi.fn(async () => path);
+    await expect(
+      adapterWith(resolveCredentialPath).getPassAdmission(entry.referendumId),
+    ).resolves.toBe('admitted');
+    expect(resolveCredentialPath).toHaveBeenCalledWith(entry, material.credentialLeaf);
+  });
+
+  it('tells a pass that will be admitted from one that came too late', async () => {
+    const refusing = (code: 'CREDENTIAL_NOT_ADMITTED' | 'CREDENTIAL_ADMISSION_CLOSED') =>
+      adapterWith(async () => {
+        throw new CivicCredentialError(code, 'refused');
+      }).getPassAdmission(entry.referendumId);
+    await expect(refusing('CREDENTIAL_NOT_ADMITTED')).resolves.toBe('pending');
+    await expect(refusing('CREDENTIAL_ADMISSION_CLOSED')).resolves.toBe('closed');
+  });
+
+  it('says so when the device holds no pass, without reading the chain', async () => {
+    const resolveCredentialPath = vi.fn(async () => path);
+    const noPass = new FakeCredential();
+    noPass.getPrivateCredentialMaterial = async () => null as unknown as typeof material;
+    await expect(
+      adapterWith(resolveCredentialPath, noPass).getPassAdmission(entry.referendumId),
+    ).resolves.toBe('no-pass');
+    expect(resolveCredentialPath).not.toHaveBeenCalled();
+  });
+
+  it('does not turn a failed read into an answer', async () => {
+    await expect(
+      adapterWith(async () => {
+        throw new Error('indexer unavailable');
+      }).getPassAdmission(entry.referendumId),
+    ).rejects.toThrow('indexer unavailable');
+    await expect(adapterWith(async () => path).getPassAdmission('unknown')).rejects.toMatchObject({
+      code: 'POLICY_NOT_SATISFIED',
+    });
   });
 });

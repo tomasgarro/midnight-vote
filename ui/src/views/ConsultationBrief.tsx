@@ -1,6 +1,7 @@
 import { ArrowUpRight, CaretDown, PlayCircle } from '@phosphor-icons/react';
 import {
   type AssistantAnswer,
+  asksHowToAnswer,
   type ConsultationBrief as Brief,
   type CitedSentence,
   type DeliberationAssistantPort,
@@ -51,7 +52,7 @@ interface OpenCitation {
   readonly citation: EvidenceCitation;
 }
 
-type AskFailure = 'signIn' | 'spent' | 'failed' | 'unsourced';
+type AskFailure = 'signIn' | 'spent' | 'failed' | 'unsourced' | 'declined';
 
 const INTL_TAG: Record<CicoLocale, string> = { es: 'es-AR', en: 'en-GB', fr: 'fr-FR' };
 
@@ -84,6 +85,72 @@ function answerSentences(answer: AssistantAnswer): CitedSentence[] {
     ...(answer.lead ? [answer.lead] : []),
     ...answer.sections.flatMap((section) => section.paragraphs),
   ];
+}
+
+/*
+ * The parliamentary groups, by the short name a reader knows. The record gives
+ * the group's full name in French or German, which is too long to sit inside
+ * a sentence. Order matters: the Union démocratique du Centre is not the
+ * Centre, and the Green Liberals are not the Greens.
+ */
+const PARTIES: ReadonlyArray<{
+  readonly match: RegExp;
+  readonly label: Readonly<Record<CicoLocale, string>>;
+}> = [
+  {
+    match: /union démocratique du centre|volkspartei|\b(udc|svp)\b|^v$/iu,
+    label: { en: 'SVP', es: 'SVP', fr: 'UDC' },
+  },
+  {
+    match: /vert.?libéra|grünliberal|\b(glp|pvl)\b|^gl$/iu,
+    label: { en: 'GLP', es: 'GLP', fr: 'PVL' },
+  },
+  { match: /\bverts\b|grüne|^g$/iu, label: { en: 'Greens', es: 'Verdes', fr: 'Verts' } },
+  {
+    match: /socialiste|sozialdemokrat|\b(sp|ps)\b|^s$/iu,
+    label: { en: 'SP', es: 'SP', fr: 'PS' },
+  },
+  {
+    match: /libéral-radical|libéraux-radicaux|freisinn|\b(fdp|plr)\b|^rl$/iu,
+    label: { en: 'FDP', es: 'FDP', fr: 'PLR' },
+  },
+  {
+    match: /centre|mitte|^m-e$|^ce$/iu,
+    label: { en: 'Centre', es: 'Centro', fr: 'Le Centre' },
+  },
+];
+
+function partyLabel(group: string | null, locale: CicoLocale): string | null {
+  if (!group) return null;
+  return PARTIES.find((party) => party.match.test(group.trim()))?.label[locale] ?? null;
+}
+
+/**
+ * Who makes an argument. The record's sentences usually name the speaker
+ * already, so the party is added after the name; a sentence that names nobody
+ * starts with the speaker.
+ */
+function withSpeaker(
+  sentence: CitedSentence,
+  citations: Readonly<Record<string, EvidenceCitation>>,
+  locale: CicoLocale,
+): CitedSentence {
+  const citation = sentence.citationIds.map((id) => citations[id]).find(Boolean);
+  if (!citation) return sentence;
+  const party = partyLabel(citation.group, locale);
+  const at = sentence.text.indexOf(citation.speaker);
+  if (at >= 0) {
+    if (!party) return sentence;
+    const end = at + citation.speaker.length;
+    return {
+      ...sentence,
+      text: `${sentence.text.slice(0, end)} (${party})${sentence.text.slice(end)}`,
+    };
+  }
+  return {
+    ...sentence,
+    text: `${citation.speaker}${party ? ` (${party})` : ''}: ${sentence.text}`,
+  };
 }
 
 interface SentenceProps {
@@ -129,16 +196,25 @@ interface AnswerProps {
 function Answer({ answer, onOpen, copy, locale }: AnswerProps) {
   const numbers = numberSources(answerSentences(answer));
   const shared = { citations: answer.citations, numbers, onOpen, copy, locale };
-  const limits = answer.limitations.flatMap((code) => {
-    const text = copy.limit[code];
-    return text ? [{ code, text }] : [];
-  });
+  // What the answer cannot say always ends with how to answer.
+  const limits = [
+    ...answer.limitations.flatMap((code) => {
+      const text = copy.limit[code];
+      return text ? [{ code, text }] : [];
+    }),
+    { code: 'advice', text: copy.cannotAdvice },
+  ];
   return (
     <div className="brief__answer" lang={answer.language}>
       {answer.lead ? (
-        <p className="brief__prose">
-          <Sentence sentence={answer.lead} {...shared} />
-        </p>
+        <section className="brief__answer-section">
+          <h4 className="brief__answer-title" lang={locale}>
+            {copy.inShort}
+          </h4>
+          <p className="brief__prose">
+            <Sentence sentence={answer.lead} {...shared} />
+          </p>
+        </section>
       ) : null}
       {answer.sections.map((section) => (
         <section key={section.title} className="brief__answer-section">
@@ -212,6 +288,12 @@ export function ConsultationBrief({ assistant, consultationId, locale }: Consult
       event.preventDefault();
       const question = draft.trim();
       if (!question || asking) return;
+      // Asked how to answer: declined here, and nothing is sent.
+      if (asksHowToAnswer(question)) {
+        setAnswer(null);
+        setAskFailure('declined');
+        return;
+      }
       setAsking(true);
       setAnswer(null);
       setAskFailure(null);
@@ -220,13 +302,15 @@ export function ConsultationBrief({ assistant, consultationId, locale }: Consult
       } catch (error) {
         const code = isDeliberationError(error) ? error.code : null;
         setAskFailure(
-          code === 'SIGN_IN_REQUIRED'
-            ? 'signIn'
-            : code === 'ALLOWANCE_SPENT'
-              ? 'spent'
-              : code === 'INVALID_RESPONSE'
-                ? 'unsourced'
-                : 'failed',
+          code === 'ADVICE_DECLINED'
+            ? 'declined'
+            : code === 'SIGN_IN_REQUIRED'
+              ? 'signIn'
+              : code === 'ALLOWANCE_SPENT'
+                ? 'spent'
+                : code === 'INVALID_RESPONSE'
+                  ? 'unsourced'
+                  : 'failed',
         );
       } finally {
         setAsking(false);
@@ -268,6 +352,15 @@ export function ConsultationBrief({ assistant, consultationId, locale }: Consult
   };
   const council = brief.decided?.nationalCouncil ?? null;
   const open = openCitation?.citation ?? null;
+  // The answer in two sentences, from the record alone: when the vote is,
+  // and how the National Council voted.
+  const voteDate = brief.voteDate ? formatDate(brief.voteDate, locale) : null;
+  const short = [
+    voteDate ? copy.shortVote(voteDate) : null,
+    council
+      ? copy.shortCouncil(council.counts.yes, council.counts.no, council.counts.abstained)
+      : null,
+  ].filter((line): line is string => Boolean(line));
 
   const side = (label: string, sentences: readonly CitedSentence[], coverage?: SideCoverage) => {
     const note = coverage ? coverageNote(coverage, copy) : null;
@@ -278,7 +371,7 @@ export function ConsultationBrief({ assistant, consultationId, locale }: Consult
           <ul className="brief__list" lang={brief.language}>
             {sentences.map((sentence) => (
               <li key={sentence.text}>
-                <Sentence sentence={sentence} {...shared} />
+                <Sentence sentence={withSpeaker(sentence, brief.citations, locale)} {...shared} />
               </li>
             ))}
           </ul>
@@ -294,6 +387,13 @@ export function ConsultationBrief({ assistant, consultationId, locale }: Consult
         <h3 className="sys-eyebrow" id={`${questionId}-understand`}>
           {copy.understand}
         </h3>
+
+        {short.length > 0 ? (
+          <div className="brief__short">
+            <h4 className="brief__heading">{copy.inShort}</h4>
+            <p className="brief__prose">{short.join(' ')}</p>
+          </div>
+        ) : null}
 
         <Card tone="sunken" className="brief__title">
           <p className="brief__label">{copy.officialTitle}</p>
@@ -352,6 +452,14 @@ export function ConsultationBrief({ assistant, consultationId, locale }: Consult
               {copy.inPreparationBody}
             </Callout>
           )}
+        </div>
+
+        <div className="brief__limits">
+          <p className="brief__limits-label">{copy.cannot}</p>
+          <ul>
+            <li>{copy.cannotAdvice}</li>
+            <li>{copy.cannotOutside}</li>
+          </ul>
         </div>
 
         {brief.review ? (
@@ -456,7 +564,10 @@ export function ConsultationBrief({ assistant, consultationId, locale }: Consult
           </p>
         ) : null}
         {askFailure ? (
-          <Callout tone={askFailure === 'signIn' ? 'neutral' : 'warning'} role="alert">
+          <Callout
+            tone={askFailure === 'signIn' || askFailure === 'declined' ? 'neutral' : 'warning'}
+            role="alert"
+          >
             {copy[askFailure]}
           </Callout>
         ) : null}

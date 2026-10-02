@@ -1,10 +1,14 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
+import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
+import { asContractAddress } from '@midnight-ntwrk/midnight-js-types';
 import { iso31661 } from 'iso-3166';
 import {
   createReferendumV2Executor,
+  deriveRarimoEventId,
   deriveRegistryContractBinding,
   type FrozenCredentialRegistryReference,
   isoNumericCountry,
@@ -13,8 +17,9 @@ import {
   type ReferendumV2CircuitKeys,
   type ReferendumV2ExecutorConfig,
   type ReferendumV2Providers,
+  readCredentialRegistryIssuerKey,
 } from 'midnight-referendum-api';
-import { HmacActionCapabilityIssuer } from './action-capability-issuer.js';
+import { capabilityKeyId, HmacActionCapabilityIssuer } from './action-capability-issuer.js';
 import { type CicoReferendumConfig, loadCicoServiceConfig } from './config.js';
 import {
   CredentialEpochCoordinator,
@@ -23,11 +28,17 @@ import {
 import { CredentialIssuerService } from './credential-issuer-service.js';
 import {
   CredentialRootPublisher,
+  type CredentialRootPublisherLogger,
   type CredentialRootPublisherReferendumTarget,
   MidnightCredentialRootPublisherReader,
 } from './credential-root-publisher.js';
-import { FileCredentialIssuanceStore, FileEvidenceAuthorizationStore } from './durable-stores.js';
+import {
+  FileCredentialIssuanceStore,
+  FileDocumentBindingStore,
+  FileEvidenceAuthorizationStore,
+} from './durable-stores.js';
 import { createCicoHttpService } from './http.js';
+import { checkIssuerRole } from './issuer-role-check.js';
 import { startMidnightIssuerRuntime } from './midnight-issuer-runtime.js';
 import { createMidnightIssuerWalletAdapter } from './midnight-issuer-wallet.js';
 import { RarimoHttpVerificationGateway } from './rarimo-http-gateway.js';
@@ -53,10 +64,35 @@ export async function startCicoService(): Promise<() => Promise<void>> {
     proofParamsAllowedOrigins: config.rarimoProofParamsAllowedOrigins,
     proofRequestBaseUrl: config.rarimoProofRequestBaseUrl,
   });
+  // Before the wallet starts, which can take long: is this service the issuer
+  // of the registry it is configured for? A wrong secret stops it here.
+  setNetworkId('preview');
+  const issuerRole = await checkIssuerRole({
+    issuerRoleSecretHex: config.issuerRuntime.issuerRoleSecretHex,
+    registryContractAddress: config.issuerRuntime.registryContractAddress,
+    readIssuerKey: async (address) => {
+      const state = await indexerPublicDataProvider(
+        config.issuerRuntime.indexerHttpUrl,
+        config.issuerRuntime.indexerWsUrl,
+      ).queryContractState(asContractAddress(address));
+      return state ? readCredentialRegistryIssuerKey(state.data) : null;
+    },
+    warn: (message) => process.stderr.write(`[cico] ${message}\n`),
+  });
+  if (issuerRole === 'matches') {
+    process.stdout.write('[cico] issuer role secret matches the registry on chain\n');
+  }
   const runtime = await startMidnightIssuerRuntime(config.issuerRuntime, {
     createWallet: createMidnightIssuerWalletAdapter,
   });
   const issuerSecret = hexBytes(config.issuerRuntime.issuerRoleSecretHex);
+  // One event for every verification under this registry and epoch, so that a
+  // document shows the same nullifier each time. The app derives the same one.
+  const verificationEventId =
+    config.documentUniqueness === 'off'
+      ? undefined
+      : deriveRarimoEventId(config.issuerRuntime.registryContractAddress, config.credentialEpoch);
+  process.stdout.write(`[cico] one pass per document: ${config.documentUniqueness}\n`);
   const issuanceStore = new FileCredentialIssuanceStore(
     join(config.stateDirectory, 'credential-issuances.json'),
   );
@@ -78,6 +114,19 @@ export async function startCicoService(): Promise<() => Promise<void>> {
       join(config.stateDirectory, 'evidence-authorizations.json'),
     ),
     issuanceStore,
+    ...(verificationEventId
+      ? {
+          documentHolders: {
+            tagFor: (authorization) => gateway.documentTagFor(authorization),
+            bindings: new FileDocumentBindingStore(
+              join(config.stateDirectory, 'document-bindings.json'),
+            ),
+            mode: config.documentUniqueness === 'observe' ? 'observe' : 'enforce',
+            // Says that it happened, never for which document or which holder.
+            report: (outcome) => process.stdout.write(`[cico] document holder: ${outcome}\n`),
+          },
+        }
+      : {}),
     validateEvidenceAuthorization: (request) =>
       gateway.validateCredentialIssuance(request, {
         issuerId: config.issuerIdText,
@@ -87,11 +136,23 @@ export async function startCicoService(): Promise<() => Promise<void>> {
         countryMapper,
       }),
   });
-  const rootPublisher = createRootPublisher(config, runtime);
+  const rootPublisher = createRootPublisher(config, runtime, epochCoordinator);
   const server = createCicoHttpService({
     gateway,
-    issuer,
+    issuer: rootPublisher
+      ? {
+          adapterName: issuer.adapterName,
+          async issueCredential(request) {
+            const result = await issuer.issueCredential(request);
+            // The person now waits for a root that holds their pass. Start
+            // publishing it at once instead of at the next tick.
+            rootPublisher.trigger();
+            return result;
+          },
+        }
+      : issuer,
     allowedOrigins: config.allowedOrigins,
+    ...(verificationEventId ? { verificationEventId } : {}),
     ...(config.actionCapabilities
       ? {
           actionCapabilityIssuer: new HmacActionCapabilityIssuer({
@@ -103,6 +164,29 @@ export async function startCicoService(): Promise<() => Promise<void>> {
     // Only offered when a publisher exists. Without referenda there is no batch
     // to wait for, and the route says so rather than inventing an empty one.
     ...(rootPublisher ? { enrollmentStatus: () => rootPublisher.getStatus() } : {}),
+    serviceStatus: async () => {
+      const wallet = await runtime.describeWallet();
+      return {
+        registryContractAddress: config.issuerRuntime.registryContractAddress,
+        consultations: config.referenda.map((referendum) => referendum.contractAddress),
+        actionCapabilities: config.actionCapabilities
+          ? {
+              keyId: capabilityKeyId(config.actionCapabilities.secret),
+              networks: config.actionCapabilities.allowedNetworks,
+              contracts: config.actionCapabilities.allowedContracts,
+              circuits: config.actionCapabilities.allowedCircuits,
+            }
+          : null,
+        issuerWallet: {
+          address: wallet?.address ?? null,
+          dustAvailable: wallet?.dustAvailable ?? null,
+        },
+        documents: {
+          onePassPerDocument: config.documentUniqueness,
+          eventId: verificationEventId ?? null,
+        },
+      };
+    },
   });
   try {
     await new Promise<void>((resolve, reject) => {
@@ -144,6 +228,7 @@ function hexBytes(value: string): Uint8Array {
 function createRootPublisher(
   config: ReturnType<typeof loadCicoServiceConfig>,
   runtime: Awaited<ReturnType<typeof startMidnightIssuerRuntime>>,
+  epochCoordinator: CredentialEpochCoordinator,
 ): CredentialRootPublisher | undefined {
   if (config.referenda.length === 0) return undefined;
   if (!config.referendumZkConfigPath) {
@@ -182,6 +267,10 @@ function createRootPublisher(
       referendumProofProvider,
     ),
   );
+  const everySeconds = Math.round(config.rootPublisher.intervalMs / 1000);
+  process.stdout.write(
+    `[cico] root publisher: ${referenda.length} consultation(s), every ${everySeconds} s\n`,
+  );
   return new CredentialRootPublisher({
     registryExecutor: runtime.executor,
     registryContractAddress: config.issuerRuntime.registryContractAddress,
@@ -190,7 +279,26 @@ function createRootPublisher(
     minBatchSize: config.rootPublisher.minBatchSize,
     maxWaitMs: config.rootPublisher.maxWaitMs,
     intervalMs: config.rootPublisher.intervalMs,
+    logger: rootPublisherLogger,
+    // One wallet pays for passes and for roots: one transaction at a time.
+    walletMutation: (operation) => epochCoordinator.runWalletMutation(operation),
   });
+}
+
+/**
+ * The publisher's own words on the service log. A person waiting to answer
+ * waits on this, so a failure has to be readable there. What it names is
+ * public: contract addresses, registry roots, counts, and the network's error.
+ */
+const rootPublisherLogger: CredentialRootPublisherLogger = {
+  info: (message, details) => process.stdout.write(logLine(message, details)),
+  warn: (message, details) => process.stderr.write(logLine(message, details)),
+  error: (message, details) => process.stderr.write(logLine(message, details)),
+};
+
+function logLine(message: string, details?: Record<string, unknown>): string {
+  const text = details ? ` ${JSON.stringify(details)}` : '';
+  return `[cico] ${message}${text.length > 600 ? `${text.slice(0, 600)}…` : text}\n`;
 }
 
 function buildReferendumTarget(

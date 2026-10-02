@@ -24,6 +24,8 @@ interface ImportMetaEnv {
   readonly VITE_CICO_REGISTRY_ID_HEX?: string;
   readonly VITE_CICO_ISSUER_ID_HEX?: string;
   readonly VITE_CICO_FROZEN_ROOT_FIELD?: string;
+  /** `frozen` (the default) or `open`. An open registry has no frozen root. */
+  readonly VITE_CICO_ENROLLMENT_MODEL?: string;
   /** Public JSON catalog; contains no organizer or issuer private key. */
   readonly VITE_CICO_REFERENDA_JSON?: string;
   /** Set to run the wallet-less sponsored-relayer path. */

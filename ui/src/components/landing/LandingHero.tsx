@@ -1,10 +1,11 @@
 import { ArrowDown, ArrowUpRight, List, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import { CivicHeroArt } from './CivicHeroArt';
+import { CivicHeroArt, heroVariantFrom } from './CivicHeroArt';
 import './landing-hero.css';
 
 export function LandingHero({ onStart }: { onStart: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [heroVariant] = useState(() => heroVariantFrom(window.location.search));
   const menuButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -146,7 +147,7 @@ export function LandingHero({ onStart }: { onStart: () => void }) {
               </a>
             </div>
           </div>
-          <CivicHeroArt />
+          <CivicHeroArt variant={heroVariant} />
         </div>
       </section>
     </>
