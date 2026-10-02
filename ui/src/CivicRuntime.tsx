@@ -879,7 +879,13 @@ function CivicApp() {
           mode={APP_MODE}
           onClose={closeOnboarding}
           dismissible={!onboardingRequired}
-          onCredentialReady={(nextCredential) => setCredential(nextCredential)}
+          onCredentialReady={(nextCredential) => {
+            setCredential(nextCredential);
+            // From here the browser holds what cannot be had again: the
+            // holder secret the document is tied to. Ask it not to evict this
+            // site's storage; a refusal is not an error.
+            void ballotVault?.requestPersistence();
+          }}
           onPassportConnected={setPassportSession}
           initialStage={journeyStage}
           initialSession={passportSession}

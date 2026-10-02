@@ -24,7 +24,7 @@ If a row is not true on the day, cut the shot and say so in the narration.
 | Time | Picture | Narration |
 | --- | --- | --- |
 | 0:00–0:12 | An open online poll, numbers jumping. Then a spreadsheet of names beside answers | "Ask people something online and you get one of two things. A number anyone could have inflated. Or a list of who said what." |
-| 0:12–0:22 | Title: midnight.vote. The Cleisthenes hero | "midnight.vote is a third way. One answer per verified person. A count anyone can check. And no list, anywhere." |
+| 0:12–0:22 | Title: midnight.vote. The Cleisthenes hero | "midnight.vote is a third way. One answer per verified passport. A count anyone can check. And no list, anywhere." |
 | 0:22–0:45 | Phone: the consultation list, one consultation opened, the deadlines and "who can answer" | "Here is a consultation running on Midnight's public test network. It says when it closes and who can answer: adults, with a passport read by its chip." |
 | 0:45–1:15 | Phone: passport on the table, the chip being read in RariMe, back to the app, the pass | "I hold my passport to the phone. The chip proves I am an adult. My name and my passport number are not sent to the service. What I get back is a pass with no name on it." |
 | 1:15–1:45 | Phone: choosing an answer, the review screen, the proof being built with the elapsed time, the sealed receipt | "I choose, I review, I seal. The proof is built here, on my device. It says: someone with a valid pass answered, once. Not who. The answer itself is sealed. I pay nothing and I have no wallet: a relayer pays the fee, and it never sees my answer." |

@@ -17,7 +17,7 @@
     "compile:v2": "node scripts/compile-passport-v2-contracts.mjs",
     "test:sim": "vitest run contracts/referendum/referendum.test.ts",
     "test:sim:v2": "npm run compile:v2 && npm run test:sim:v2:compiled",
-    "test:sim:v2:compiled": "vitest run contracts/passport-v2-contracts.test.ts",
+    "test:sim:v2:compiled": "npm run sync:contract && vitest run contracts/passport-v2-contracts.test.ts",
     "dev": "npm run dev --workspace midnight-referendum-ui --",
     "dev:undeployed": "npm run dev --workspace midnight-referendum-ui -- --mode undeployed --host localhost --port 4173 --strictPort",
     "validate:contract": "npm run compile && npm run test:sim && npm run test:sim:v2",

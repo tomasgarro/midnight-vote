@@ -11,7 +11,7 @@
 ## 1. Title
 
 **midnight.vote**
-One answer per verified person. A count anyone can check. No list of who
+One answer per verified passport. A count anyone can check. No list of who
 answered.
 
 *Visual: the Cleisthenes hero from the landing page.*
@@ -34,7 +34,7 @@ piloting electronic collecting since 1 September.*
 
 | The buyer gets | The buyer never gets |
 | --- | --- |
-| One answer per verified adult, and a public count | A list of who answered, or how |
+| One answer per verified passport, from an adult, and a public count | A list of who answered, or how |
 | A short brief of the question, each sentence tied to the official record | Advice on how to answer |
 | A record that the rules were published first and not changed | Personal data to store, secure or disclose |
 
