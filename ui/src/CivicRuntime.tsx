@@ -37,6 +37,7 @@ import {
   savePassportReceipt,
 } from '@/integration/receipt-store';
 import { RUNTIME_COPY, sealRefusalMessage } from '@/integration/runtime-copy';
+import { sealWhenAdmitted } from '@/integration/seal-admission';
 import {
   browserAnswerMarkerStore,
   type CountOutcome,
@@ -386,6 +387,8 @@ function CivicApp() {
   ]);
   const runtimeContractAddress = passportV2Runtime.config?.referenda[0]?.contractAddress ?? null;
 
+  /** True while a sealing waits for the person's pass to be admitted. */
+  const [admissionWaiting, setAdmissionWaiting] = useState(false);
   const [sealedAnswers, setSealedAnswers] = useState<SealedAnswer[]>([]);
   const [countingId, setCountingId] = useState<string | null>(null);
   const [countNotices, setCountNotices] = useState<Readonly<Record<string, CountNotice>>>({});
@@ -646,10 +649,12 @@ function CivicApp() {
           // Weeks can pass between sealing and the count. Ask the browser not
           // to evict the opening in the meantime; a refusal is not an error.
           void ballotVault.requestPersistence();
-          const confirmed = await actionPort.castVote({
-            referendumId: route.referendumId,
-            choice,
-            authorization,
+          // A pass issued a moment ago may not be admitted to this consultation
+          // yet. The app waits for that itself; the person taps once.
+          const confirmed = await sealWhenAdmitted({
+            seal: () =>
+              actionPort.castVote({ referendumId: route.referendumId, choice, authorization }),
+            onWaiting: setAdmissionWaiting,
           });
           // The sealed answer is tracked by the vault, not by a stored receipt.
           // This one lives for the receipt screen only and names no transaction.
@@ -944,6 +949,7 @@ function CivicApp() {
               walletlessProving={walletlessProving}
               provingParty={provingParty}
               deviceProofStartedAt={deviceProofStartedAt}
+              admissionWaiting={admissionWaiting}
               previewError={previewError}
               receipt={receipt}
               dustBalance={dustBalance}

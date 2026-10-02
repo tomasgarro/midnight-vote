@@ -20,7 +20,7 @@ export const RUNTIME_COPY = {
     authorizationMissing:
       'Tu pase no tiene una autorización vigente para responder. Verificá de nuevo tu pasaporte.',
     passNotAdmitted:
-      'Tu pase todavía no fue admitido en esta consulta. Suele tardar un minuto. Probá de nuevo en un momento.',
+      'Tu pase todavía no fue admitido en esta consulta. Probá de nuevo en unos minutos.',
     passTooLate:
       'Tu pase se agregó después de que esta consulta dejó de admitir pases. Podés responder otras consultas abiertas.',
     manifestMissing: (network: string) =>
@@ -43,7 +43,7 @@ export const RUNTIME_COPY = {
     authorizationMissing:
       'Your pass holds no current authorization to answer. Verify your passport again.',
     passNotAdmitted:
-      'Your pass has not been admitted to this consultation yet. It usually takes a minute. Try again shortly.',
+      'Your pass has not been admitted to this consultation yet. Try again in a few minutes.',
     passTooLate:
       'Your pass was added after this consultation stopped admitting passes. You can answer the other open consultations.',
     manifestMissing: (network: string) =>
@@ -66,7 +66,7 @@ export const RUNTIME_COPY = {
     authorizationMissing:
       'Votre laissez-passer n’a pas d’autorisation en cours pour répondre. Vérifiez à nouveau votre passeport.',
     passNotAdmitted:
-      'Votre laissez-passer n’est pas encore admis dans cette consultation. Cela prend en général une minute. Réessayez dans un instant.',
+      'Votre laissez-passer n’est pas encore admis dans cette consultation. Réessayez dans quelques minutes.',
     passTooLate:
       'Votre laissez-passer a été ajouté après la fin des admissions de cette consultation. Vous pouvez répondre aux autres consultations ouvertes.',
     manifestMissing: (network: string) =>

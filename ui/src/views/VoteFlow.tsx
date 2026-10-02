@@ -118,6 +118,11 @@ const COPY = {
     sealedState: 'sellada',
     closes: 'Cierra',
     viewSealed: 'Ver mis respuestas',
+    admissionTitle: 'Admitiendo tu pase',
+    admissionBody:
+      'Tu pase es nuevo y esta consulta todavía no lo admitió. La app espera ese paso y sella tu respuesta apenas ocurra.',
+    admissionNote:
+      'Dejá esta pantalla abierta. Todavía no se envió nada. Si pasan tres minutos, te pedimos que pruebes de nuevo.',
     processingDuration: 'Suele tardar entre 30 y 90 segundos. No cierres esta pantalla.',
     processingDurationDemo: 'En demo esto es inmediato: no se envía nada a ninguna red.',
     processingNoCancel:
@@ -191,6 +196,11 @@ const COPY = {
     sealedState: 'sealed',
     closes: 'Closes',
     viewSealed: 'View my answers',
+    admissionTitle: 'Admitting your pass',
+    admissionBody:
+      'Your pass is new, and this consultation has not admitted it yet. The app is waiting for that, and seals your answer as soon as it happens.',
+    admissionNote:
+      'Keep this screen open. Nothing has been sent yet. After three minutes you are asked to try again.',
     processingDuration: 'This usually takes 30 to 90 seconds. Do not close this screen.',
     processingDurationDemo: 'In demo this is instant: nothing is sent to any network.',
     processingNoCancel:
@@ -263,6 +273,11 @@ const COPY = {
     sealedState: 'scellée',
     closes: 'Clôture',
     viewSealed: 'Voir mes réponses',
+    admissionTitle: 'Admission de votre laissez-passer',
+    admissionBody:
+      "Votre laissez-passer est récent et cette consultation ne l'a pas encore admis. L'application attend cette étape et scelle votre réponse dès qu'elle a lieu.",
+    admissionNote:
+      "Gardez cet écran ouvert. Rien n'a encore été envoyé. Après trois minutes, il vous sera demandé de réessayer.",
     processingDuration: 'Cela prend en général 30 à 90 secondes. Ne fermez pas cet écran.',
     processingDurationDemo: "En démo, c'est instantané : rien n'est envoyé sur un réseau.",
     processingNoCancel:
@@ -324,6 +339,8 @@ export interface VoteFlowProps {
   readonly provingParty?: 'wallet' | 'device' | 'hosted-server' | null;
   /** When this device started the proof it is building now. */
   readonly deviceProofStartedAt?: number | null;
+  /** True while the app waits for the person's pass to be admitted to this consultation. */
+  readonly admissionWaiting?: boolean;
   readonly previewError: string | null;
   readonly receipt: VoteReceipt | null;
   readonly dustBalance?: bigint | null;
@@ -347,6 +364,7 @@ export function VoteFlow({
   walletlessProving,
   provingParty = null,
   deviceProofStartedAt = null,
+  admissionWaiting = false,
   previewError,
   receipt,
   dustBalance = null,
@@ -391,6 +409,24 @@ export function VoteFlow({
       ) : null}
     </div>
   );
+
+  if (stage === 'processing' && admissionWaiting) {
+    /* The pass was issued a moment ago and this consultation has not admitted
+       it yet. Nothing has been sent, so the screen says that, and says what it
+       is waiting for. */
+    return (
+      <Screen header={header(false)}>
+        <Display>{copy.admissionTitle}</Display>
+        <p className="flow__body">{copy.admissionBody}</p>
+        <div className="flow__indeterminate" role="progressbar" aria-label={copy.admissionTitle}>
+          <span />
+        </div>
+        <p className="flow__wait-note" role="status">
+          {copy.admissionNote}
+        </p>
+      </Screen>
+    );
+  }
 
   if (stage === 'processing') {
     return (

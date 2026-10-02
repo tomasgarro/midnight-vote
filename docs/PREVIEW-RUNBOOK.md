@@ -216,8 +216,8 @@ app, and mobile data or Wi-Fi.
 | 2 | Open the consultation. Check the three deadlines and "who can answer" | A screenshot |
 | 3 | Add eligibility. The app opens RariMe. Scan the passport's chip | How long the scan took. Any refusal, word for word |
 | 4 | Back in the app, the pass appears under You | A screenshot. The pass shows a country and an age class, never a name |
-| 5 | Wait until the app says the pass is admitted. The credential service publishes the new root to the consultation | How long it took. If it takes more than five minutes, read the credential service's log |
-| 6 | Choose an answer, review it, seal it. Keep the screen on while the proof is built | The elapsed time the app shows. The phone model |
+| 5 | Choose an answer, review it, seal it. If the pass is not admitted to the consultation yet, the app shows "Admitting your pass" and waits by itself, up to three minutes, while the credential service publishes the new root | Whether that screen appeared, and for how long. If the app gives up, read the credential service's log |
+| 6 | The app then builds the proof. Keep the screen on | The elapsed time the app shows. The phone model |
 | 7 | The receipt appears. Open the public results | The count of sealed answers went up by one |
 | 8 | After the closing time, and after the operator closed the consultation: open the app on the same phone and count the answer | The elapsed time. The tally |
 
@@ -225,7 +225,7 @@ What can go wrong, and what it means:
 
 | The app says | Meaning | Do |
 | --- | --- | --- |
-| "Your pass has not been admitted to this consultation yet" | The pass is in the registry, and no root that holds it is published to the consultation yet | Wait a minute and try again. If it persists, the root publisher is not running: check `CICO_REFERENDA_JSON` and the issuer wallet's DUST |
+| "Your pass has not been admitted to this consultation yet" | The app waited three minutes, and no root that holds the pass was published to the consultation | Try again. If it persists, the root publisher is not running or cannot pay: read its log lines above, and check `CICO_REFERENDA_JSON` and the issuer wallet's DUST |
 | "Your pass was added after this consultation stopped admitting passes" | The consultation's enrolment deadline passed before this pass existed | Nothing to fix. The person can answer the other open consultations |
 | "Origin is not allowed" in the browser console | The credential service or the relayer does not know `https://midnight.vote` | The new credential manifest is not deployed |
 | The relayer is unavailable | `relay.midnight.vote/ready` is not 200 | Its wallet is still replaying, or it holds no DUST |

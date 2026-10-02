@@ -437,3 +437,42 @@ describe('readiness without a wallet', () => {
     );
   });
 });
+
+describe('waiting for a new pass to be admitted', () => {
+  const sealing = {
+    stage: 'processing' as const,
+    executionMode: 'sponsored-device-proving' as const,
+    provingParty: 'device' as const,
+  };
+
+  it.each([
+    ['en', 'Admitting your pass', /Nothing has been sent yet/u],
+    ['es', 'Admitiendo tu pase', /Todavía no se envió nada/u],
+    ['fr', 'Admission de votre laissez-passer', /Rien n'a encore été envoyé/u],
+  ] as const)(
+    'says in %s that the app is waiting, and that nothing was sent',
+    (locale, title, note) => {
+      render(<VoteFlow {...flowProps({ ...sealing, admissionWaiting: true, locale })} />);
+
+      expect(screen.getByRole('heading', { name: title })).toBeTruthy();
+      expect(screen.getByRole('status').textContent).toMatch(note);
+      // No transaction exists yet, so the screen must not speak of one.
+      expect(
+        screen.queryByText(/cannot be cancelled|no se puede cancelar|ne peut plus être annulée/u),
+      ).toBeNull();
+    },
+  );
+
+  it('shows the usual sealing screen once the wait is over', () => {
+    render(<VoteFlow {...flowProps({ ...sealing, admissionWaiting: false })} />);
+
+    expect(screen.queryByRole('heading', { name: 'Admitting your pass' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Preparing your receipt' })).toBeTruthy();
+  });
+
+  it('never shows the wait outside the sealing step', () => {
+    render(<VoteFlow {...flowProps({ stage: 'review', admissionWaiting: true })} />);
+
+    expect(screen.queryByRole('heading', { name: 'Admitting your pass' })).toBeNull();
+  });
+});
