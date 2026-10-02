@@ -39,7 +39,7 @@ test('the landing page keeps its paper when the app is in the dark theme', async
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
   await expect(page.locator('.midnight-hero')).toHaveCSS('background-color', 'rgb(243, 237, 223)');
   await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(37, 40, 35)');
-  await expect(page.locator('.finale-footer')).toHaveCSS('background-color', 'rgb(37, 40, 35)');
+  await expect(page.locator('.finale-footer')).toHaveCSS('background-color', 'rgb(243, 237, 223)');
 });
 
 for (const width of [320, 390, 768]) {

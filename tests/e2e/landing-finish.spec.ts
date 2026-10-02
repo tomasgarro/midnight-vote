@@ -30,15 +30,20 @@ for (const width of [390, 1440]) {
       );
       await action.blur();
     }
-    const landscape = page.locator('.finale-landscape img');
-    await landscape.scrollIntoViewIfNeeded();
-    await expect(landscape).toHaveJSProperty('naturalWidth', 1600);
     await expect(page.locator('.finale-guide-symbol')).toHaveCount(0);
-    await page.screenshot({ path: test.info().outputPath(`lakefront-${width}.png`) });
     const footer = page.locator('.finale-footer');
     await footer.scrollIntoViewIfNeeded();
-    await expect(footer).toHaveCSS('background-color', 'rgb(37, 40, 35)');
+    // The footer is the engraved harbour: a silent, inline clip on the page's own paper.
+    const scene = footer.locator('.lake-scene video');
+    await expect(scene).toHaveJSProperty('muted', true);
+    await expect(scene).toHaveAttribute('playsinline', '');
+    await expect(scene).toHaveAttribute(
+      'poster',
+      /\/art\/civic\/lake\/(desktop|phone)-start\.webp$/,
+    );
+    await expect(footer).toHaveCSS('background-color', 'rgb(243, 237, 223)');
     await expect(footer.getByRole('link', { name: 'Humans & agents' })).toBeVisible();
+    await expect(footer.getByText('Back to top')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -51,6 +56,29 @@ for (const width of [390, 1440]) {
     await expect(heroLink.locator('svg')).toHaveCSS('transform', 'none');
   });
 }
+
+test('the harbour clip waits for the footer, and reduced motion gets the finished picture', async ({
+  page,
+}) => {
+  const clips: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/art/civic/lake/')) clips.push(request.url());
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  expect(clips).toEqual([]);
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  const footer = page.locator('.finale-footer');
+  await footer.scrollIntoViewIfNeeded();
+  await expect(footer.locator('.lake-scene video')).toHaveCount(0);
+  const still = footer.locator('.lake-scene img');
+  await expect(still).toHaveAttribute('src', '/art/civic/lake/desktop-end.webp');
+  await expect(still).toHaveJSProperty('complete', true);
+  expect(clips.some((url) => url.endsWith('.mp4'))).toBe(false);
+});
 
 for (const width of [320, 1440]) {
   test(`selective disclosure and the new city artwork stay readable at ${width}px`, async ({

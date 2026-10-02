@@ -97,8 +97,19 @@ the app, where headings are small.
 | Picture | Where | File |
 | --- | --- | --- |
 | Cleisthenes before an alpine lake, in an arched frame | Landing page, first screen | `ui/public/art/civic/alpine-lake.webp`, `cleisthenes-bust.webp` |
-| The Geneva lakefront, engraved | Landing page, last screen | `ui/public/art/civic/geneva-lakefront.webp` |
+| The Geneva harbour from the Quai Wilson, engraved in sanguine: a Mouette leaves past the Pâquis lighthouse, the clouds drift, then the scene rests | Landing page footer (the links sit in its sky) | `ui/public/art/civic/lake/` (AV1 and H.264 clips, start and end stills, desktop 3:2 and phone 4:5) |
 | Cleisthenes in a portico above the lake (variant) | Landing page, only with `?hero=portico`, until it is approved | `ui/public/art/civic/portico.webp` with the two above |
+
+The footer harbour is drawn from the Quai Wilson looking south-east, and its geometry was
+checked against terrain data (AWS Terrain Tiles) and OpenStreetMap: the Salève's real skyline,
+the Jet d'eau at its true place and height, the Pâquis lighthouse and the Bains des Pâquis, and
+the snow crown of Mont Blanc, which does clear the Bornes from the quay. The Mouette follows line
+M3, out of the harbour mouth towards Genève-Plage. It was generated with GPT Image 2,
+Gemini 3 Pro Image and Kling 3 Pro, guided only by public-domain and CC0 references (a 1908
+Photoglob view of the Salève, a 1930 Agence Rol photograph of the Quai Wilson, a c.1910 postcard
+of the Mouettes, CC0 photographs of the Jet d'eau and of a Mouette), then printed in the site's
+sanguine (`--ground`, `--accent`) by a gradient map. The Salève, the town and the quay stay from
+the still in every frame; only the water, the Mouette's lane and the clouds move.
 
 The pictures are the ones Cleisthenes uses at `/Switzerland`. They were painted
 on rag paper, so the landing page and the documentation page stay in the light
