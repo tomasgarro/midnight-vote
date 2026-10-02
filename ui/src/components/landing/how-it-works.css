@@ -627,7 +627,11 @@
 @media (prefers-reduced-motion: reduce) {
   .how-section .how-panel *,
   .how-section .how-panel,
-  .how-section .how-progress button > i {
+  .how-section .how-progress button > i,
+  /* As specific as the rule that starts it, or the dots keep moving. */
+    .how-panel[data-active="true"]
+    .how-proof-path
+    span {
     animation: none;
     transition: none;
   }
