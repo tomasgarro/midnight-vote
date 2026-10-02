@@ -9,6 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { useState } from 'react';
 import './landing-finale.css';
+import { LakeScene } from './LakeScene';
 import { SelectiveDisclosureScene } from './SelectiveDisclosureScene';
 
 export function LandingFinale({ onStart }: { onStart: () => void }) {
@@ -167,15 +168,6 @@ export function LandingFinale({ onStart }: { onStart: () => void }) {
           </button>
           <small>Non-binding demo · simulated eligibility</small>
         </div>
-        <div className="finale-landscape" aria-hidden="true">
-          <img
-            src="/art/civic/geneva-lakefront.webp"
-            alt=""
-            loading="lazy"
-            width="1600"
-            height="640"
-          />
-        </div>
       </section>
     </>
   );
@@ -184,10 +176,11 @@ export function LandingFinale({ onStart }: { onStart: () => void }) {
 export function LandingFooter() {
   return (
     <footer className="finale-footer">
+      <LakeScene />
       <div className="finale-footer__top">
         <div>
           <a className="midnight-brand" href="#landing-main">
-            <img src="/brand/midnight-vote-d3-white.svg" width="43" height="25" alt="" />
+            <img src="/brand/midnight-vote-d3-black.svg" width="43" height="25" alt="" />
             <span>
               midnight<span className="midnight-brand__suffix">.vote</span>
             </span>
@@ -225,15 +218,6 @@ export function LandingFooter() {
             </a>
           </div>
         </nav>
-      </div>
-      <div className="finale-footer__bottom">
-        <p>
-          An independent project built on Midnight.
-          <br />A participation prototype, not an official Midnight product or a binding election.
-        </p>
-        <a href="#landing-main">
-          Back to top <ArrowUpRight className="landing-action-arrow" size={16} />
-        </a>
       </div>
     </footer>
   );

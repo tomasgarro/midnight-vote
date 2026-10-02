@@ -230,7 +230,7 @@ export default function DocsPage() {
       </main>
       <footer className="vote-docs__footer">
         <p>
-          An independent project built on Midnight.
+          An independent project built on Midnight, not an official Midnight product.
           <br />
           Non-binding participation · September 2026
         </p>
