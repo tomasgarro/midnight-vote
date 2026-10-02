@@ -380,7 +380,9 @@ answer is sealed with a permission the credential service signed. Only the
 scan is missing. `prepare` writes the service's configuration and prints the
 two commands that start the services.
 
-Run on 2 October 2026 on a laptop: a pass was issued 30 seconds after the
+Three runs are recorded in
+`docs/evidence/preview-2026-10-02/DRESS-REHEARSAL.md`. The first, on 2 October
+2026 on a laptop: a pass was issued 30 seconds after the
 stand-in scan, admitted to the consultation 48 seconds later, and the answer
 was sealed 27 to 36 seconds after that.
 

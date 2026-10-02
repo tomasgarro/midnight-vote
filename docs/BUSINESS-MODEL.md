@@ -15,7 +15,7 @@ until one of them does.
 
 | Product | What the buyer gets | What the buyer never gets |
 | --- | --- | --- |
-| A verified consultation | One answer per verified adult, a public count, and a result anyone can check on-chain | A list of who answered, or how any person answered |
+| A verified consultation | One answer per verified document of an adult ([how](adr/ADR-012-one-holder-per-document.md)), a public count, and a result anyone can check on-chain | A list of who answered, or how any person answered |
 | A sourced brief | What is asked and what was argued, each sentence tied to the official record, reviewed by a named person | Advice on how to answer |
 | Evidence | A record that the rules were published before the consultation and were not changed | Personal data to store, secure or disclose |
 

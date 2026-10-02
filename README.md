@@ -20,6 +20,8 @@ A credential registry and a consultation that is open now are deployed on Midnig
 | `referendum-v2`: rehearsal 2, finalized | `9f7ebe9d972a8d0794ee1448317ad619970713fb1f62f7c30263795299f90be8` | 2 October 2026, block 1115944 |
 | `credential-registry-v1` of the dress rehearsal | `bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387` | 2 October 2026, block 1116397 |
 | `referendum-v2`: the dress rehearsal, finalized | `8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17` | 2 October 2026, block 1116410 |
+| Dress run 2 (a dropped page): registry and consultation, finalized | `bccc75ad9415aaa46ad1fa5a3727ab7375562c0c1579ca651a3b6a245165cfde`, `ac59a5352ade50f7b4029e00a63ed696a36af5715c79ecceaa63235cdf58c5ae` | 2 October 2026, blocks 1117309 and 1117327 |
+| Dress run 3 (one document, one holder): registry and consultation, finalized | `862e3d7c5662830ae5096478ef707acf8d74d8cc138a785b896473743be7c74b`, `4ada263de79bae15f42fb7aeb9b5afa408b0073e01843e5848de62461d8845e2` | 2 October 2026, blocks 1118190 and 1118203 |
 
 Check either one against the network's own indexer, not against this repository:
 

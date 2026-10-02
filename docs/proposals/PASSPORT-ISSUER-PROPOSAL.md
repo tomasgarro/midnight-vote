@@ -103,6 +103,15 @@ These may matter for Passport's design.
    Some uses, such as a count weeks after an answer, outlive them.
 4. **Evidence is only as good as its source.** A passport chip proves a
    document, not residence and not the right to vote.
+5. **One document must mean one holder, and our holder lives in one browser.**
+   A verifier that spends one nullifier per holder takes one answer per holder,
+   not per document. We tie each document to the first holder it was issued a
+   credential for, using the nullifier the chip proof shows under an event
+   fixed for the registry (ADR-012 in our repository). It holds, at a cost: a
+   person who changes browser, or whose browser clears its storage, cannot be
+   issued a credential again until the registry's epoch changes. An account
+   that held the holder secret would remove that cost. It is our strongest
+   reason for the second question below.
 
 ## What we ask
 

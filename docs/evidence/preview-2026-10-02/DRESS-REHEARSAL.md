@@ -5,6 +5,10 @@ Midnight Preview, with one part replaced: the passport scan. **No document was
 read and no person answered.** A stand-in said "verified" where the passport
 verifier would have checked a proof from a real chip.
 
+Two more runs followed the same day, each on a registry of its own, and each
+has a section below: a page dropped while the pass was being issued, and one
+document on two devices. What stood in is the same in all three.
+
 ## Why it was run
 
 The two earlier rehearsals used a fixture pass and signed the relay's
@@ -89,6 +93,83 @@ tally YES 1, NO 1, undecided 0, three accepted roots.
 The times are a laptop's. On the server the same transactions run on two
 shared cores, and each one is paid from one wallet, one at a time.
 
+## A second run: what a phone does to a page
+
+On a phone the person leaves the browser to scan, and the browser may drop the
+page. Two faults followed from that in the app, found by reading the code
+after the first run and fixed before this one:
+
+- a verification in progress lived only in the page's memory, so a reload
+  lost the secret the scan was bound to;
+- the app drew the pass's validity timestamps again on every retry, and the
+  credential service refuses a retry whose claims differ from the first
+  request. A request cut off once left the person with a pass on chain that
+  they could not hold.
+
+The second run played both against the real service, on a second registry
+(`bccc75ad9415aaa46ad1fa5a3727ab7375562c0c1579ca651a3b6a245165cfde`) and
+consultation (`ac59a5352ade50f7b4029e00a63ed696a36af5715c79ecceaa63235cdf58c5ae`).
+
+| Time | What | Block | Transaction hash |
+| --- | --- | --- | --- |
+| 06:35:12 | The app asks the credential service for the pass. Six seconds later the process is ended: the page is dropped | | the request was in flight |
+| 06:35:18 | A new process starts on the same device. It takes up the attempt kept in the device's vault. No new scan | | no transaction |
+| 06:35:24 | **One** pass is issued: the one the first request asked for. The second request was answered with it | 1117338 | `be4ea1b43611daebf5114f06735bdadcd92936aa40b823af44b42d14309dfedc` |
+| 06:35:48 | Its root is attested | 1117342 | `1651b1c3a4fae3a65ff76698f028332c70ee7792555d74a89dcf85162389fa46` |
+| 06:36:12 | Its root is published to the consultation | 1117346 | `ad8da70ece642823f12c3e884c30f064ed443dc5656f69b9f4a1c6545566a9c5` |
+| 06:36:42 | The answer is sealed | 1117351 | `dff9bebe8bd35c838139fa52dc6d2e5491cffa899703194456d23c9a46ecde4c` |
+| 06:38 | The device is made to forget that its answer was confirmed, and tries to answer again. The app finds the answer on chain and refuses at once, with `ANSWER_ALREADY_SEALED`. The first answer stands | | no transaction |
+| 06:55:12 | The operator closes the consultation | 1117536 | `749942078f4369f4b987967ebef2f806770e5b458427d2225c97cdd8077e6503` |
+| 06:55:48 | The device counts its answer, 29 seconds after it asked | 1117542 | `69b5fa31d76b41b97841907b6fdbace23c4ac600b06f16bae3a2b79b2c86af2a` |
+| 07:07:48 | The operator finalizes: YES 1, NO 0, undecided 0 | 1117662 | `8780c440ed005d46ec15c2b9444ee98c4f1c38f15e00c16df4156ed6cd52261d` |
+
+The registry holds two passes: the fixture the deployment added, and the one
+pass of this run. The pass the device holds is valid from 06:35:12, the moment
+of the first request, not of the second.
+
+## A third run: one document, one holder
+
+Before this run, nothing tied a pass to a document. Each verification drew a
+new holder in the browser, and the contract takes one answer per holder. A
+person verified in a second browser, or again the next day when the 24-hour
+pass had expired, could answer an open consultation twice.
+[ADR-012](../../adr/ADR-012-one-holder-per-document.md) records the rule that
+closes it. This run played the rule against the real credential service, on a
+third registry (`862e3d7c5662830ae5096478ef707acf8d74d8cc138a785b896473743be7c74b`,
+block 1118190) and consultation
+(`4ada263de79bae15f42fb7aeb9b5afa408b0073e01843e5848de62461d8845e2`, block
+1118203).
+
+The stand-in verifier was given one more thing to imitate. A real proof shows
+a nullifier that is the same whenever one document is proven under one event.
+The stand-in derives such a number from a label, so that "the same document"
+means something: "alma" and "bruno" below are labels, not people.
+
+| Time | What | Block | Transaction hash |
+| --- | --- | --- | --- |
+| 08:03:30 | Device A scans "alma". The service has not seen this document: it records the holder and issues the pass. Log: `document holder: bound` | 1118215 | `1da867454d535d71f2ef91d517b85e2e4951b4b4569cbd471d8a0af2612fb8da` |
+| 08:04:18 | Its root is published to the consultation | 1118223 | `9ba2e2729a0254cde2f8ff04a00bac4c001546319d546916d8b447d8e7d35bf2` |
+| 08:04:54 | Device A seals YES | 1118229 | `15d39ccbfac25a308c1e1f6afa182b007150b606705c3783c244b23de9dc8a33` |
+| 08:05:21 | Device B scans "alma" too: one person, a second device. The service refuses, five seconds after the device asked, with `DOCUMENT_ALREADY_ENROLLED`. Log: `document holder: refused`. Device B holds no pass | | no transaction |
+| 08:05:42 | Device A asks for a new pass although it holds one, as on the day after. Same document, same holder: the service issues it. Log: `document holder: renewed` | 1118237 | `aa3187c74657505dfbaffacdfa91c05da472761e8da00c5240d837ae8474a68c` |
+| 08:06:30 | The renewed pass's root is published | 1118245 | `a03379f3bb4ebece7d9301117b8d9558a7b33dd3d1ed8693faca76d6714c918d` |
+| 08:06:48 | Device A tries to answer NO with the renewed pass. The app refuses by its own record, with `ANSWER_ALREADY_SEALED` | | no transaction |
+| 08:06:57 | Device A is made to lose its record of the answer, and tries again with the renewed pass. Now only the contract stands in the way. It refuses while the circuit runs on the device, before any proof: "This voter has already voted in this referendum" | | no transaction |
+| 08:08:00 | Device C scans "bruno", another document. Log: `document holder: bound` | 1118260 | `d9e9967d444975030b92f69d6a14ef0c829eb2548478839536864c8866b6e463` |
+| 08:08:48 | Its root is published | 1118268 | `5bcf68419994b5dc857e63651b942f6da8223e426107de7f7e8bfaac36323967` |
+| 08:09:18 | Device C seals NO | 1118273 | `6a0c079201b40419e59f40c4cf7f65b80b9ff26960f2a9d7ef2f45d922ec34e7` |
+| 08:51:36 | The operator closes the consultation | 1118696 | `9d7c623778e50fa08ea0bb0ec4a57ecd589af567f844c57140d32afcddaa438b` |
+| 08:52:06 | Device A counts its answer, with the record that was put back | 1118701 | `47b181e216477265c166e3de8c48709460ea817365183af1ad6f9a586e7df335` |
+| 08:52:36 | Device C counts its answer | 1118706 | `1f416225932c9622431f0d9870cea3cf233a38d88e843cc656640a72fd584f9b` |
+| 09:06:48 | The operator finalizes: YES 1, NO 1, undecided 0 | 1118848 | `3c7ec871a2e0b68c1ba0c5f1777e82abedad9753518a640671e778ebe5a07e37` |
+
+The registry holds four passes: the fixture the deployment added, two for
+"alma" (the first and its renewal, one holder), one for "bruno". The
+consultation holds two sealed answers, one per document.
+
+The service's record of the two documents is two lines of digests. It holds
+no label, no country and no holder binding in the clear.
+
 ## What it found
 
 One fault, in the app. The wait for admission ended only when the answer was
@@ -98,6 +179,14 @@ wait plus the sealing. The app now asks where the pass stands without building
 a proof, ends the wait when it is admitted, and shows the proof screen from
 then on. The second run was made with that fix.
 
+The third run found a second one, also in the app. When the contract refused
+the renewed pass, the refusal reached the journey as an unhandled error from
+the runtime, a stack trace. A person would have read "the transaction
+failed". The app now recognises that refusal and says what is true: the pass
+has already answered, and this browser holds no record of that answer. Played
+again at 08:09:53, the journey ended with `HOLDER_ALREADY_ANSWERED` after one
+second, and no transaction.
+
 ## What this evidence does and does not support
 
 - **Supports:** the credential service issues a pass on chain, publishes its
@@ -105,6 +194,13 @@ then on. The second run was made with that fix.
   the app's own client code completes the journey against both; an answer is
   counted later without a pass. All on a public Midnight network, with the
   configuration the server gets.
+- **Supports, from the third run:** the credential service refuses a second
+  holder for a document it has issued a pass for, and renews the pass of the
+  first; a renewed pass cannot answer a consultation its holder has answered,
+  by the app's record and, without it, by the contract.
+- **Does not support:** that a real proof shows a nullifier, or the same one
+  on a second scan. The stand-in was written to behave as Rarimo's circuit is
+  documented to. The first two scans of a real passport show it.
 - **Does not support:** that a document was verified, or that RariMe and the
   passport verifier work with this service; that a person has answered; any
   proving time on a phone or in a browser; that the two services work **on

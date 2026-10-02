@@ -17,7 +17,7 @@ answers is a person's, and none is in this consultation.
 | --- | --- |
 | [REHEARSAL.md](REHEARSAL.md) | One consultation from a sealed answer to a final tally, with a fixture pass |
 | [REHEARSAL-2.md](REHEARSAL-2.md) | A pass answering after later passes changed the registry's root; a pass that is too new, and one that is too late, refused before a proof. It also records the root this consultation was given afterwards |
-| [DRESS-REHEARSAL.md](DRESS-REHEARSAL.md) | The credential service and the relay end to end, on a registry of its own, with a stand-in for the passport scan |
+| [DRESS-REHEARSAL.md](DRESS-REHEARSAL.md) | The credential service and the relay end to end, on a registry of its own, with a stand-in for the passport scan. Three runs: the whole journey; a page dropped while the pass was being issued; one document on two devices, and a renewed pass |
 
 After the second rehearsal the registry this consultation uses holds two
 passes. Both are fixtures held by the operator. This consultation admits the
