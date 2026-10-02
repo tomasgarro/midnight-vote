@@ -36,8 +36,6 @@ const COPY = {
     scopeMore: 'Más lugares',
     scopeDialogTitle: 'Elegí un lugar',
     scopeLabel: 'Alcance de las consultas',
-    globalScope: 'Consultas globales',
-    countryScope: 'Consultas en',
     globalDescription: 'Abiertas a personas con una credencial elegible, sin país específico.',
     availableCountries: 'Consultas disponibles',
     countrySearch: 'Buscar cualquier país',
@@ -67,8 +65,6 @@ const COPY = {
     scopeMore: 'More places',
     scopeDialogTitle: 'Choose a place',
     scopeLabel: 'Consultation scope',
-    globalScope: 'Global consultations',
-    countryScope: 'Consultations in',
     globalDescription: 'Open to people with an eligible credential, without a specific country.',
     availableCountries: 'Consultations available',
     countrySearch: 'Search any country',
@@ -98,8 +94,6 @@ const COPY = {
     scopeMore: 'Plus de lieux',
     scopeDialogTitle: 'Choisir un lieu',
     scopeLabel: 'Périmètre de la consultation',
-    globalScope: 'Consultations mondiales',
-    countryScope: 'Consultations en',
     globalDescription:
       "Ouvertes aux personnes disposant d'un justificatif éligible, sans pays particulier.",
     availableCountries: 'Consultations disponibles',
@@ -296,12 +290,8 @@ export function VotesView({
             key={sectionKey}
           >
             <div className="votes__results-head">
-              <div>
-                <p className="sys-eyebrow">
-                  {sectionKey === 'global' ? copy.globalScope : copy.countryScope}
-                </p>
-                <h2 id={`discover-${sectionKey}`}>{countryLabel}</h2>
-              </div>
+              {/* The place is the heading; the page title already says what is listed. */}
+              <h2 id={`discover-${sectionKey}`}>{countryLabel}</h2>
               {sectionKey !== 'global' && passMatchesCountry ? (
                 <span className="votes__eligible">
                   <ShieldCheck size={15} weight="fill" />{' '}

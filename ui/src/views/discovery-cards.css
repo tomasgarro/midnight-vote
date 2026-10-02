@@ -178,9 +178,6 @@
   .discovery-carousel-nav {
     display: flex;
   }
-  .poll-media {
-    height: 190px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .discovery-rail {
