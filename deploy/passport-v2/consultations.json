@@ -1,0 +1,30 @@
+{
+  "registryManifest": "deploy/passport-v2/preview.manifest.json",
+  "apiUrl": "https://cico.midnight.vote",
+  "consultations": {
+    "test": {
+      "referendumId": "preview-wave2-test-consultation",
+      "country": null,
+      "passesUntil": "2026-10-09T17:00:00+02:00",
+      "answersClose": "2026-10-09T18:00:00+02:00",
+      "countingUntil": "2026-10-12T18:00:00+02:00",
+      "text": {
+        "en": {
+          "title": "Results after the close",
+          "question": "Should the result of a consultation stay hidden until it closes?",
+          "description": "A test consultation on Midnight Preview. Answers close on 9 October 2026 at 18:00, Geneva time."
+        },
+        "es": {
+          "title": "Resultados después del cierre",
+          "question": "¿El resultado de una consulta debería quedar oculto hasta que cierre?",
+          "description": "Una consulta de prueba en Midnight Preview. Las respuestas cierran el 9 de octubre de 2026 a las 18:00, hora de Ginebra."
+        },
+        "fr": {
+          "title": "Les résultats après la clôture",
+          "question": "Le résultat d'une consultation doit-il rester caché jusqu'à sa clôture ?",
+          "description": "Une consultation de test sur Midnight Preview. Les réponses sont closes le 9 octobre 2026 à 18 h, heure de Genève."
+        }
+      }
+    }
+  }
+}

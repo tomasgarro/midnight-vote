@@ -62,17 +62,24 @@ wallet replays the chain as before. To force a replay, delete the file.
 
 ## Put a consultation on chain
 
+A consultation is written down once, in
+`deploy/passport-v2/consultations.json`: its question in each language, the
+country of the document if it has a country rule, and its three deadlines.
+Each has a short slug. The test consultation's slug is `test`.
+
 Needs Docker Desktop running (for `referendum-proof-server`) and the files
 `.env.v2.preview` and `relayer/.env`, which hold the operator's secrets and
 are not in the repository.
 
 ```bash
-npm run deploy:preview:test
+npm run deploy:preview:consultation -- test
 ```
 
-The command writes the consultation's inputs once (`.env.v2.preview.test`),
-then deploys against the registry that already exists and publishes the
-current credential root to the new consultation. It casts no answer.
+The first run draws the consultation's event id, fixes its opening time and
+writes its inputs to `.env.v2.preview.<slug>`. It then deploys against the
+registry that already exists and publishes the current credential root to the
+new consultation. It casts no answer. A deployed consultation cannot change
+its id or its schedule: the command refuses a file that no longer matches.
 
 It can be run again at any time. It reads its manifest and does what is due:
 it admits a newer credential root while the consultation still enrols, closes
@@ -157,9 +164,9 @@ The schedule is enforced on chain. The contract changes phase only when asked.
 
 | When | Who | What |
 | --- | --- | --- |
-| After the closing time | Operator | `npm run deploy:preview:test` again. It closes the consultation: answers can now be counted |
+| After the closing time | Operator | `npm run deploy:preview:consultation -- <slug>` again. It closes the consultation: answers can now be counted |
 | Until the counting deadline | Each person | Opens the app on the device that sealed the answer, and counts it. The app does this through the relayer |
-| After the counting deadline | Operator | `npm run deploy:preview:test` once more. It finalizes: the tally is fixed |
+| After the counting deadline | Operator | The same command once more. It finalizes: the tally is fixed |
 
 Before a deadline the command prints the date and ends normally.
 
@@ -175,5 +182,10 @@ Before a deadline the command prints the date and ends normally.
   answer in that consultation can no longer do so. Close enrolment late.
 - The app builds the proof on the person's device. On a laptop the seal took
   about two minutes. A phone is not measured yet.
-- One language is stored with the deployment. The other languages of a
-  consultation are in `deploy/passport-v2/consultation-copy.json`.
+- English is stored with the deployment. The other languages of a
+  consultation reach the app from `deploy/passport-v2/consultations.json`,
+  through `print-consultation-values.mjs --write-app-env`.
+- Adding a consultation changes three values on the server
+  (`RELAYER_V2_ALLOWED_CONTRACTS`, `CICO_ACTION_ALLOWED_CONTRACTS`,
+  `CICO_REFERENDA_JSON`) and needs a new app build. Both services restart;
+  with their wallet state saved that takes minutes.

@@ -8,9 +8,10 @@
  * public configuration of the app on Preview. Build it with
  * `npm run build:preview --workspace midnight-referendum-ui`.
  *
- * Give every manifest whose consultations should be live. With none, it reads
- * the test consultation's manifest. Closed consultations are left out of the
- * server values: nothing can be sealed in them, and counting needs no pass.
+ * Give the manifests whose consultations should be live. With none, it reads
+ * the manifest of every consultation in deploy/passport-v2/consultations.json
+ * that has been deployed from this machine. A consultation whose counting is
+ * over is left out of the server values: nothing more can be done in it.
  *
  * | Printed | Goes to |
  * | --- | --- |
@@ -19,12 +20,16 @@
  * | VITE_* | ui/.env.preview.local, read by `vite build --mode preview` |
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { loadConsultations, manifestPathFor, translationsOf } from './consultations.mjs';
 
-const COPY_PATH = 'deploy/passport-v2/consultation-copy.json';
+const known = loadConsultations();
 
 const writeAppEnv = process.argv.includes('--write-app-env');
 const paths = process.argv.slice(2).filter((argument) => !argument.startsWith('--'));
-if (paths.length === 0) paths.push('deploy/passport-v2/preview.test.manifest.json');
+if (paths.length === 0) {
+  paths.push(...Object.keys(known.consultations).map(manifestPathFor).filter(existsSync));
+}
+if (paths.length === 0) throw new Error('No consultation has been deployed from this machine');
 
 const manifests = paths.map((path) => {
   const manifest = JSON.parse(readFileSync(path, 'utf8'));
@@ -48,9 +53,13 @@ if (deployed.length === 0) throw new Error('No consultation in these manifests i
 const live = deployed.filter((referendum) => Number(referendum.revealClosesAtUnix) > now);
 const addresses = live.map((referendum) => referendum.contractAddress).join(',');
 
-// The manifest holds one language. The other languages of each consultation
-// are kept beside it, by consultation id, and travel to the app only.
-const copy = existsSync(COPY_PATH) ? JSON.parse(readFileSync(COPY_PATH, 'utf8')) : {};
+// A manifest holds one language. The other languages of a consultation are in
+// the consultations file, and travel to the app only.
+const copy = Object.fromEntries(
+  Object.values(known.consultations)
+    .map((consultation) => [consultation.referendumId, translationsOf(consultation)])
+    .filter(([, translations]) => translations),
+);
 
 const forPublisher = live.map((referendum) => ({
   contractAddress: referendum.contractAddress,
