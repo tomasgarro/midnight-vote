@@ -95,7 +95,7 @@ const SHELL_COPY = {
     heading: 'Resultados públicos',
     sealed: (n: bigint) => (n === 1n ? 'respuesta sellada' : 'respuestas selladas'),
     total: (counted: bigint, issued: bigint) =>
-      `${counted.toString()} contadas de ${issued.toString()} selladas · leído del contrato`,
+      `${counted.toString()} ${counted === 1n ? 'contada' : 'contadas'} de ${issued.toString()} ${issued === 1n ? 'sellada' : 'selladas'} · leído del contrato`,
   },
   en: {
     unreadable: 'Contract unreadable',
@@ -109,7 +109,7 @@ const SHELL_COPY = {
     heading: 'Résultats publics',
     sealed: (n: bigint) => (n === 1n ? 'réponse scellée' : 'réponses scellées'),
     total: (counted: bigint, issued: bigint) =>
-      `${counted.toString()} comptées sur ${issued.toString()} scellées · lu depuis le contrat`,
+      `${counted.toString()} ${counted === 1n ? 'comptée' : 'comptées'} sur ${issued.toString()} ${issued === 1n ? 'scellée' : 'scellées'} · lu depuis le contrat`,
   },
 } as const;
 

@@ -27,7 +27,13 @@ const known = loadConsultations();
 const writeAppEnv = process.argv.includes('--write-app-env');
 const paths = process.argv.slice(2).filter((argument) => !argument.startsWith('--'));
 if (paths.length === 0) {
-  paths.push(...Object.keys(known.consultations).map(manifestPathFor).filter(existsSync));
+  paths.push(
+    ...Object.keys(known.consultations)
+      // A rehearsal carries a fixture answer. It never reaches the app or the servers.
+      .filter((slug) => !slug.startsWith('rehearsal'))
+      .map(manifestPathFor)
+      .filter(existsSync),
+  );
 }
 if (paths.length === 0) throw new Error('No consultation has been deployed from this machine');
 
