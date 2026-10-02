@@ -4,9 +4,12 @@ How midnight.vote runs on Midnight Preview during Wave 2: what runs where, how
 a consultation goes on chain, what an operator pastes and where, and how a
 consultation is closed and counted. Written 2 October 2026.
 
-The addresses of a deployment are not repeated here. They are in the manifests
-under `deploy/passport-v2/`, and `node scripts/print-consultation-values.mjs`
-prints every value derived from them.
+The addresses of a deployment are not repeated here. The deploy command writes
+a manifest under `deploy/passport-v2/`, which stays on the operator's machine,
+and `node scripts/print-consultation-values.mjs` prints every value derived
+from it. A reviewed copy of each manifest, with what it does and does not
+show, is under `docs/evidence/`: the current one is
+[preview-2026-10-02](evidence/preview-2026-10-02/README.md).
 
 ## What runs where
 
@@ -117,6 +120,36 @@ returns a project's environment in plain text.
 | `curl https://midnight.vote/Switzerland/api/health` | 200. If not, restart `swiss-civic-pilot`: it lost the edge network |
 | The relayer's log | Its wallet address, then "listening". Before that: "Set RELAYER_SEED…" means a secret is missing |
 | The credential service's log | Its issuer wallet and a DUST balance above zero. It pays for every pass and every root it publishes |
+
+## The first phone run
+
+Do this only after the three outside checks above answer as expected. It needs
+the passport and its holder, an Android or iOS phone with NFC and the RariMe
+app, and mobile data or Wi-Fi.
+
+| Step | On the phone | Write down |
+| --- | --- | --- |
+| 1 | Open `https://midnight.vote/#app`. The chip at the top says PREVIEW | The time |
+| 2 | Open the consultation. Check the three deadlines and "who can answer" | A screenshot |
+| 3 | Add eligibility. The app opens RariMe. Scan the passport's chip | How long the scan took. Any refusal, word for word |
+| 4 | Back in the app, the pass appears under You | A screenshot. The pass shows a country and an age class, never a name |
+| 5 | Wait until the app says the pass is admitted. The credential service publishes the new root to the consultation | How long it took. If it takes more than five minutes, read the credential service's log |
+| 6 | Choose an answer, review it, seal it. Keep the screen on while the proof is built | The elapsed time the app shows. The phone model |
+| 7 | The receipt appears. Open the public results | The count of sealed answers went up by one |
+| 8 | After the closing time, and after the operator closed the consultation: open the app on the same phone and count the answer | The elapsed time. The tally |
+
+What can go wrong, and what it means:
+
+| The app says | Meaning | Do |
+| --- | --- | --- |
+| "This consultation has not admitted the latest passes yet" | The pass is in the registry, and its root is not yet published to the consultation | Wait a minute and try again. If it persists, the root publisher is not running: check `CICO_REFERENDA_JSON` and the issuer wallet's DUST |
+| "Origin is not allowed" in the browser console | The credential service or the relayer does not know `https://midnight.vote` | The new credential manifest is not deployed |
+| The relayer is unavailable | `relay.midnight.vote/ready` is not 200 | Its wallet is still replaying, or it holds no DUST |
+| RariMe refuses the document | The passport is not supported or was registered before | Record the exact message. Try the second passport |
+| The proof stops or the tab reloads | The phone ran out of memory | Close other apps and try again. Record the model. This is a result worth reporting |
+
+A sealed answer is kept on the device that sealed it. Private browsing, or
+clearing the site's data, loses it, and it can then never be counted.
 
 ## Close, count, finalize
 

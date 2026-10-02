@@ -315,13 +315,19 @@ if (relayer.networkId !== networkId) {
   );
 }
 const relayerUrl = `http://${relayer.host}:${relayer.port}`;
-const health = await fetch(`${relayerUrl}/health`)
-  .then((response) => (response.ok ? response.json() : null))
-  .catch(() => null);
-if (!health) {
+// The prepare phase deploys and publishes roots with the operator wallet and
+// stops before the citizen cast, so it never reaches the relayer. Waiting for
+// one would cost a second cold wallet sync for nothing.
+const relayerNeeded = evidencePhase !== 'prepare';
+const health = relayerNeeded
+  ? await fetch(`${relayerUrl}/health`)
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null)
+  : null;
+if (relayerNeeded && !health) {
   fail(`The relayer is not responding at ${relayerUrl}; start the matching relayer first`);
 }
-if (BigInt(health.dustBalance ?? '0') <= 0n) {
+if (relayerNeeded && BigInt(health.dustBalance ?? '0') <= 0n) {
   fail('The relayer has no DUST; fund it before deploying the v2 vertical slice');
 }
 if (equalBytes(issuerSecret, bytes32(relayer.seedHex))) {
@@ -337,7 +343,7 @@ manifest = updateManifest({
   endpoints,
   dust: {
     ...manifest.dust,
-    before: manifest.dust.before ?? String(health.dustBalance ?? '0'),
+    before: manifest.dust.before ?? (health ? String(health.dustBalance ?? '0') : null),
   },
 });
 
@@ -373,10 +379,14 @@ if (!/^[0-9a-f]{64}$/iu.test(operatorFeeSeed)) {
   fail('V2_OPERATOR_FEE_SEED_HEX must be 32 bytes of hexadecimal');
 }
 /*
- * A cold wallet replays the whole indexer history before it reports a balance,
- * and nothing here persists that state between runs. On Preview that took
- * about 27 minutes against 180k indices in September 2026, so the eight-minute
- * bound this used to hard-code failed a wallet that was funded and fine.
+ * A cold wallet replays the whole indexer history before it reports a balance.
+ * On Preview that took about 27 minutes against 180k indices in September
+ * 2026 and about 85 minutes against 258k in October, so the eight-minute bound
+ * this used to hard-code failed a wallet that was funded and fine.
+ *
+ * The wallet's state is kept between runs in `.state/`, which is not in the
+ * repository. A consultation is deployed, closed and finalized by three runs
+ * of this script, days apart; only the first one replays the chain.
  */
 const operatorSyncWaitMs = Number.parseInt(
   optional('V2_OPERATOR_SYNC_WAIT_MS', String(40 * 60 * 1_000)),
@@ -388,7 +398,16 @@ if (!Number.isSafeInteger(operatorSyncWaitMs) || operatorSyncWaitMs < 60_000) {
 console.log(
   `waiting up to ${Math.round(operatorSyncWaitMs / 60_000)} minutes for the operator wallet to synchronize…`,
 );
-const operatorWallet = await startRelayerWallet({ ...relayer, seedHex: operatorFeeSeed });
+const operatorWallet = await startRelayerWallet(
+  { ...relayer, seedHex: operatorFeeSeed },
+  {
+    statePath: resolve(ROOT, `.state/operator-wallet.${networkId}.json`),
+    log: (line) => console.log(line),
+  },
+);
+// Saved while it replays as well, so an interrupted run is not lost.
+const operatorStateTimer = setInterval(() => void saveOperatorWalletState(), 5 * 60 * 1_000);
+operatorStateTimer.unref();
 const operatorState = await firstValueFrom(
   operatorWallet.facade.state().pipe(
     filter(
@@ -402,6 +421,7 @@ const operatorState = await firstValueFrom(
     timeout({ first: operatorSyncWaitMs }),
   ),
 );
+await saveOperatorWalletState();
 const operatorProviders = {
   privateStateProvider: api.inMemoryPrivateStateProvider(),
   publicDataProvider: indexerPublicDataProvider(relayer.indexerHttpUrl, relayer.indexerWsUrl),
@@ -649,8 +669,23 @@ await observe('referendum.deploy', registryAddress, referendumAddress);
 if (enrollmentModel === 'open') {
   const latestRegistryState = await readRegistryState(registryAddress);
   const latestRootField = latestRegistryState.currentRoot.field.toString();
-  const referendumAfterJoin = manifest.referenda[0];
-  if (!referendumAfterJoin.acceptedRoots.includes(latestRootField)) {
+  // The chain is the record. Another publisher (the credential service) may
+  // have admitted a root this manifest never heard of, and publishing it a
+  // second time would be refused.
+  const onChain = await readReferendumState(referendumAddress);
+  const admittedOnChain = onChain.acceptedCredentialRoots.map((root) => root.field.toString());
+  const known = new Set([...manifest.referenda[0].acceptedRoots, ...admittedOnChain]);
+  if (known.size !== manifest.referenda[0].acceptedRoots.length) {
+    manifest = updateReferendum({ acceptedRoots: [...known] });
+  }
+  // A root can only be admitted while the consultation still enrols. After
+  // that the contract refuses it, and a later run (to close or finalize) must
+  // not stop here because someone got a pass too late for this consultation.
+  const stillEnrolling =
+    onChain.phase === 'COMMIT' &&
+    !onChain.enrollmentClosed &&
+    BigInt(Math.floor(Date.now() / 1_000)) < enrollmentClosesAtUnix;
+  if (!known.has(latestRootField) && stillEnrolling) {
     await admitRegistryRoot(latestRegistryState.currentRoot);
     manifest = updateReferendum({
       acceptedRoots: [...manifest.referenda[0].acceptedRoots, latestRootField],
@@ -659,6 +694,8 @@ if (enrollmentModel === 'open') {
 }
 
 if (evidencePhase === 'prepare') {
+  await operateSchedule(referendumAddress);
+  await saveOperatorWalletState();
   await operatorWallet.stop().catch(() => undefined);
   console.log(`Passport v2 ${networkId} preparation manifest: ${manifestPath}`);
   process.exit(0);
@@ -1055,6 +1092,7 @@ function loadOrCreateManifest(expected) {
     assertManifestMatches(parsed, expected);
     return parsed;
   }
+  const reusedRegistry = deployedRegistryAddress(expected);
   const created = {
     kind: api.PASSPORT_V2_MANIFEST_KIND,
     version: api.PASSPORT_V2_MANIFEST_VERSION,
@@ -1081,8 +1119,10 @@ function loadOrCreateManifest(expected) {
       uniquenessTimestampUpperBoundUnixSeconds: expected.uniquenessUpperBound.toString(),
     },
     registry: {
-      contractAddress: null,
-      registryContractBindingHex: null,
+      contractAddress: reusedRegistry,
+      registryContractBindingHex: reusedRegistry
+        ? toHex(api.deriveRegistryContractBinding(reusedRegistry))
+        : null,
       registryIdHex: expected.registryIdHex,
       issuerId: expected.issuerId,
       issuerIdHex: expected.issuerIdHex,
@@ -1127,6 +1167,89 @@ function loadOrCreateManifest(expected) {
   manifest = created;
   saveManifest();
   return created;
+}
+
+/**
+ * A later consultation runs against the registry that is already deployed, so
+ * the passes people hold stay good for it. V2_REGISTRY_FROM_MANIFEST names the
+ * manifest of the deployment that created that registry. Only its address is
+ * taken from there: the roots and the credential count are read from the chain
+ * once the registry is joined.
+ */
+function deployedRegistryAddress(expected) {
+  const sourcePath = optional('V2_REGISTRY_FROM_MANIFEST', '');
+  if (!sourcePath) return null;
+  let source;
+  try {
+    source = JSON.parse(readFileSync(resolve(ROOT, sourcePath), 'utf8'));
+  } catch {
+    fail(`Cannot read the manifest named by V2_REGISTRY_FROM_MANIFEST: ${sourcePath}`);
+  }
+  const registry = source.registry;
+  if (source.networkId !== networkId || !registry?.contractAddress) {
+    fail(`${sourcePath} holds no registry deployed on ${networkId}`);
+  }
+  if (
+    registry.registryIdHex !== expected.registryIdHex ||
+    registry.issuerId !== expected.issuerId ||
+    registry.issuerIdHex !== expected.issuerIdHex ||
+    registry.credentialEpoch !== expected.credentialEpoch.toString() ||
+    registry.enrollmentModel !== expected.enrollmentModel
+  ) {
+    fail(`The registry in ${sourcePath} does not match the requested registry metadata`);
+  }
+  return registry.contractAddress;
+}
+
+/**
+ * The operator's part of a consultation that real people answer: close it
+ * once answers are over, finalize it once counting is over. It never casts
+ * or counts an answer. Before a deadline it says when to come back, and that
+ * is not a failure.
+ */
+async function operateSchedule(address) {
+  // A block's time can trail the clock, so a deadline is only acted on once
+  // it is clearly behind us.
+  const settled = (deadlineUnix) => BigInt(Math.floor(Date.now() / 1_000)) >= deadlineUnix + 30n;
+  const when = (deadlineUnix) => new Date(Number(deadlineUnix) * 1_000).toISOString();
+
+  let state = await readReferendumState(address);
+  if (state.phase === 'COMMIT') {
+    if (!settled(closesAtUnix)) {
+      console.log(
+        `Answers are open until ${when(closesAtUnix)}. Run this again after that to close the consultation.`,
+      );
+      return;
+    }
+    const receipt = await referendumExecutor.closeVote();
+    recordStep('lifecycle.close', 'confirmed', receipt);
+    await observe('lifecycle.close', registryAddress, address);
+    state = await readReferendumState(address);
+    console.log('The consultation is closed on chain. Answers can now be counted.');
+  }
+  if (state.phase === 'REVEAL') {
+    if (!settled(revealClosesAtUnix)) {
+      console.log(
+        `Counting is open until ${when(revealClosesAtUnix)}. Run this again after that to finalize.`,
+      );
+      return;
+    }
+    const receipt = await referendumExecutor.finalizeVote();
+    recordStep('lifecycle.finalize', 'confirmed', receipt);
+    await observe('lifecycle.finalize', registryAddress, address);
+    console.log('The consultation is finalized. Its tally is fixed.');
+    return;
+  }
+  if (state.phase === 'FINALIZED') console.log('The consultation is already finalized.');
+}
+
+/** Never fatal: a run that could not save its wallet state has still done its work. */
+async function saveOperatorWalletState() {
+  try {
+    await operatorWallet.saveState();
+  } catch (error) {
+    console.warn(`operator wallet state not saved: ${error?.message ?? error}`);
+  }
 }
 
 function assertManifestMatches(existing, expected) {
