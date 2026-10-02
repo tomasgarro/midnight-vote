@@ -296,10 +296,40 @@ export class V2ActionService {
   }
 
   private run(id: string): void {
-    const task = this.runWalletStage(id).finally(() => {
-      this.running.delete(id);
-    });
+    const task = this.runWalletStage(id)
+      .catch((error: unknown) => this.abandon(id, error))
+      .finally(() => {
+        this.running.delete(id);
+      });
     this.running.set(id, task);
+  }
+
+  /**
+   * One action that fails unexpectedly must not stop the relay for everyone
+   * else. The rejection used to go unhandled, which ends the process: a single
+   * failed write to the action store took the relayer down in the middle of
+   * a rehearsal.
+   *
+   * The action is left exactly where a restart would leave it. Before
+   * submission it is marked for recovery, and the person's device asks again
+   * with a new capability. After submission it is reconciled against the
+   * indexer and never submitted a second time.
+   */
+  private async abandon(id: string, error: unknown): Promise<void> {
+    this.transient.delete(id);
+    console.error(
+      `[relayer] action ${id} stopped unexpectedly: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    try {
+      await this.options.store.transition(
+        id,
+        ['authorized', 'validated', 'dust_reserved', 'finalized'],
+        { status: 'recovery_required', errorCode: 'recovery_required' },
+      );
+    } catch {
+      // The store is what failed. A restart marks the action the same way.
+    }
+    this.scheduleReconcile(id, this.confirmationRetryMs);
   }
 
   private async runWalletStage(id: string): Promise<void> {
@@ -383,7 +413,16 @@ export class V2ActionService {
   }
 
   private scheduleReconcile(id: string, delayMs: number): void {
-    const timer = setTimeout(() => void this.reconcile(id), delayMs);
+    const timer = setTimeout(() => {
+      // A reconciliation that cannot reach the store is tried again later. It
+      // must not end the process either.
+      this.reconcile(id).catch((error: unknown) => {
+        console.error(
+          `[relayer] reconciling ${id} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        this.scheduleReconcile(id, Math.max(this.confirmationRetryMs, 1_000));
+      });
+    }, delayMs);
     timer.unref?.();
   }
 
