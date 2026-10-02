@@ -31,6 +31,7 @@ import type {
   CivicCredentialPort,
   CivicCredentialPrivateMaterial,
   CivicCredentialPrivateStatePort,
+  PassAdmission,
 } from './ports.js';
 import type { CredentialRegistryHistoryPort } from './registry-history.js';
 import type {
@@ -288,6 +289,28 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
     });
     this.receipts.set(receipt.transactionId, receipt);
     return receipt;
+  }
+
+  /**
+   * Whether this device's pass can answer this consultation now. It reads the
+   * registry and the consultation, as sealing does, and builds no proof. The
+   * app asks it while a new pass waits for its root to be published.
+   */
+  async getPassAdmission(referendumId: string): Promise<PassAdmission> {
+    const entry = this.referenda.get(referendumId);
+    if (!entry) throw new CivicCredentialError('POLICY_NOT_SATISFIED', 'Unknown referendum');
+    const material = await this.credential.getPrivateCredentialMaterial();
+    if (!material) return 'no-pass';
+    try {
+      await this.stateResolver.resolveCredentialPath(entry, material.credentialLeaf);
+      return 'admitted';
+    } catch (error) {
+      if (error instanceof CivicCredentialError) {
+        if (error.code === 'CREDENTIAL_NOT_ADMITTED') return 'pending';
+        if (error.code === 'CREDENTIAL_ADMISSION_CLOSED') return 'closed';
+      }
+      throw error;
+    }
   }
 
   /**

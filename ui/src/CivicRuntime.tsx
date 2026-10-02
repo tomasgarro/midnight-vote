@@ -651,9 +651,11 @@ function CivicApp() {
           void ballotVault.requestPersistence();
           // A pass issued a moment ago may not be admitted to this consultation
           // yet. The app waits for that itself; the person taps once.
+          const askAdmission = actionPort.getPassAdmission?.bind(actionPort);
           const confirmed = await sealWhenAdmitted({
             seal: () =>
               actionPort.castVote({ referendumId: route.referendumId, choice, authorization }),
+            ...(askAdmission ? { admission: () => askAdmission(route.referendumId) } : {}),
             onWaiting: setAdmissionWaiting,
           });
           // The sealed answer is tracked by the vault, not by a stored receipt.
