@@ -6,7 +6,7 @@ import type { CicoLocale } from '@/integration/locale';
 import { REFLECTION_COPY } from '@/pulse/local-reflection';
 import { answerCatalogue, GUIDE_COPY, type GuideAnswer } from './catalogue-guide';
 import { CHAT_PROMPTS } from './chat-prompts';
-import { localizePoll, type Poll, pollCountryCode } from './poll-model';
+import { localizePoll, type Poll, pollPlaceCode } from './poll-model';
 import './catalogue-chat.css';
 export interface CatalogueMessage {
   id: number;
@@ -64,7 +64,7 @@ export function CatalogueChat({
   };
   const scroll = useRef<HTMLDivElement>(null);
   const id = useRef(initialMessages[initialMessages.length - 1]?.id ?? 0);
-  const countries = [...new Set(polls.map(pollCountryCode).filter((c): c is string => Boolean(c)))];
+  const countries = [...new Set(polls.map(pollPlaceCode).filter((c): c is string => Boolean(c)))];
   const briefs = polls
     .filter((poll) => briefIds.includes(poll.id))
     .map((poll) => localizePoll(poll, locale));
@@ -293,8 +293,8 @@ export function CatalogueChat({
                     <article className="catalogue-chat__source" key={pId}>
                       <h2>{p.title}</h2>
                       <small>
-                        {pollCountryCode(p)
-                          ? countryName(pollCountryCode(p) ?? '', locale)
+                        {pollPlaceCode(p)
+                          ? countryName(pollPlaceCode(p) ?? '', locale)
                           : t.globalLabel}
                       </small>
                       <details className="chat-proposal-preview">

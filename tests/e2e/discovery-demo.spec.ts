@@ -28,7 +28,7 @@ test('Swiss simulated pass, place chips, carousel, filters and dialogue', async 
     'aria-pressed',
     'true',
   );
-  // One place at a time: the four Swiss consultations, and no filter for four.
+  // One place at a time: the four federal objects of 29 November, and no filter for four.
   await expect(page.locator('.votes__results h2')).toHaveText(['Switzerland']);
   await expect(page.locator('.discovery-rail > li')).toHaveCount(4);
   await expect(page.locator('.discovery-subjects')).toBeHidden();
@@ -101,10 +101,10 @@ test('Swiss simulated pass, place chips, carousel, filters and dialogue', async 
   await page
     .getByRole('button', { name: 'What consultations are open for me?', exact: true })
     .click();
+  await expect(page.getByRole('heading', { name: 'Limiting fireworks' })).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Better connections, closer communities' }),
+    page.getByRole('heading', { name: 'A minimum age for social media?' }),
   ).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Open verification rules' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 test('age input validation and under-18 demo does not enable participation', async ({ page }) => {
@@ -154,7 +154,7 @@ test('French Swiss cards and demo form fit a 320px dark phone', async ({ page })
   await page.getByRole('button', { name: 'Créer mon laissez-passer simulé', exact: true }).click();
   await page.getByRole('button', { name: 'Voir les consultations', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Mieux relier nos communautés', exact: true }),
+    page.getByRole('heading', { name: 'Limiter les feux d’artifice', exact: true }),
   ).toBeVisible();
   await page.locator('.votes__results').last().scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'outputs/swiss-cards-320-fr-dark.png' });

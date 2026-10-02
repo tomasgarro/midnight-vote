@@ -4,7 +4,7 @@ import { formatDate } from '@/integration/format';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability } from '@/integration/poll-lifecycle';
 import type { DiscoveryScope } from '@/integration/product-boundaries';
-import { isCountryPoll, type Poll, pollCountryCode } from './poll-model';
+import { type Poll, pollCountryCode, pollPlaceCode } from './poll-model';
 
 /**
  * What a pass can do with each consultation, and why not when it cannot.
@@ -118,8 +118,9 @@ export function orderForPass(
     .map(({ poll }) => poll);
 }
 
+/** The place a consultation is listed under. Who may answer it is `passBlock`'s question. */
 function scopeKey(poll: Poll): string {
-  return isCountryPoll(poll) ? (pollCountryCode(poll) ?? '') : 'global';
+  return pollPlaceCode(poll) ?? 'global';
 }
 
 /** How many consultations this pass can answer now, per place ('global' for Global). */

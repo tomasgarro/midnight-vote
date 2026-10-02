@@ -90,7 +90,9 @@ test('catalogue answers, follow-ups and consultation return preserve the convers
   await page.goto('/#app');
   await page.getByRole('button', { name: 'Cleisthenes', exact: true }).click();
   await page.getByRole('button', { name: 'Show global consultations', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Open verification rules' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'A minimum age for social media?' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Summarize', exact: true }).first().click();
   await expect(page.locator('.catalogue-chat__answer')).toHaveCount(2);
   const input = page.getByRole('textbox', { name: 'Ask about a consultation' });
@@ -104,7 +106,9 @@ test('catalogue answers, follow-ups and consultation return preserve the convers
   );
   await page.screenshot({ path: 'outputs/dashboard-chat-mobile.png' });
   await page.getByRole('button', { name: 'Read consultation', exact: true }).last().click();
-  await expect(page.getByRole('heading', { name: 'Open verification rules' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'A minimum age for social media?' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('.catalogue-chat__question').last()).toContainText(
     'What are the arguments?',

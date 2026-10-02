@@ -12,7 +12,6 @@ import type { CicoLocale } from '@/integration/locale';
 import { countryPolicyCode, toPassportV2Catalog } from '@/integration/passport-v2-catalog';
 import type { PassportV2RuntimeReferendum } from '@/integration/passport-v2-runtime-config';
 import type { PassportReceiptRecord } from '@/integration/receipt-store';
-import { DISCOVERY_FIXTURES } from './discovery-fixtures';
 import { REAL_TOPIC_FIXTURES } from './real-topic-fixtures';
 
 export type Choice = VoteReveal['choice'];
@@ -46,6 +45,15 @@ export interface Poll {
   runtimeCountryCode?: string;
   /** Runtime v2 contract address used by the public indexer reader. */
   runtimeContractAddress?: string;
+  /**
+   * ISO alpha-2 place the consultation is listed under, when that is not its
+   * country policy. A Swiss federal object is listed under Switzerland and
+   * open to any adult pass: where a question belongs says nothing about who
+   * may answer it.
+   */
+  place?: string;
+  /** The official date the subject is known by: a federal vote, a proposal. */
+  milestone?: { kind: 'vote' | 'proposal'; date: string };
   /** What the contract enforces for this consultation; absent on demo fixtures. */
   runtime?: PollRuntimeFacts;
 }
@@ -68,34 +76,6 @@ export interface PollRuntimeFacts {
 export type VoteReceipt = PassportReceiptRecord;
 
 const EN_POLL_COPY: Record<string, Partial<Poll>> = {
-  'reglas-de-verificacion': {
-    title: 'Open verification rules',
-    description:
-      'A global consultation on whether this platform should publish its eligibility rules before each vote opens.',
-    question:
-      'Before opening each consultation, should this platform publish the exact eligibility rule it will apply, and the window during which that rule can be challenged?',
-    opened: 'August 29, 2026',
-    deadline: 'October 4, 2026',
-    eligible: 'Any eligibility pass',
-    participation: '2,140 simulated responses',
-    whyNow:
-      'It is the only question in this catalogue that belongs to no country: it is about how this platform works, and a pass from anywhere can answer it.',
-    legalFrame:
-      'Product governance. It is not an official consultation of any state, and not a public service.',
-    evidence:
-      'The outcome would apply to this platform and nothing else. Participation figures are simulated.',
-    evidenceLabel: 'GLOBAL CONSULTATION · product governance',
-    argumentsFor: [
-      'Publishing the rule before opening lets people argue about it while it can still change.',
-      'A known challenge window gives anyone excluded by the rule somewhere to go.',
-    ],
-    argumentsAgainst: [
-      'Publishing the rule in advance also helps anyone looking to work around it.',
-      'A fixed window can delay urgent consultations without improving the outcome.',
-    ],
-    uncertainty:
-      'How long the window runs, who rules on a challenge, and what happens to an already-open consultation are not defined in this demo.',
-  },
   'france-mobilite': {
     title: 'Everyday mobility in the France pilot',
     description: 'A simulated pilot consultation on safer, simpler low-emission local travel.',
@@ -256,40 +236,11 @@ export function localizePoll(poll: Poll, locale: CicoLocale): Poll {
 }
 
 export const POLLS: Poll[] = [
-  {
-    id: 'reglas-de-verificacion',
-    title: 'Reglas de verificación abiertas',
-    description:
-      'Una consulta global sobre si esta plataforma debe publicar sus reglas de elegibilidad antes de abrir cada votación.',
-    question:
-      '¿Debería esta plataforma publicar, antes de abrir cada consulta, la regla exacta de elegibilidad que va a aplicar y el período durante el cual se puede impugnar?',
-    opened: '29 de agosto de 2026',
-    deadline: '4 de octubre de 2026',
-    opensAt: '2026-08-29T00:00:00+00:00',
-    closesAt: '2026-10-04T23:59:59+00:00',
-    eligible: 'Cualquier pase de elegibilidad',
-    participation: '2.140 participaciones simuladas',
-    whyNow:
-      'Es la única pregunta de este catálogo que no pertenece a ningún país: trata sobre cómo funciona esta plataforma, y quien tenga un pase de cualquier país puede responderla.',
-    legalFrame:
-      'Gobernanza del producto. No es una consulta oficial de ningún Estado ni un servicio público.',
-    evidence:
-      'El resultado se aplicaría a esta plataforma y a nada más. Las cifras de participación son simuladas.',
-    evidenceLabel: 'CONSULTA GLOBAL · gobernanza del producto',
-    argumentsFor: [
-      'Publicar la regla antes de abrir permite discutirla mientras todavía se puede cambiar.',
-      'Una ventana de impugnación conocida da a quien queda afuera un camino para reclamar.',
-    ],
-    argumentsAgainst: [
-      'Publicar la regla con antelación también le sirve a quien quiera buscarle la vuelta.',
-      'Una ventana fija puede retrasar consultas urgentes sin mejorar el resultado.',
-    ],
-    uncertainty:
-      'La duración de la ventana, quién resuelve una impugnación y qué pasa con una consulta ya abierta no están definidos en esta demo.',
-    // A question about this platform's own rules has no external authority to
-    // cite. Inventing one would be worse than citing nothing.
-    sources: [],
-  },
+  // Subjects people recognise come first: the World question, then the four
+  // Swiss federal objects of 29 November 2026.
+  ...REAL_TOPIC_FIXTURES,
+  // Kept until the French question is chosen from the shortlist in
+  // docs/CONSULTATION-SUBJECTS.md. It is a simulated pilot, and says so.
   {
     id: 'france-mobilite',
     title: 'Mobilité du quotidien — pilote France',
@@ -564,8 +515,6 @@ export const POLLS: Poll[] = [
       },
     ],
   },
-  ...DISCOVERY_FIXTURES,
-  ...REAL_TOPIC_FIXTURES,
 ];
 export function requireDefaultPoll(polls: readonly Poll[]): Poll {
   const poll = polls.at(0);
@@ -598,19 +547,36 @@ export const DASHBOARD_COUNTRIES = ASSIGNED_COUNTRIES.map((country) => ({
   numeric: country.numeric,
 }));
 
+/** True when the consultation is listed under a country rather than under Global. */
 export function isCountryPoll(poll: Poll): boolean {
+  if (poll.place) return true;
   return poll.runtimeScope ? poll.runtimeScope === 'country' : COUNTRY_POLL_IDS.has(poll.id);
 }
 
-/** Return the displayable ISO alpha-2 scope for a country consultation. */
+/**
+ * The ISO alpha-2 country whose passes alone may answer, or null when any pass
+ * may. This is eligibility, not where the consultation is listed.
+ */
 export function pollCountryCode(poll: Poll): string | null {
   const value = poll.runtimeCountryCode ?? COUNTRY_POLL_COUNTRIES.get(poll.id);
   const normalized = value?.trim().toUpperCase();
   return normalized || null;
 }
 
+/** The ISO alpha-2 country the consultation is listed under, or null for Global. */
+export function pollPlaceCode(poll: Poll): string | null {
+  return poll.place?.trim().toUpperCase() || pollCountryCode(poll);
+}
+
+/** Listed under this country. Says nothing about who may answer. */
 export function isCountryPollForCountry(poll: Poll, countryCode: string): boolean {
-  return pollCountryCode(poll) === countryCode.trim().toUpperCase();
+  return pollPlaceCode(poll) === countryCode.trim().toUpperCase();
+}
+
+/** A pass from this country meets the consultation's country rule, if it has one. */
+export function meetsCountryPolicy(poll: Poll, countryCode: string): boolean {
+  const required = pollCountryCode(poll);
+  return !required || required === countryCode.trim().toUpperCase();
 }
 
 /**

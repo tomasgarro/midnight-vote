@@ -16,7 +16,7 @@ import { formatDate, formatDateTime } from '@/integration/format';
 import type { CicoLocale } from '@/integration/locale';
 import { getPollAvailability } from '@/integration/poll-lifecycle';
 import { ConsultationBrief } from '@/views/ConsultationBrief';
-import { COUNTRY_POLL_COUNTRIES, localizePoll, type Poll } from '@/views/poll-model';
+import { localizePoll, type Poll, pollPlaceCode } from '@/views/poll-model';
 import './policy-detail-view.css';
 import { passBlock, passBlockLine } from './pass-fit';
 
@@ -69,6 +69,7 @@ const COPY = {
     runtimeAbstain: 'No tomás posición. Tu respuesta se cuenta como sin decidir.',
     eligible: 'Habilitadas',
     scope: 'Ámbito',
+    milestone: { vote: 'Votación oficial', proposal: 'Propuesta oficial' },
     about: 'De qué se trata',
     frame: 'Marco vigente',
     perspectives: 'Perspectivas',
@@ -114,6 +115,7 @@ const COPY = {
     runtimeAbstain: 'You take no position. Your answer is counted as undecided.',
     eligible: 'Eligible',
     scope: 'Scope',
+    milestone: { vote: 'Official vote', proposal: 'Official proposal' },
     about: 'What it is about',
     frame: 'Current framework',
     perspectives: 'Perspectives',
@@ -159,6 +161,7 @@ const COPY = {
     runtimeAbstain: 'Vous ne prenez pas position. Votre réponse est comptée comme indécise.',
     eligible: 'Éligibles',
     scope: 'Périmètre',
+    milestone: { vote: 'Votation officielle', proposal: 'Proposition officielle' },
     about: "De quoi il s'agit",
     frame: 'Cadre actuel',
     perspectives: 'Points de vue',
@@ -213,7 +216,7 @@ export function PolicyDetailView({
   const isOpen = getPollAvailability(poll).isOpen;
   const block =
     credential?.kind === 'synthetic-demo-credential' ? passBlock(poll, credential) : null;
-  const consultationCountry = poll.runtimeCountryCode ?? COUNTRY_POLL_COUNTRIES.get(poll.id);
+  const consultationCountry = pollPlaceCode(poll);
   const consultationCountryName = consultationCountry
     ? getCountryName(consultationCountry, locale)
     : null;
@@ -300,6 +303,12 @@ export function PolicyDetailView({
             {consultationCountryName ? (
               <StatRow label={copy.scope} value={consultationCountryName} />
             ) : null}
+            {poll.milestone ? (
+              <StatRow
+                label={copy.milestone[poll.milestone.kind]}
+                value={formatDate(poll.milestone.date, locale) ?? '—'}
+              />
+            ) : null}
           </StatGroup>
         )}
       </Card>
@@ -375,11 +384,11 @@ export function PolicyDetailView({
         </dl>
       </section>
 
-      {poll.sources.length ? (
+      {displayPoll.sources.length ? (
         <section className="policy__section">
           <Eyebrow>{copy.sources}</Eyebrow>
           <ul className="policy__sources">
-            {poll.sources.map((source) => (
+            {displayPoll.sources.map((source) => (
               <li key={source.href}>
                 <a href={source.href} target="_blank" rel="noreferrer">
                   <span>
