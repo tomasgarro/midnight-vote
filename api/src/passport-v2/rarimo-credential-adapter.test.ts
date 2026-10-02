@@ -590,3 +590,84 @@ describe('a verification in progress when the page is dropped', () => {
     });
   });
 });
+
+describe('asking the issuer again for the same pass', () => {
+  // A clock that moves: each look at it is five seconds later.
+  function movingClock() {
+    let time = now.getTime();
+    return () => {
+      time += 5_000;
+      return new Date(time);
+    };
+  }
+
+  it('asks with the claims of the first attempt, however much later', async () => {
+    const gateway = new FakeRarimoGateway();
+    const issuer = new FakeCicoIssuer();
+    const adapter = new RarimoCivicCredentialAdapter({
+      gateway,
+      issuer,
+      issuerId: 'cico-rarimo-preview',
+      credentialEpoch: 7,
+      countryMapper: mapper,
+      uniquenessTimestampUpperBoundUnixSeconds: 1_800_000_000,
+      now: movingClock(),
+    });
+    const enrollment = await adapter.beginEnrollment(request({ requireAdult: true }));
+    gateway.statuses.set([...gateway.requests.keys()][0], 'verified');
+
+    // The request is cut off: the issuer may or may not have issued the pass.
+    issuer.fail = true;
+    await expect(adapter.getEnrollmentStatus(enrollment.enrollmentId)).rejects.toMatchObject({
+      code: 'ISSUANCE_FAILED',
+      retryable: true,
+    });
+    issuer.fail = false;
+    await expect(adapter.getEnrollmentStatus(enrollment.enrollmentId)).resolves.toMatchObject({
+      status: 'issued',
+    });
+
+    expect(issuer.requests).toHaveLength(2);
+    // The issuer tells a retry from a different pass by these. They must not move.
+    expect(issuer.requests[1]?.claims).toEqual(issuer.requests[0]?.claims);
+    expect(issuer.requests[1]?.evidenceAuthorization).toBe(
+      issuer.requests[0]?.evidenceAuthorization,
+    );
+    const summary = await adapter.getCredentialSummary();
+    expect(summary?.validFrom).toBe(issuer.requests[0]?.claims.validFrom);
+  });
+
+  it('asks for the same pass after the page was dropped while it was being issued', async () => {
+    const gateway = new FakeRarimoGateway();
+    const issuer = new FakeCicoIssuer();
+    const pendingVault = new MemoryEnrollmentVault();
+    const clock = movingClock();
+    const page = () =>
+      new RarimoCivicCredentialAdapter({
+        gateway,
+        issuer,
+        issuerId: 'cico-rarimo-preview',
+        credentialEpoch: 7,
+        countryMapper: mapper,
+        uniquenessTimestampUpperBoundUnixSeconds: 1_800_000_000,
+        now: clock,
+        vault: new MemoryCredentialVault(),
+        pendingVault,
+      });
+    const first = page();
+    const enrollment = await first.beginEnrollment(request());
+    gateway.statuses.set([...gateway.requests.keys()][0], 'verified');
+    issuer.fail = true;
+    await expect(first.getEnrollmentStatus(enrollment.enrollmentId)).rejects.toMatchObject({
+      code: 'ISSUANCE_FAILED',
+    });
+    expect(pendingVault.stored?.issuanceClaims).toEqual(issuer.requests[0]?.claims);
+
+    issuer.fail = false;
+    await expect(page().getEnrollmentStatus(enrollment.enrollmentId)).resolves.toMatchObject({
+      status: 'issued',
+    });
+    expect(issuer.requests[1]?.claims).toEqual(issuer.requests[0]?.claims);
+    expect(issuer.requests[1]?.holderBinding).toEqual(issuer.requests[0]?.holderBinding);
+  });
+});

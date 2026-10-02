@@ -95,6 +95,8 @@ export interface StoredRarimoEnrollment {
   readonly expiresAt: string;
   readonly request: RarimoVerificationRequest;
   readonly policy?: CredentialPolicy;
+  /** The claims the issuer was first asked for; every retry asks for the same. */
+  readonly issuanceClaims?: CivicCredentialClaims;
 }
 
 export interface RarimoEnrollmentVaultPort {
@@ -117,6 +119,13 @@ interface RarimoEnrollmentRecord {
   status: EnrollmentStatus;
   updatedAt: string;
   summary?: CredentialSummary;
+  /**
+   * The claims of the pass, fixed the first time the issuer is asked. The
+   * issuer recognises a retry by them: asked again with later timestamps, it
+   * refuses the retry as a different pass, although the first one may already
+   * be on chain.
+   */
+  issuanceClaims?: CivicCredentialClaims;
   credentialBlind?: Uint8Array;
   credentialLeaf?: Uint8Array;
   actionAuthorizationHandle?: string;
@@ -334,16 +343,22 @@ export class RarimoCivicCredentialAdapter
       validateEvidenceBinding(record, verifiedEvidence);
       const derivedClaims = deriveClaims(verifiedEvidence, this.countryMapper, record);
       const now = new Date(Math.floor(this.now().getTime() / 1_000) * 1_000);
-      const validUntil = new Date(now.getTime() + this.credentialTtlMs);
-      const claims: CivicCredentialClaims = {
-        issuerId: this.issuerId,
-        country: derivedClaims.country,
-        ageClass: derivedClaims.ageClass,
-        assurance: derivedClaims.assurance,
-        credentialEpoch: this.credentialEpoch,
-        validFrom: now.toISOString(),
-        validUntil: validUntil.toISOString(),
-      };
+      if (!record.issuanceClaims) {
+        const validUntil = new Date(now.getTime() + this.credentialTtlMs);
+        record.issuanceClaims = {
+          issuerId: this.issuerId,
+          country: derivedClaims.country,
+          ageClass: derivedClaims.ageClass,
+          assurance: derivedClaims.assurance,
+          credentialEpoch: this.credentialEpoch,
+          validFrom: now.toISOString(),
+          validUntil: validUntil.toISOString(),
+        };
+        // Kept before the issuer is asked, so a page that is dropped while the
+        // pass is being issued asks for the same pass when it comes back.
+        await this.rememberPending(record);
+      }
+      const claims = record.issuanceClaims;
       const proofFingerprint = verifiedEvidence.evidenceFingerprint;
       let issuance: CivicCredentialIssuanceResult;
       try {
@@ -647,6 +662,7 @@ export class RarimoCivicCredentialAdapter
         expiresAt: kept.expiresAt,
         request: { ...kept.request },
         ...(kept.policy ? { policy: kept.policy } : {}),
+        ...(kept.issuanceClaims ? { issuanceClaims: { ...kept.issuanceClaims } } : {}),
         status: 'pending',
         updatedAt: this.now().toISOString(),
         cleanupRequested: false,
@@ -674,6 +690,7 @@ export class RarimoCivicCredentialAdapter
         expiresAt: record.expiresAt,
         request: { ...record.request },
         ...(record.policy ? { policy: record.policy } : {}),
+        ...(record.issuanceClaims ? { issuanceClaims: { ...record.issuanceClaims } } : {}),
       });
     } catch {
       // Without it, a reload loses the attempt, as before.
