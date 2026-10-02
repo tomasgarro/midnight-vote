@@ -5,7 +5,7 @@ import {
   MapPin,
   ShieldCheck,
 } from '@phosphor-icons/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, CountryPicker, Display, EmptyState, Sheet } from '@/components/system';
 import { CountryFlag } from '@/components/system/CountryFlag';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
@@ -162,6 +162,20 @@ export function VotesView({
     if (passKey) setScope(defaultScopeForPass(polls, credential));
   }, [passKey]);
   const [scopeSheetOpen, setScopeSheetOpen] = useState(false);
+  // The chosen place can sit past the edge of the chip row, for instance when
+  // a pass opens the list on it. Bring it into view, sideways only.
+  const scopesRef = useRef<HTMLFieldSetElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the chosen place changes.
+  useEffect(() => {
+    const row = scopesRef.current;
+    const pressed = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!row || !pressed) return;
+    const rowBox = row.getBoundingClientRect();
+    const box = pressed.getBoundingClientRect();
+    if (box.left < rowBox.left || box.right > rowBox.right) {
+      row.scrollLeft += box.left - rowBox.left - (rowBox.width - box.width) / 2;
+    }
+  }, [scope]);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -221,7 +235,7 @@ export function VotesView({
 
       {/* The places that have consultations are one tap away. Every other
           place is in the sheet, behind the last chip. */}
-      <fieldset className="votes__scopes" aria-label={copy.scopeLabel}>
+      <fieldset ref={scopesRef} className="votes__scopes" aria-label={copy.scopeLabel}>
         <button type="button" aria-pressed={scope.kind === 'world'} onClick={chooseGlobal}>
           <GlobeHemisphereWest size={17} aria-hidden="true" />
           {copy.world}
