@@ -170,6 +170,14 @@ node --env-file=relayer/.env --env-file=.env.issuer.local relayer/dist/register-
 NIGHT alone pays for nothing. It generates DUST only once it is registered,
 and that is the step people miss.
 
+A faster way, for a test and not for a pilot: set `CICO_ISSUER_WALLET_SEED` in
+hPanel to the operator's fee seed (`V2_OPERATOR_FEE_SEED_HEX` in
+`.env.v2.preview`), which is funded and registered. The credential service
+then pays from the operator's wallet. Two processes on one wallet must never
+spend at the same moment, so do not run the deploy command while someone is
+getting a pass. Give the service its own funded wallet before real people use
+it.
+
 ## The first phone run
 
 Do this only after the three outside checks above answer as expected. It needs
