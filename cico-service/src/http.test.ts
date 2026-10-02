@@ -99,6 +99,7 @@ async function start(options?: {
   gateway?: RarimoVerificationGateway;
   actionCapabilityIssuer?: import('./action-capability-issuer.js').ActionCapabilityIssuer;
   enrollmentStatus?: import('./http.js').EnrollmentStatusReader;
+  serviceStatus?: () => Promise<import('./http.js').CicoServiceStatus>;
 }) {
   const service = createCicoHttpService({
     gateway: options?.gateway ?? gateway(),
@@ -108,6 +109,7 @@ async function start(options?: {
       ? { actionCapabilityIssuer: options.actionCapabilityIssuer }
       : {}),
     ...(options?.enrollmentStatus ? { enrollmentStatus: options.enrollmentStatus } : {}),
+    ...(options?.serviceStatus ? { serviceStatus: options.serviceStatus } : {}),
   });
   servers.push(service);
   await new Promise<void>((resolve) => service.listen(0, '127.0.0.1', resolve));
@@ -349,6 +351,69 @@ describe('CICO HTTP boundary service', () => {
           })
         ).status,
       ).toBe(403);
+    });
+  });
+
+  describe('GET /v1/service/status', () => {
+    const status = {
+      registryContractAddress: 'ab'.repeat(32),
+      consultations: ['cd'.repeat(32)],
+      actionCapabilities: {
+        keyId: '4caad0fe941626a4',
+        networks: ['preview'],
+        contracts: ['cd'.repeat(32)],
+        circuits: ['castVote', 'revealVote'],
+      },
+      issuerWallet: { address: 'mn_addr_preview1example', dustAvailable: true },
+    };
+
+    it('says what the service is configured for, in public terms', async () => {
+      const base = await start({ serviceStatus: async () => status });
+      const response = await fetch(`${base}/v1/service/status`, {
+        headers: { origin: browserHeaders.origin },
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(status);
+    });
+
+    it('passes what it does not know through as null', async () => {
+      const base = await start({
+        serviceStatus: async () => ({
+          ...status,
+          actionCapabilities: null,
+          issuerWallet: { address: null, dustAvailable: null },
+        }),
+      });
+      const body = (await (
+        await fetch(`${base}/v1/service/status`, { headers: { origin: browserHeaders.origin } })
+      ).json()) as typeof status;
+      expect(body.actionCapabilities).toBeNull();
+      expect(body.issuerWallet).toEqual({ address: null, dustAvailable: null });
+    });
+
+    it('refuses to send a status that carries a secret by name', async () => {
+      const base = await start({
+        serviceStatus: async () =>
+          ({ ...status, issuerWallet: { ...status.issuerWallet, seed: 'never' } }) as typeof status,
+      });
+      const response = await fetch(`${base}/v1/service/status`, {
+        headers: { origin: browserHeaders.origin },
+      });
+      expect(response.status).toBe(500);
+      expect(await response.text()).not.toContain('never');
+    });
+
+    it('reports unavailable when the service offers none, and requires a trusted origin', async () => {
+      const without = await start();
+      expect(
+        (
+          await fetch(`${without}/v1/service/status`, {
+            headers: { origin: browserHeaders.origin },
+          })
+        ).status,
+      ).toBe(503);
+      const base = await start({ serviceStatus: async () => status });
+      expect((await fetch(`${base}/v1/service/status`)).status).toBe(403);
     });
   });
 });

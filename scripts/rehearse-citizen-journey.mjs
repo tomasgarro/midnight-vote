@@ -150,8 +150,11 @@ const credential = {
 };
 
 // The device vault, as a file. It holds the fixture answer and its salt until
-// the answer is counted.
-const vaultPath = resolve(ROOT, `.state/rehearsal-vault.${slug}.json`);
+// the answer is counted. A second fixture pass is a second person, so it gets
+// its own device: name it with REHEARSAL_DEVICE.
+const device = process.env.REHEARSAL_DEVICE?.trim() ?? '';
+if (device && !/^[a-z0-9-]+$/u.test(device)) fail('REHEARSAL_DEVICE is letters, digits and dashes');
+const vaultPath = resolve(ROOT, `.state/rehearsal-vault.${slug}${device ? `.${device}` : ''}.json`);
 const readVault = () =>
   existsSync(vaultPath)
     ? JSON.parse(readFileSync(vaultPath, 'utf8')).map((opening) => ({
@@ -261,20 +264,34 @@ const seconds = () => `${Math.round((Date.now() - started) / 1000)} s`;
 console.log(`consultation ${deployed.referendumId} at ${deployed.contractAddress}`);
 console.log('before:', JSON.stringify(await publicState()));
 
-if (command === 'seal') {
-  const receipt = await adapter.castVote({
-    referendumId: deployed.referendumId,
-    choice: choiceArgument,
-    authorization,
-  });
-  console.log(`sealed in ${seconds()}: transaction ${receipt.transactionId}`);
-  console.log('receipt:', JSON.stringify({ ...receipt, choice: undefined }));
-} else if (command === 'count') {
-  const receipt = await adapter.revealVote({ referendumId: deployed.referendumId, authorization });
-  console.log(`counted in ${seconds()}: transaction ${receipt.transactionId}`);
-} else {
-  console.log('this device:', await adapter.getSealedAnswerStatus(deployed.referendumId));
+let refused = false;
+try {
+  if (command === 'seal') {
+    const receipt = await adapter.castVote({
+      referendumId: deployed.referendumId,
+      choice: choiceArgument,
+      authorization,
+    });
+    console.log(`sealed in ${seconds()}: transaction ${receipt.transactionId}`);
+    console.log('receipt:', JSON.stringify({ ...receipt, choice: undefined }));
+  } else if (command === 'count') {
+    const receipt = await adapter.revealVote({
+      referendumId: deployed.referendumId,
+      authorization,
+    });
+    console.log(`counted in ${seconds()}: transaction ${receipt.transactionId}`);
+  } else {
+    console.log('this device:', await adapter.getSealedAnswerStatus(deployed.referendumId));
+  }
+} catch (error) {
+  // A refusal the app would show to a person is a result of the rehearsal,
+  // not a crash. Anything else is.
+  if (!api.isCivicCredentialError(error)) throw error;
+  refused = true;
+  console.log(
+    `refused after ${seconds()}: ${error.code}${error.retryable ? ' (worth retrying)' : ''}: ${error.message}`,
+  );
 }
 
 console.log('after: ', JSON.stringify(await publicState()));
-process.exit(0);
+process.exit(refused ? 2 : 0);

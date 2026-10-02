@@ -23,6 +23,29 @@ const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
  */
 export type EnrollmentStatusReader = () => CredentialRootPublisherStatus;
 
+/**
+ * What this service is configured for, in public terms: the contracts it acts
+ * on, a fingerprint of the secret it shares with the relay, and whether its
+ * wallet can pay. An operator reads it from outside before a person tries.
+ */
+export interface CicoServiceStatus {
+  readonly registryContractAddress: string;
+  /** Consultations the root publisher admits new passes to. */
+  readonly consultations: readonly string[];
+  /** Null when this service issues no capabilities: walletless answers are off. */
+  readonly actionCapabilities: {
+    readonly keyId: string;
+    readonly networks: readonly string[];
+    readonly contracts: readonly string[];
+    readonly circuits: readonly string[];
+  } | null;
+  /** Null fields mean the wallet could not be asked just now. */
+  readonly issuerWallet: {
+    readonly address: string | null;
+    readonly dustAvailable: boolean | null;
+  };
+}
+
 export interface CicoHttpServiceOptions {
   readonly gateway: RarimoVerificationGateway;
   readonly issuer: CivicCredentialIssuerPort;
@@ -31,6 +54,7 @@ export interface CicoHttpServiceOptions {
   readonly actionCapabilityIssuer?: ActionCapabilityIssuer;
   /** Absent when no referenda are configured; the route then reports unavailable. */
   readonly enrollmentStatus?: EnrollmentStatusReader;
+  readonly serviceStatus?: () => Promise<CicoServiceStatus>;
 }
 
 /** Local/hosted HTTP façade. Real Rarimo and Midnight implementations are injected. */
@@ -146,6 +170,11 @@ async function routeRequest(
       lastPublishedAtUnixMs: status.lastPublishedAtMs,
       observedAtUnixMs: status.observedAtMs,
     });
+    return;
+  }
+  if (request.method === 'GET' && url.pathname === '/v1/service/status') {
+    if (!options.serviceStatus) throw new HttpProblem(503, 'Service status unavailable');
+    sendSafeJson(response, 200, await options.serviceStatus());
     return;
   }
   if (request.method === 'POST' && url.pathname === '/v1/credentials/issuances') {
@@ -309,6 +338,12 @@ const forbiddenResponseKeys = new Set([
   'choice',
   'votersecret',
   'holderblind',
+  // Nothing this service answers has a reason to carry one of these by name.
+  'seed',
+  'secret',
+  'walletseed',
+  'issuersecret',
+  'capabilitysecret',
 ]);
 
 function sendSafeJson(response: ServerResponse, status: number, value: unknown): void {

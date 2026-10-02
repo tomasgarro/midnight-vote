@@ -6,6 +6,7 @@ import {
 } from '@midnight-ntwrk/wallet-sdk-address-format';
 import { loadConfig, type RelayerConfig } from './config.js';
 import { evaluateRelayerReadiness } from './readiness.js';
+import { capabilityKeyId } from './v2-capability.js';
 import { handleV2Route } from './v2-http.js';
 import { MidnightIndexerReceiptResolver } from './v2-indexer.js';
 import { createConfiguredV2Store } from './v2-runtime.js';
@@ -333,6 +334,16 @@ export async function startServer(): Promise<void> {
           });
           send(response, readiness.ready ? 200 : 503, {
             ...readiness,
+            // What this relay sponsors, and a fingerprint of the secret it
+            // shares with the credential service. All of it is public.
+            v2: v2Service
+              ? {
+                  capabilityKeyId: capabilityKeyId(config.v2CapabilitySecret),
+                  networks: config.v2AllowedNetworks,
+                  contracts: config.v2AllowedContracts,
+                  circuits: config.v2AllowedCircuits,
+                }
+              : null,
             networkId: config.networkId,
             dustBalance: state?.dust.balance(dustAt).toString() ?? '0',
             dustEvaluationTime: dustAt.toISOString(),

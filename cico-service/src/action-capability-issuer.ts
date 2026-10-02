@@ -12,6 +12,23 @@ export interface ActionCapabilityIssuanceRequest {
   readonly credentialAuthorization: string;
 }
 
+/**
+ * A short public fingerprint of the capability secret.
+ *
+ * The relay holds the same secret and publishes the same fingerprint, so an
+ * operator can see from outside that the two were given the same value. It is
+ * a keyed hash of a constant, cut to 64 bits. It signs nothing, and it tells
+ * no more about the secret than any capability this service hands out. The
+ * relay computes it in its own package; a shared test vector holds the two
+ * together.
+ */
+export function capabilityKeyId(secret: string): string {
+  return createHmac('sha256', secret)
+    .update('midnight-referendum:v2-capability:key-id:1')
+    .digest('hex')
+    .slice(0, 16);
+}
+
 export interface ActionCapabilityIssuer {
   issue(request: ActionCapabilityIssuanceRequest): Promise<string>;
 }

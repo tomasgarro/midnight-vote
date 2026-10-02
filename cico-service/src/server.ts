@@ -18,7 +18,7 @@ import {
   type ReferendumV2Providers,
   readCredentialRegistryIssuerKey,
 } from 'midnight-referendum-api';
-import { HmacActionCapabilityIssuer } from './action-capability-issuer.js';
+import { capabilityKeyId, HmacActionCapabilityIssuer } from './action-capability-issuer.js';
 import { type CicoReferendumConfig, loadCicoServiceConfig } from './config.js';
 import {
   CredentialEpochCoordinator,
@@ -138,6 +138,25 @@ export async function startCicoService(): Promise<() => Promise<void>> {
     // Only offered when a publisher exists. Without referenda there is no batch
     // to wait for, and the route says so rather than inventing an empty one.
     ...(rootPublisher ? { enrollmentStatus: () => rootPublisher.getStatus() } : {}),
+    serviceStatus: async () => {
+      const wallet = await runtime.describeWallet();
+      return {
+        registryContractAddress: config.issuerRuntime.registryContractAddress,
+        consultations: config.referenda.map((referendum) => referendum.contractAddress),
+        actionCapabilities: config.actionCapabilities
+          ? {
+              keyId: capabilityKeyId(config.actionCapabilities.secret),
+              networks: config.actionCapabilities.allowedNetworks,
+              contracts: config.actionCapabilities.allowedContracts,
+              circuits: config.actionCapabilities.allowedCircuits,
+            }
+          : null,
+        issuerWallet: {
+          address: wallet?.address ?? null,
+          dustAvailable: wallet?.dustAvailable ?? null,
+        },
+      };
+    },
   });
   try {
     await new Promise<void>((resolve, reject) => {

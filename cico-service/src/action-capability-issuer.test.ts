@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ActionCapabilityError,
   type ActionCapabilityIssuanceRequest,
+  capabilityKeyId,
   HmacActionCapabilityIssuer,
 } from './action-capability-issuer.js';
 
@@ -105,5 +106,20 @@ describe('HmacActionCapabilityIssuer', () => {
         misconfigured.issue({ ...request, circuit, action: 'credential' }),
       ).rejects.toBeInstanceOf(ActionCapabilityError);
     }
+  });
+});
+
+describe('the public fingerprint of the capability secret', () => {
+  it('is the vector the relay pins too', () => {
+    // The relay computes this in its own package. Both suites pin this value.
+    expect(capabilityKeyId('a-capability-secret-shared-by-two-services')).toBe('4caad0fe941626a4');
+  });
+
+  it('differs per secret and is not a capability signature', async () => {
+    const id = capabilityKeyId(secret);
+    expect(id).toMatch(/^[0-9a-f]{16}$/u);
+    expect(capabilityKeyId(`${secret}!`)).not.toBe(id);
+    const token = await issuer().issue(request);
+    expect(token).not.toContain(id);
   });
 });

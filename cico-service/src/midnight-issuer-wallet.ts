@@ -39,6 +39,11 @@ import {
 const WALLET_STATE_SAVE_INTERVAL_MS = 5 * 60 * 1_000;
 /** A stopping container is killed after its grace period; the last save must fit in it. */
 const SHUTDOWN_SAVE_LIMIT_MS = 15_000;
+/** A status request waits this long for the wallet's state, then answers without it. */
+const DESCRIBE_LIMIT_MS = 3_000;
+
+/** One state of the wallet, as the facade emits it. */
+type FacadeState = Awaited<ReturnType<WalletFacade['waitForSyncedState']>>;
 
 /** Production Node wallet adapter for the dedicated Preview credential issuer. */
 export async function createMidnightIssuerWalletAdapter(
@@ -239,6 +244,35 @@ export async function createMidnightIssuerWalletAdapter(
         );
       }
       await saveState('synchronized');
+    },
+    async describe() {
+      // One state, or nothing: a status request must not hang on the wallet.
+      const state = await new Promise<FacadeState | null>((resolve) => {
+        const timer = setTimeout(() => {
+          subscription.unsubscribe();
+          resolve(null);
+        }, DESCRIBE_LIMIT_MS);
+        const subscription = facade.state().subscribe({
+          next: (value) => {
+            clearTimeout(timer);
+            queueMicrotask(() => subscription.unsubscribe());
+            resolve(value);
+          },
+          error: () => {
+            clearTimeout(timer);
+            resolve(null);
+          },
+        });
+      });
+      if (!state) return null;
+      return {
+        // Public address only. Never any key material.
+        address: MidnightBech32m.encode(
+          configuration.networkId,
+          state.unshielded.address,
+        ).asString(),
+        dustAvailable: state.dust.balance(new Date()) > 0n,
+      };
     },
     async stop() {
       if (stopped) return;

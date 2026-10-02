@@ -175,6 +175,39 @@ in front of servers that are not ready shows a consultation nobody can answer.
 
 ## Check it from outside
 
+One command asks everything a person depends on, and says what to change:
+
+```bash
+npm run check:preview
+```
+
+It needs no secret and changes nothing. It reads the relay's readiness, the
+credential service's status, each consultation on the chain, the published app
+and Cleisthenes.
+
+| It reports | Meaning |
+| --- | --- |
+| `ok` | Observed, and as it should be |
+| `WAIT` | Not ready yet, and it gets there by itself: a wallet still reading the chain, a root not published yet |
+| `FAIL` | A person would be stopped. The line under it names the variable or the step |
+| `?` | Could not be observed from this machine. Nothing is claimed |
+
+Two of its checks cannot be made by hand:
+
+- **Relay and credential service share one secret.** Each publishes a short
+  fingerprint of its capability secret. If the two pastes differ, the
+  fingerprints differ. Without this check the mistake shows only after a
+  person's device has built a proof, when the relay refuses it.
+- **On chain.** Whether each consultation admits every pass issued so far.
+
+Before the hPanel sitting it reports the relay and the credential service as
+not answering: the edge has no certificate for `relay.midnight.vote` and
+`cico.midnight.vote` until the credential project runs the new manifest. It
+also reports the app's proving files as missing until the Preview build is
+published.
+
+The same things by hand, and what the logs say:
+
 | Check | Expect |
 | --- | --- |
 | `curl https://relay.midnight.vote/ready` | 200 once the relayer's wallet has replayed and holds DUST |
