@@ -8,6 +8,29 @@ midnight.vote is a Passport-first civic participation project built on Midnight.
 
 [Try midnight.vote](https://midnight.vote) · [Public Docs](https://midnight.vote/docs) · [Submission brief](docs/SUBMISSION.md) · [Run locally](docs/QUICKSTART.md) · [All documentation](docs/README.md)
 
+## On Midnight Preview
+
+Two contracts are deployed on Midnight's public test network. A consultation is open on them now.
+
+| Contract | Address | Deployed |
+| --- | --- | --- |
+| `credential-registry-v1` | `9f8fe7c54d9907543cbcde82943c2be35ccb20f404e477ca2c29b8fc84a52132` | 2 September 2026, block 683026 |
+| `referendum-v2`: "Should the result of a consultation stay hidden until it closes?" | `862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4` | 2 October 2026, block 1113403 |
+
+Check either one against the network's own indexer, not against this repository:
+
+```bash
+curl -s https://indexer.preview.midnight.network/api/v4/graphql -H 'content-type: application/json' -d '{"query":"{ contractAction(address: \"862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4\") { __typename transaction { hash block { height } } } }"}'
+```
+
+| | State on 2 October 2026 |
+| --- | --- |
+| The consultation | Open until 9 October 2026, 16:00 UTC. Any adult with a passport read by its chip may answer |
+| The app in Preview mode | Reads the consultation and its count of sealed answers from the chain |
+| A sealed and counted answer by a real person | **Not yet.** It needs the relay and the credential service to be switched on, and a passport |
+
+What was observed, and what was not, is recorded in [docs/evidence/preview-2026-10-02](docs/evidence/preview-2026-10-02/README.md). How it is operated is in the [Preview runbook](docs/PREVIEW-RUNBOOK.md).
+
 ## The four pillars
 
 | Pillar | What we are building | What exists today |
