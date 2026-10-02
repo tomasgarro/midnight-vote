@@ -147,8 +147,28 @@ in front of servers that are not ready shows a consultation nobody can answer.
 | `curl https://relay.midnight.vote/ready` | 200 once the relayer's wallet has replayed and holds DUST |
 | `curl -H "Origin: https://midnight.vote" https://cico.midnight.vote/v1/enrollment/status` | 200 with the root publisher's counters. 503 means no consultation is configured |
 | `curl https://midnight.vote/Switzerland/api/health` | 200. If not, restart `swiss-civic-pilot`: it lost the edge network |
-| The relayer's log | Its wallet address, then "listening". Before that: "Set RELAYER_SEED…" means a secret is missing |
-| The credential service's log | Its issuer wallet and a DUST balance above zero. It pays for every pass and every root it publishes |
+| The relayer's log | "wallet state restored" or a replay, then "listening". Before that: "Set RELAYER_SEED…" means a secret is missing |
+| The credential service's log | At start: `issuer wallet address, to fund with NIGHT: mn_addr_preview1…`. After the replay: `issuer wallet synchronized. DUST: <number above zero>` |
+
+### If the issuer wallet holds no DUST
+
+The credential service pays for every pass and every root it publishes, from
+its own wallet. Its log says `the issuer wallet holds no DUST` when that
+wallet cannot pay. Nothing else is wrong; a pass simply cannot be issued yet.
+
+| Step | What |
+| --- | --- |
+| 1 | Copy the address from the log line `issuer wallet address, to fund with NIGHT` |
+| 2 | Send Preview NIGHT to it: from the Preview faucet (it asks for a captcha), or from a wallet that holds some |
+| 3 | Register that NIGHT for DUST generation. Only the wallet that owns it can. On the operator's machine, put the issuer seed (the value of `CICO_ISSUER_WALLET_SEED` in hPanel) in a file that git ignores, as one line `DUST_REGISTER_SEED_HEX=<the seed>`, for example `.env.issuer.local`. Then run the command below, and delete the file |
+| 4 | Restart nothing. DUST accrues by itself; the service's next attempt succeeds once the balance is above zero |
+
+```bash
+node --env-file=relayer/.env --env-file=.env.issuer.local relayer/dist/register-dust.js
+```
+
+NIGHT alone pays for nothing. It generates DUST only once it is registered,
+and that is the step people miss.
 
 ## The first phone run
 

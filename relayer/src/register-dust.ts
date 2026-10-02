@@ -24,7 +24,7 @@ import { startRelayerWallet } from './wallet.js';
 const config = resolveConfig();
 console.log(`network: ${config.networkId}`);
 console.log(`wallet:  ${config.label}`);
-console.log('starting wallet and syncing (this can take several minutes)…');
+console.log('starting wallet and syncing (a wallet that starts with nothing needs over an hour)…');
 
 const wallet = await startRelayerWallet(config);
 
@@ -34,8 +34,12 @@ const WAIT_FOR_NIGHT_MS = 8 * 60 * 1000;
 /** DUST accrues only after a full replay, so this bound is generous. */
 const DUST_WAIT_MS = 35 * 60 * 1000;
 
-/** A cold wallet replays the whole indexer history; on Preview that is ~27 min. */
-const SYNC_WAIT_MS = 45 * 60 * 1000;
+/**
+ * A cold wallet replays the whole indexer history. On Preview that was about
+ * 27 minutes in September 2026 and about 85 in October, more on a busy
+ * machine. The 45-minute bound this had would now stop a wallet that is fine.
+ */
+const SYNC_WAIT_MS = 3 * 60 * 60 * 1000;
 
 /**
  * Bounds a wallet call and narrates it.
