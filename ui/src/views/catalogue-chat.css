@@ -62,6 +62,21 @@
   line-height: 1.7;
   animation: chat-response-in 400ms both;
 }
+/* The parts of an answer, always in the same order and the same weight. */
+.chat-answer-section {
+  margin-top: 14px;
+  animation: chat-response-in 400ms both;
+}
+.chat-answer-section h3 {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.chat-answer-section p {
+  margin: 0 0 6px;
+}
 .chat-thinking {
   display: flex;
   align-items: center;
@@ -105,6 +120,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-response-prose p,
+  .chat-answer-section,
   .chat-thinking i {
     animation: none;
   }
