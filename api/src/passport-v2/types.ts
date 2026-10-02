@@ -207,6 +207,13 @@ export type CivicCredentialErrorCode =
    * takes one answer per pass, so there is nothing to seal again.
    */
   | 'ANSWER_ALREADY_SEALED'
+  /**
+   * The contract refused the answer because the holder of this pass has
+   * already answered, and this device holds no record of that answer. A
+   * renewed pass has the same holder as the pass it replaced, so it cannot
+   * answer a second time.
+   */
+  | 'HOLDER_ALREADY_ANSWERED'
   /** This device holds no opening for a sealed answer on this referendum. */
   | 'BALLOT_OPENING_NOT_FOUND'
   /** The referendum is not in its counting phase, or the count has closed. */

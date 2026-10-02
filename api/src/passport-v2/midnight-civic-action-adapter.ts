@@ -116,6 +116,19 @@ export interface MidnightCivicActionAdapterOptions {
 /** How many earlier passes a lookup goes back before it gives up. */
 const EARLIER_PASSES = 48;
 
+/** The assertion `castVote` fails with when the holder's nullifier is spent. */
+const ALREADY_ANSWERED_ASSERTION = 'This voter has already voted in this referendum';
+
+/** The runtime wraps a failed assertion several times; the text is in one of the causes. */
+function refusedAsAlreadyAnswered(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current.message.includes(ALREADY_ANSWERED_ASSERTION)) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 /**
  * Browser-owned v2 vote adapter. It prepares the Compact witness locally and
  * calls the Midnight executor; no HTTP action request ever receives `choice`.
@@ -292,17 +305,32 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
 
     const executor = this.executorFactory(this.providers, entry.config);
     await executor.join(entry.contractAddress, privateState);
-    const receipt = this.actionExecutionContext
-      ? await this.actionExecutionContext.run(
-          {
-            credentialAuthorization: request.authorization.handle,
-            contractAddress: entry.contractAddress,
-            circuit: 'castVote',
-            action: 'vote',
-          },
-          () => executor.castVote(),
-        )
-      : await executor.castVote();
+    let receipt: CanonicalReceipt;
+    try {
+      receipt = this.actionExecutionContext
+        ? await this.actionExecutionContext.run(
+            {
+              credentialAuthorization: request.authorization.handle,
+              contractAddress: entry.contractAddress,
+              circuit: 'castVote',
+              action: 'vote',
+            },
+            () => executor.castVote(),
+          )
+        : await executor.castVote();
+    } catch (error) {
+      // The contract's own rule, met while the circuit ran on this device and
+      // before any proof: the holder's nullifier is already spent. None of
+      // this device's openings is on chain, or the check above would have said
+      // so, which means the answer was sealed where its record was not kept.
+      if (refusedAsAlreadyAnswered(error)) {
+        throw new CivicCredentialError(
+          'HOLDER_ALREADY_ANSWERED',
+          'The holder of this pass has already answered this referendum, and this device has no record of that answer',
+        );
+      }
+      throw error;
+    }
     assertVoteReceipt(receipt, entry.contractAddress, 'castVote');
     await this.ballotOpenings?.save({
       ...opening,

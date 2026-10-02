@@ -146,6 +146,7 @@ describe('what the app says when sealing an answer is refused', () => {
     ['CREDENTIAL_NOT_ADMITTED', 'passNotAdmitted'],
     ['CREDENTIAL_ADMISSION_CLOSED', 'passTooLate'],
     ['ANSWER_ALREADY_SEALED', 'answerAlreadySealed'],
+    ['HOLDER_ALREADY_ANSWERED', 'holderAlreadyAnswered'],
   ] as const)('says %s in each of the three languages', (code, key) => {
     const said = LOCALES.map((locale) =>
       sealRefusalMessage(refusal(code, 'English from the adapter'), locale, 'Preview'),
