@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { padBytes32 } from 'midnight-referendum-api';
+import { deriveRoleKey, padBytes32 } from 'midnight-referendum-api';
 
 /**
  * One referendum this service's root publisher is authorized to admit
@@ -108,6 +108,21 @@ export function loadCicoServiceConfig(
     );
   }
   const referenda = parseReferenda(env);
+  // A consultation takes a root only from the holder of its root-publisher
+  // secret. With another secret every publish would be refused, and nobody
+  // with a new pass could answer. Say so at start, not at the first person.
+  const rootPublisherKey = deriveRoleKey(
+    'cico:ref-v2:root-publisher:',
+    bytes32(rootPublisherSecretHex, 'CICO_ROOT_PUBLISHER_SECRET_HEX'),
+  );
+  for (const referendum of referenda) {
+    if (!equalBytes(referendum.rootPublisherKey, rootPublisherKey)) {
+      throw new Error(
+        `CICO_ROOT_PUBLISHER_SECRET_HEX is not the root publisher of the consultation ${referendum.contractAddress}: ` +
+          'the key it derives is not the rootPublisherKeyHex in CICO_REFERENDA_JSON',
+      );
+    }
+  }
   const rarimoBaseUrl = required(env, 'CICO_RARIMO_BASE_URL');
   const verifierOrigin = absoluteHttpUrl(rarimoBaseUrl, 'CICO_RARIMO_BASE_URL').origin;
   const explorerBaseUrl = env.CICO_EXPLORER_BASE_URL?.trim();

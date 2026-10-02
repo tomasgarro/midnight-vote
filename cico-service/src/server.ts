@@ -1,7 +1,10 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
+import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
+import { asContractAddress } from '@midnight-ntwrk/midnight-js-types';
 import { iso31661 } from 'iso-3166';
 import {
   createReferendumV2Executor,
@@ -13,6 +16,7 @@ import {
   type ReferendumV2CircuitKeys,
   type ReferendumV2ExecutorConfig,
   type ReferendumV2Providers,
+  readCredentialRegistryIssuerKey,
 } from 'midnight-referendum-api';
 import { HmacActionCapabilityIssuer } from './action-capability-issuer.js';
 import { type CicoReferendumConfig, loadCicoServiceConfig } from './config.js';
@@ -29,6 +33,7 @@ import {
 } from './credential-root-publisher.js';
 import { FileCredentialIssuanceStore, FileEvidenceAuthorizationStore } from './durable-stores.js';
 import { createCicoHttpService } from './http.js';
+import { checkIssuerRole } from './issuer-role-check.js';
 import { startMidnightIssuerRuntime } from './midnight-issuer-runtime.js';
 import { createMidnightIssuerWalletAdapter } from './midnight-issuer-wallet.js';
 import { RarimoHttpVerificationGateway } from './rarimo-http-gateway.js';
@@ -54,6 +59,24 @@ export async function startCicoService(): Promise<() => Promise<void>> {
     proofParamsAllowedOrigins: config.rarimoProofParamsAllowedOrigins,
     proofRequestBaseUrl: config.rarimoProofRequestBaseUrl,
   });
+  // Before the wallet starts, which can take long: is this service the issuer
+  // of the registry it is configured for? A wrong secret stops it here.
+  setNetworkId('preview');
+  const issuerRole = await checkIssuerRole({
+    issuerRoleSecretHex: config.issuerRuntime.issuerRoleSecretHex,
+    registryContractAddress: config.issuerRuntime.registryContractAddress,
+    readIssuerKey: async (address) => {
+      const state = await indexerPublicDataProvider(
+        config.issuerRuntime.indexerHttpUrl,
+        config.issuerRuntime.indexerWsUrl,
+      ).queryContractState(asContractAddress(address));
+      return state ? readCredentialRegistryIssuerKey(state.data) : null;
+    },
+    warn: (message) => process.stderr.write(`[cico] ${message}\n`),
+  });
+  if (issuerRole === 'matches') {
+    process.stdout.write('[cico] issuer role secret matches the registry on chain\n');
+  }
   const runtime = await startMidnightIssuerRuntime(config.issuerRuntime, {
     createWallet: createMidnightIssuerWalletAdapter,
   });

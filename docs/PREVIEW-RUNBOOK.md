@@ -104,7 +104,7 @@ All changes go in together, because each restart costs a wallet replay.
 | Step | Where | What |
 | --- | --- | --- |
 | 1 | hPanel → VPS → Docker Manager → `midnight-civic-relay` → Manage → environment | Replace the two placeholders: `RELAYER_SEED` and `RELAYER_V2_CAPABILITY_SECRET`, from `relayer/.env`. `RELAYER_V2_ALLOWED_CONTRACTS` already holds the test consultation's address; change it only when a consultation is added. Save and restart |
-| 2 | same place → `midnight-rarimo-nfc` → environment | Add `CICO_ACTION_CAPABILITY_SECRET` (the same value as the relay's capability secret), `CICO_ACTION_ALLOWED_CONTRACTS` and `CICO_REFERENDA_JSON` as printed |
+| 2 | same place → `midnight-rarimo-nfc` → environment | Add `CICO_ACTION_CAPABILITY_SECRET` (the same value as the relay's capability secret), `CICO_ACTION_ALLOWED_CONTRACTS` and `CICO_REFERENDA_JSON` as printed. Two values that are already there must be the operator's own, see below |
 | 3 | `midnight-rarimo-nfc` → compose editor | Replace the content with `deploy/hostinger/rarimo-standalone/docker-compose.hostinger.preview.yml`. Save and deploy |
 | 4 | Wait | Both wallets replay, this first time. Expect two to three hours on the two-core server. Later restarts take minutes |
 | 5 | Web host | Publish the `preview` build of the app, as described below |
@@ -121,6 +121,35 @@ node -e "const m=require('fs').readFileSync('relayer/.env','utf8').match(/^RELAY
 
 Never send these values through the Hostinger API or a connector. The API
 returns a project's environment in plain text.
+
+### Two secrets that are not free choices
+
+The registry and each consultation were deployed from the operator's machine.
+Each holds a public key, and only the secret behind that key may act.
+
+| In hPanel, project `midnight-rarimo-nfc` | Must equal, in `.env.v2.preview` | If it does not |
+| --- | --- | --- |
+| `CICO_ISSUER_ROLE_SECRET` | `V2_ISSUER_ROLE_SECRET_HEX` | The registry refuses every pass |
+| `CICO_ROOT_PUBLISHER_SECRET_HEX` | `V2_ROOT_PUBLISHER_ROLE_SECRET_HEX` | No consultation takes a new root, so nobody with a new pass can answer |
+
+The credential service checks both when it starts, before its wallet does,
+and stops with a line that names the variable:
+`CICO_ISSUER_ROLE_SECRET is not the issuer of the registry …` or
+`CICO_ROOT_PUBLISHER_SECRET_HEX is not the root publisher of the consultation …`.
+When both are right its log says `issuer role secret matches the registry on
+chain`. To copy the right value:
+
+```bash
+node -e "const m=require('fs').readFileSync('.env.v2.preview','utf8').match(/^V2_ISSUER_ROLE_SECRET_HEX=(.*)$/m);process.stdout.write(m[1].trim())" | clip
+```
+
+```bash
+node -e "const m=require('fs').readFileSync('.env.v2.preview','utf8').match(/^V2_ROOT_PUBLISHER_ROLE_SECRET_HEX=(.*)$/m);process.stdout.write(m[1].trim())" | clip
+```
+
+The relayer's wallet is one wallet. Once the server's relayer holds
+`RELAYER_SEED`, no relayer with the same seed may run anywhere else: two
+processes on one wallet spend the same DUST.
 
 ## Publish the app
 

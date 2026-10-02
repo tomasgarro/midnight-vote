@@ -143,6 +143,15 @@ export function parseCredentialRegistryV1(data: ChargedState): CredentialRegistr
   };
 }
 
+/**
+ * The public key of the registry's issuer, as the registry holds it on chain.
+ * A service compares it with the key its own secret derives, to learn at start
+ * whether it is the issuer of this registry at all.
+ */
+export function readCredentialRegistryIssuerKey(data: ChargedState): Uint8Array {
+  return new Uint8Array(GeneratedRegistry.ledger(data).issuerKey);
+}
+
 export function findCredentialPath(
   data: ChargedState,
   credentialLeaf: Uint8Array,
