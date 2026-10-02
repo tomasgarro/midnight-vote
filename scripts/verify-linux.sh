@@ -42,6 +42,11 @@ if [[ "$compiler_available" != true ]]; then
   fail "A working Compact compiler is required because generated contract assets are not tracked. Verify compactc --version or compact compile --version."
 fi
 
+# CI starts from a fresh checkout, which has none of the untracked generated
+# bindings. Start without them here too, so that a step which needs them before
+# anything has generated them fails on this machine as it would there.
+rm -rf api/src/generated/credential-registry-v1 api/src/generated/referendum-v2
+
 npm run validate:contract
 npm run build --workspace midnight-referendum-api
 npm test
