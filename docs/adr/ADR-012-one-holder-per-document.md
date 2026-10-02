@@ -90,6 +90,7 @@ secret, which the service never sees.
 | Limit | Why |
 | --- | --- |
 | A pass cannot move to another browser or device | The holder secret lives in one browser's vault. A person who clears the site's data, uses private browsing, or starts in a messaging app's own browser is refused elsewhere until the registry's epoch changes |
+| A browser that clears the site's storage locks its document out | Safari clears a site's storage after seven days of use without a visit. The holder secret goes with it, and the document cannot get a new pass in this registry. The app asks for persistent storage when a pass is issued; a browser may decline |
 | The operator cannot release one document | The file holds digests only. It can be kept or removed as a whole |
 | The rule is the service's, not the chain's | The issuer could still issue any pass. The rule binds the people who ask, not the issuer |
 | Losing `document-bindings.json` reopens the rule | Every document would be unknown again. The state directory must be kept with the wallet state |

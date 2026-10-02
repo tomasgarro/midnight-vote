@@ -404,6 +404,16 @@ It can also rehearse what a phone does to a page:
   same browser once its site data is cleared. Nothing moves a pass.
 - The rule holds for one registry. A consultation on another registry, such as
   a dress rehearsal, knows nothing of it.
+- A browser may clear this site's storage by itself. The app asks it not to,
+  when a pass is issued and when an answer is sealed, and a browser may
+  decline. Safari clears a site's script-writable storage after seven days of
+  Safari use without a visit to the site; a site added to the Home Screen has
+  its own counter (WebKit, "Full Third-Party Cookie Blocking and More", 2020).
+  When that happens the person loses three things at once: the pass, the
+  sealed answers not yet counted, and the holder secret, so the document gets
+  no new pass in this registry either. For a pilot with iPhones: ask people to
+  open the app at least once a week until the count, or to add it to the Home
+  Screen first. How Safari answers the app's request is not measured.
 - The registry is shared by every consultation and keeps enrolling. The
   credential service publishes each new root to every open consultation, one
   transaction per consultation. A person's proof is built against the newest root the
