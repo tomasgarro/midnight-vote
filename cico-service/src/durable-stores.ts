@@ -122,6 +122,54 @@ export class FileEvidenceAuthorizationStore implements EvidenceAuthorizationStor
   }
 }
 
+/**
+ * Which holder a document belongs to, for one registry epoch.
+ *
+ * A document may be verified more than once: a pass expires and is renewed.
+ * It may not move to another holder, because each holder can answer a
+ * consultation once, and two holders would be two answers for one document.
+ */
+export interface DocumentBindingStore {
+  /**
+   * Ties the document to the holder if it has none.
+   *
+   * | Result | Meaning |
+   * | --- | --- |
+   * | `bound` | The document had no holder. It has this one now |
+   * | `same` | It already had this holder: a renewal or a retry |
+   * | `other` | It has another holder. Nothing was changed |
+   */
+  bind(documentTag: string, holderBinding: string): Promise<'bound' | 'same' | 'other'>;
+}
+
+/**
+ * File-backed document bindings. Only SHA-256 digests are persisted: of the
+ * document tag, which is itself a hash of a proof's nullifier, and of the
+ * holder's public binding. Neither says who anybody is.
+ */
+export class FileDocumentBindingStore implements DocumentBindingStore {
+  private readonly store: AtomicJsonStore<DocumentBindingState>;
+
+  constructor(input: DurableFileStoreInput) {
+    this.store = new AtomicJsonStore(input, emptyDocumentBindingState, parseDocumentBindingState);
+  }
+
+  async bind(documentTag: string, holderBinding: string): Promise<'bound' | 'same' | 'other'> {
+    requireNonEmpty(documentTag, 'documentTag');
+    requireNonEmpty(holderBinding, 'holderBinding');
+    const documentKey = digest('document', documentTag);
+    const holderKey = digest('holder', holderBinding);
+    return this.store.update(async (state) => {
+      const existing = state.documents[documentKey];
+      if (!existing) {
+        state.documents[documentKey] = holderKey;
+        return 'bound';
+      }
+      return existing === holderKey ? 'same' : 'other';
+    });
+  }
+}
+
 /** Durable public transaction receipt index for restart/recovery lookups. */
 export class FileCanonicalReceiptStore implements CanonicalReceiptStore {
   private readonly store: AtomicJsonStore<ReceiptState>;
@@ -259,6 +307,33 @@ interface EvidenceAuthorizationRecord {
 interface EvidenceState {
   readonly version: 1;
   readonly authorizations: Record<string, EvidenceAuthorizationRecord>;
+}
+
+interface DocumentBindingState {
+  readonly version: 1;
+  readonly documents: Record<string, string>;
+}
+
+function emptyDocumentBindingState(): DocumentBindingState {
+  return { version: 1, documents: {} };
+}
+
+function parseDocumentBindingState(value: unknown): DocumentBindingState {
+  if (!isRecord(value) || value.version !== 1 || !isRecord(value.documents)) {
+    throw new Error('Document binding state is corrupt or unsupported');
+  }
+  const documents: Record<string, string> = {};
+  for (const [key, holder] of Object.entries(value.documents)) {
+    if (
+      !/^[a-f0-9]{64}$/u.test(key) ||
+      typeof holder !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(holder)
+    ) {
+      throw new Error('Document binding state is corrupt or unsupported');
+    }
+    documents[key] = holder;
+  }
+  return { version: 1, documents };
 }
 
 interface ReceiptState {

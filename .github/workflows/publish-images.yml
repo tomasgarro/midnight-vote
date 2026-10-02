@@ -29,13 +29,20 @@ jobs:
       contents: read
       packages: write
     strategy:
-      fail-fast: true
+      # One service must not hold back the other's image.
+      fail-fast: false
       matrix:
         service:
+          # The package `midnight-civic-cico` was first pushed by hand and is not
+          # linked to this repository, so the workflow's token may not write to
+          # it. The credential service is published under a name this
+          # repository owns.
           - name: cico
+            package: midnight-civic-cico-service
             workspace: midnight-referendum-cico-service
             directory: cico-service
           - name: relayer
+            package: midnight-civic-relayer
             workspace: midnight-referendum-relayer
             directory: relayer
 
@@ -85,7 +92,7 @@ jobs:
           RELEASE: ${{ inputs.release }}
         run: |
           short_sha="$(git rev-parse --short=7 HEAD)"
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/midnight-civic-${{ matrix.service.name }}"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.service.package }}"
           tag="${RELEASE}-${short_sha}"
           docker build --pull \
             --build-arg NODE_IMAGE="$NODE_IMAGE" \

@@ -7,14 +7,15 @@ import {
   padBytes32,
 } from './crypto.js';
 import {
-  assertReferendumRegistryBinding,
-  createFrozenCredentialRegistryReference,
+  assertCanonicalReferendumBinding,
+  type CredentialTreeView,
+  credentialTreeView,
   findBallotPath,
-  findCredentialPath,
   isBallotRevealed,
   parseCredentialRegistryV1,
   parseReferendumV2,
   type ReferendumV2PrivateState,
+  resolveAdmittedCredentialPath,
 } from './midnight-v2.js';
 import {
   createReferendumV2Executor,
@@ -30,7 +31,9 @@ import type {
   CivicCredentialPort,
   CivicCredentialPrivateMaterial,
   CivicCredentialPrivateStatePort,
+  PassAdmission,
 } from './ports.js';
+import type { CredentialRegistryHistoryPort } from './registry-history.js';
 import type {
   CanonicalReceipt,
   CastVoteRequest,
@@ -99,6 +102,31 @@ export interface MidnightCivicActionAdapterOptions {
    * as unavailable.
    */
   readonly ballotOpenings?: BallotOpeningVaultPort;
+  /**
+   * Where the registry gained each pass. With it, a pass is proven against the
+   * newest root the consultation admitted that already held it, so a person is
+   * not held up by passes issued after theirs. Without it, a pass can be
+   * proven only while the registry's current root is admitted.
+   */
+  readonly registryHistory?: CredentialRegistryHistoryPort;
+  /** Seconds since the epoch; only chooses the wording of a refusal. */
+  readonly nowUnix?: () => number;
+}
+
+/** How many earlier passes a lookup goes back before it gives up. */
+const EARLIER_PASSES = 48;
+
+/** The assertion `castVote` fails with when the holder's nullifier is spent. */
+const ALREADY_ANSWERED_ASSERTION = 'This voter has already voted in this referendum';
+
+/** The runtime wraps a failed assertion several times; the text is in one of the causes. */
+function refusedAsAlreadyAnswered(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current.message.includes(ALREADY_ANSWERED_ASSERTION)) return true;
+    current = current.cause;
+  }
+  return false;
 }
 
 /**
@@ -153,7 +181,11 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
       throw new TypeError('Referendum catalog IDs must be unique');
     }
     this.randomBytes = options.randomBytes ?? secureRandomBytes;
-    const canonical = createCanonicalStateResolver(options.providers);
+    const canonical = createCanonicalStateResolver(
+      options.providers,
+      options.registryHistory,
+      options.nowUnix ?? (() => Math.floor(Date.now() / 1000)),
+    );
     this.stateResolver = options.stateResolver ?? canonical;
     this.resolveRevealContext =
       options.stateResolver?.resolveRevealContext?.bind(options.stateResolver) ??
@@ -218,9 +250,31 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
     if (held.some((opening) => opening.status === 'sealed')) {
       // The contract would refuse the repeat anyway, but only after a proof was built.
       throw new CivicCredentialError(
-        'CONFLICT',
+        'ANSWER_ALREADY_SEALED',
         'This device already sealed an answer for this referendum',
       );
+    }
+    // An earlier attempt may have reached the chain without this device ever
+    // seeing the confirmation: the page was dropped, or the wait gave up. Only
+    // the chain can say. If it did land, that is the person's answer, and a
+    // second proof would be built for nothing.
+    const unsettled = ownOpenings(held, entry).filter((opening) => opening.status === 'sealing');
+    if (unsettled.length > 0 && this.ballotOpenings) {
+      const context = await this.resolveRevealContext(
+        entry,
+        unsettled.map((opening) => opening.ballotCommitment),
+      );
+      const landed = context.ballots.findIndex(
+        (ballot) => ballot.revealed || ballot.revealPath !== null,
+      );
+      const opening = landed < 0 ? undefined : unsettled[landed];
+      if (opening) {
+        await this.ballotOpenings.save({ ...opening, status: 'sealed' });
+        throw new CivicCredentialError(
+          'ANSWER_ALREADY_SEALED',
+          'This device already sealed an answer for this referendum',
+        );
+      }
     }
 
     await this.stateResolver.assertCanonicalBinding(entry);
@@ -251,17 +305,32 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
 
     const executor = this.executorFactory(this.providers, entry.config);
     await executor.join(entry.contractAddress, privateState);
-    const receipt = this.actionExecutionContext
-      ? await this.actionExecutionContext.run(
-          {
-            credentialAuthorization: request.authorization.handle,
-            contractAddress: entry.contractAddress,
-            circuit: 'castVote',
-            action: 'vote',
-          },
-          () => executor.castVote(),
-        )
-      : await executor.castVote();
+    let receipt: CanonicalReceipt;
+    try {
+      receipt = this.actionExecutionContext
+        ? await this.actionExecutionContext.run(
+            {
+              credentialAuthorization: request.authorization.handle,
+              contractAddress: entry.contractAddress,
+              circuit: 'castVote',
+              action: 'vote',
+            },
+            () => executor.castVote(),
+          )
+        : await executor.castVote();
+    } catch (error) {
+      // The contract's own rule, met while the circuit ran on this device and
+      // before any proof: the holder's nullifier is already spent. None of
+      // this device's openings is on chain, or the check above would have said
+      // so, which means the answer was sealed where its record was not kept.
+      if (refusedAsAlreadyAnswered(error)) {
+        throw new CivicCredentialError(
+          'HOLDER_ALREADY_ANSWERED',
+          'The holder of this pass has already answered this referendum, and this device has no record of that answer',
+        );
+      }
+      throw error;
+    }
     assertVoteReceipt(receipt, entry.contractAddress, 'castVote');
     await this.ballotOpenings?.save({
       ...opening,
@@ -270,6 +339,28 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
     });
     this.receipts.set(receipt.transactionId, receipt);
     return receipt;
+  }
+
+  /**
+   * Whether this device's pass can answer this consultation now. It reads the
+   * registry and the consultation, as sealing does, and builds no proof. The
+   * app asks it while a new pass waits for its root to be published.
+   */
+  async getPassAdmission(referendumId: string): Promise<PassAdmission> {
+    const entry = this.referenda.get(referendumId);
+    if (!entry) throw new CivicCredentialError('POLICY_NOT_SATISFIED', 'Unknown referendum');
+    const material = await this.credential.getPrivateCredentialMaterial();
+    if (!material) return 'no-pass';
+    try {
+      await this.stateResolver.resolveCredentialPath(entry, material.credentialLeaf);
+      return 'admitted';
+    } catch (error) {
+      if (error instanceof CivicCredentialError) {
+        if (error.code === 'CREDENTIAL_NOT_ADMITTED') return 'pending';
+        if (error.code === 'CREDENTIAL_ADMISSION_CLOSED') return 'closed';
+      }
+      throw error;
+    }
   }
 
   /**
@@ -455,31 +546,41 @@ export function buildReferendumV2VoterPrivateState(
 
 function createCanonicalStateResolver(
   providers: ReferendumV2Providers,
+  registryHistory: CredentialRegistryHistoryPort | undefined,
+  nowUnix: () => number,
 ): Required<MidnightCivicActionStateResolver> {
+  // The registry as it was after each earlier pass, newest first. One request
+  // lists the blocks; a state is fetched only when the one before it did not do.
+  async function* earlierRegistryViews(
+    history: CredentialRegistryHistoryPort,
+    registryContractAddress: string,
+  ): AsyncGenerator<CredentialTreeView> {
+    const heights = await history.credentialBlockHeights(registryContractAddress, EARLIER_PASSES);
+    for (const blockHeight of heights) {
+      const past = await providers.publicDataProvider.queryContractState(registryContractAddress, {
+        type: 'blockHeight',
+        blockHeight,
+      });
+      if (past) yield credentialTreeView(past.data);
+    }
+  }
+
   return {
     async assertCanonicalBinding(entry) {
       const registryState = await providers.publicDataProvider.queryContractState(
         entry.config.registry.registryContractAddress,
       );
       if (!registryState) throw new Error('Credential registry has no canonical state');
-      const reference = createFrozenCredentialRegistryReference(
-        entry.config.registry.registryContractAddress,
-        parseCredentialRegistryV1(registryState.data),
-      );
-      assertReferendumRegistryBinding(reference, {
-        registryContractBinding: entry.config.registry.registryContractBinding,
-        registryId: entry.config.registry.registryId,
-        issuerId: entry.config.registry.issuerId,
-        credentialEpoch: entry.config.registry.credentialEpoch,
-        initialCredentialRoot: entry.config.registry.frozenRoot,
-      });
-
       const referendumState = await providers.publicDataProvider.queryContractState(
         entry.contractAddress,
       );
       if (!referendumState) throw new Error('Referendum has no canonical state');
       const referendum = parseReferendumV2(referendumState.data);
-      assertReferendumRegistryBinding(reference, referendum);
+      assertCanonicalReferendumBinding(
+        entry.config.registry,
+        parseCredentialRegistryV1(registryState.data),
+        referendum,
+      );
       if (referendum.phase !== 'COMMIT' || referendum.closed) {
         throw new Error('Referendum is not accepting votes');
       }
@@ -488,11 +589,25 @@ function createCanonicalStateResolver(
       }
     },
     async resolveCredentialPath(entry, credentialLeaf) {
-      const registryState = await providers.publicDataProvider.queryContractState(
-        entry.config.registry.registryContractAddress,
-      );
+      const registryContractAddress = entry.config.registry.registryContractAddress;
+      const registryState =
+        await providers.publicDataProvider.queryContractState(registryContractAddress);
       if (!registryState) throw new Error('Credential registry has no canonical state');
-      return findCredentialPath(registryState.data, credentialLeaf);
+      const referendumState = await providers.publicDataProvider.queryContractState(
+        entry.contractAddress,
+      );
+      if (!referendumState) throw new Error('Referendum has no canonical state');
+      const referendum = parseReferendumV2(referendumState.data);
+      return resolveAdmittedCredentialPath({
+        credentialLeaf,
+        current: credentialTreeView(registryState.data),
+        frozen: parseCredentialRegistryV1(registryState.data).frozen,
+        referendum,
+        enrollmentDeadlinePassed: BigInt(nowUnix()) >= referendum.enrollmentClosesAtUnix,
+        ...(registryHistory
+          ? { earlier: () => earlierRegistryViews(registryHistory, registryContractAddress) }
+          : {}),
+      });
     },
     async resolveRevealContext(entry, ballotCommitments) {
       const referendumState = await providers.publicDataProvider.queryContractState(

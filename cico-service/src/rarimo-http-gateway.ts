@@ -8,7 +8,10 @@ import type {
   RarimoVerificationStatus,
   RarimoVerifiedEvidence,
 } from 'midnight-referendum-api';
-import { deriveRarimoIssuanceEventData } from 'midnight-referendum-api';
+import {
+  deriveRarimoIssuanceEventData,
+  rarimoVerificationRequestProblem,
+} from 'midnight-referendum-api';
 
 /**
  * HTTP adapter for a self-hosted Rarimo verificator-svc.
@@ -30,6 +33,8 @@ const JSON_API_MEDIA_TYPE = 'application/vnd.api+json';
 const RARIMO_GLOBAL_PUBLIC_SIGNAL_COUNT = 23;
 
 const SIGNAL_INDEX = {
+  /** The document's nullifier for this event: stable for one document and one event. */
+  nullifier: 0,
   citizenship: 6,
   eventId: 9,
   eventData: 10,
@@ -108,6 +113,8 @@ export interface RarimoCredentialIssuancePolicy {
 
 export type RarimoHttpGatewayErrorCode =
   | 'INVALID_CONFIGURATION'
+  /** The browser asked for a verification this product does not make. */
+  | 'REQUEST_NOT_ALLOWED'
   | 'TIMEOUT'
   | 'UPSTREAM_UNAVAILABLE'
   | 'UPSTREAM_HTTP_ERROR'
@@ -134,6 +141,8 @@ interface IssuanceAuthorizationContext {
   readonly context: VerificationContext;
   readonly evidence: RarimoVerifiedEvidence;
   readonly verifiedAt: Date;
+  /** See `documentTagFor`. Null when the proof showed no nullifier. */
+  readonly documentTag: string | null;
 }
 
 interface HttpResponseBody {
@@ -215,6 +224,11 @@ export class RarimoHttpVerificationGateway implements RarimoVerificationGateway 
     request: RarimoVerificationRequest,
   ): Promise<RarimoVerificationLink> {
     validateGatewayRequest(request);
+    // The browser chooses the bounds of its request. Only a request of the
+    // shape the app makes may lead to a pass: every pass this gateway later
+    // authorizes comes from a request that was kept here, after this check.
+    const problem = rarimoVerificationRequestProblem(request, this.now());
+    if (problem) throw new RarimoHttpGatewayError('REQUEST_NOT_ALLOWED', problem, 400);
     const response = await this.request('POST', this.endpoints.verificationLink, {
       expectedStatuses: [200],
       body: this.codec.encodeVerificationRequest(request),
@@ -290,6 +304,7 @@ export class RarimoHttpVerificationGateway implements RarimoVerificationGateway 
           context,
           evidence,
           verifiedAt: this.now(),
+          documentTag: documentTagFromProof(proof, evidence.eventId),
         });
       } else if (
         existing.context.request.requestId !== context.request.requestId ||
@@ -318,6 +333,22 @@ export class RarimoHttpVerificationGateway implements RarimoVerificationGateway 
         }
       }
     }
+  }
+
+  /**
+   * An opaque tag of the document behind a verified proof, for telling that a
+   * document already has a pass. It is a hash of the proof's nullifier and its
+   * event. The nullifier is what the document shows under that event and
+   * nothing else, so the tag names no person and no document number; it only
+   * comes out the same when the same document is verified under the same
+   * event again. It stays inside this service: the evidence handed to the
+   * browser does not carry it.
+   *
+   * Null when the proof showed no nullifier. Undefined when the authorization
+   * is not one this gateway verified.
+   */
+  documentTagFor(evidenceAuthorization: string): string | null | undefined {
+    return this.issuanceAuthorizations.get(evidenceAuthorization)?.documentTag;
   }
 
   /**
@@ -757,6 +788,16 @@ function buildProofRequestUrl(baseUrl: string, proofParamsUrl: string): string {
   url.searchParams.set('type', 'proof-request');
   url.searchParams.set('proof_params_url', proofParamsUrl);
   return url.href;
+}
+
+function documentTagFromProof(proof: RarimoProofProjection, eventId: string): string | null {
+  const nullifier = proof.publicSignals[SIGNAL_INDEX.nullifier];
+  // A proof that does not disclose its nullifier carries zero there.
+  if (typeof nullifier !== 'string' || !/^[1-9][0-9]*$/u.test(nullifier)) return null;
+  return createHash('sha256')
+    .update('cico:document:v1:', 'utf8')
+    .update(`${eventId}:${nullifier}`, 'utf8')
+    .digest('hex');
 }
 
 function fingerprint(value: unknown): string {

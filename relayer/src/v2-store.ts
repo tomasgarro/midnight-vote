@@ -561,7 +561,7 @@ async function writeAtomic(filePath: string, state: V2FileState): Promise<void> 
     } finally {
       await file.close();
     }
-    await rename(tempPath, filePath);
+    await renameOver(tempPath, filePath);
     await chmod(filePath, 0o600).catch((error) => {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== 'EPERM' && code !== 'ENOTSUP') throw error;
@@ -569,6 +569,25 @@ async function writeAtomic(filePath: string, state: V2FileState): Promise<void> 
   } catch (error) {
     await rm(tempPath, { force: true }).catch(() => undefined);
     throw error;
+  }
+}
+
+/**
+ * Replaces `filePath` with `tempPath`. On Windows a rename over a file that
+ * anything else has open, a virus scanner included, fails with EPERM, EBUSY
+ * or EACCES for a moment. It is retried briefly. On Linux, where the relayer
+ * is deployed, the first attempt succeeds.
+ */
+async function renameOver(tempPath: string, filePath: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(tempPath, filePath);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= 9 || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { padBytes32 } from 'midnight-referendum-api';
+import { deriveRoleKey, padBytes32 } from 'midnight-referendum-api';
 import { describe, expect, it } from 'vitest';
 import { loadCicoServiceConfig } from './config.js';
 
@@ -7,11 +7,16 @@ function hex(value: Uint8Array): string {
   return Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+const ROOT_PUBLISHER_SECRET_HEX = '77'.repeat(32);
+
 const validReferendum = {
   contractAddress: 'referendum-address',
   eventIdHex: '44'.repeat(32),
   organizerKeyHex: '55'.repeat(32),
-  rootPublisherKeyHex: '66'.repeat(32),
+  // The public key of the root-publisher secret below, as a deployment records it.
+  rootPublisherKeyHex: hex(
+    deriveRoleKey('cico:ref-v2:root-publisher:', new Uint8Array(32).fill(0x77)),
+  ),
   initialRootField: '123456789',
   countryPolicy: null,
   minimumAssurance: '2',
@@ -31,7 +36,7 @@ const valid = {
   CICO_CREDENTIAL_EPOCH: '7',
   CICO_ISSUER_WALLET_SEED: '11'.repeat(32),
   CICO_ISSUER_ROLE_SECRET: '22'.repeat(32),
-  CICO_ROOT_PUBLISHER_SECRET_HEX: '77'.repeat(32),
+  CICO_ROOT_PUBLISHER_SECRET_HEX: ROOT_PUBLISHER_SECRET_HEX,
   CICO_ZK_CONFIG_PATH: '/tmp/credential-registry-v1',
   CICO_REGISTRY_CONTRACT_ADDRESS: 'registry-address',
   CICO_REGISTRY_ID_HEX: '33'.repeat(32),
@@ -194,6 +199,61 @@ describe('CICO service configuration', () => {
         ]),
       }),
     ).toThrow('must not equal organizerKeyHex');
+  });
+
+  it('refuses to start with a root-publisher secret a consultation would not accept', () => {
+    // The consultation was deployed for another publisher. Every root this
+    // service offered it would be refused, and no new pass could answer.
+    expect(() =>
+      loadCicoServiceConfig({
+        ...valid,
+        CICO_REFERENDUM_ZK_CONFIG_PATH: 'contracts/referendum-v2/managed/referendum-v2',
+        CICO_REFERENDA_JSON: JSON.stringify([
+          validReferendum,
+          {
+            ...validReferendum,
+            contractAddress: 'other-consultation',
+            rootPublisherKeyHex: '66'.repeat(32),
+          },
+        ]),
+      }),
+    ).toThrow(
+      'CICO_ROOT_PUBLISHER_SECRET_HEX is not the root publisher of the consultation other-consultation',
+    );
+    expect(() =>
+      loadCicoServiceConfig({
+        ...valid,
+        CICO_ROOT_PUBLISHER_SECRET_HEX: '78'.repeat(32),
+        CICO_REFERENDUM_ZK_CONFIG_PATH: 'contracts/referendum-v2/managed/referendum-v2',
+        CICO_REFERENDA_JSON: JSON.stringify([validReferendum]),
+      }),
+    ).toThrow('is not the root publisher of the consultation referendum-address');
+  });
+
+  it('never repeats a secret in the refusal', () => {
+    try {
+      loadCicoServiceConfig({
+        ...valid,
+        CICO_ROOT_PUBLISHER_SECRET_HEX: '78'.repeat(32),
+        CICO_REFERENDA_JSON: JSON.stringify([validReferendum]),
+      });
+      throw new Error('expected a refusal');
+    } catch (error) {
+      expect(String(error)).not.toContain('78'.repeat(32));
+    }
+  });
+
+  it('keeps a document to one holder unless told otherwise', () => {
+    expect(loadCicoServiceConfig(valid).documentUniqueness).toBe('enforce');
+    expect(
+      loadCicoServiceConfig({ ...valid, CICO_DOCUMENT_UNIQUENESS: 'observe' }).documentUniqueness,
+    ).toBe('observe');
+    expect(
+      loadCicoServiceConfig({ ...valid, CICO_DOCUMENT_UNIQUENESS: 'off' }).documentUniqueness,
+    ).toBe('off');
+    expect(() => loadCicoServiceConfig({ ...valid, CICO_DOCUMENT_UNIQUENESS: 'maybe' })).toThrow(
+      'CICO_DOCUMENT_UNIQUENESS must be enforce, observe or off',
+    );
   });
 
   it('rejects malformed CICO_REFERENDA_JSON', () => {

@@ -28,7 +28,17 @@ export type PassportV2RuntimeReferendum = ReferendumV2CatalogEntry & {
   readonly closesAt?: string;
   readonly eligible?: string;
   readonly participation?: string;
+  /** The same consultation in other languages. The top-level text is the fallback. */
+  readonly translations?: ReferendumTranslations;
 };
+
+/** What a catalogue may say about a consultation in one language. */
+export interface ReferendumText {
+  readonly title?: string;
+  readonly question?: string;
+  readonly description?: string;
+}
+export type ReferendumTranslations = Partial<Record<'es' | 'en' | 'fr', ReferendumText>>;
 
 interface ReferendumWireEntry {
   readonly referendumId?: unknown;
@@ -37,6 +47,8 @@ interface ReferendumWireEntry {
   readonly organizerKeyHex?: unknown;
   /** Narrow authority that admits later registry roots; never the organizer. */
   readonly rootPublisherKeyHex?: unknown;
+  /** The registry root this consultation was deployed against, as a decimal string. */
+  readonly initialRootField?: unknown;
   /** On-chain enforced schedule, as decimal unix-second strings. */
   readonly opensAtUnix?: unknown;
   readonly enrollmentClosesAtUnix?: unknown;
@@ -55,9 +67,13 @@ interface ReferendumWireEntry {
   readonly closesAt?: unknown;
   readonly eligible?: unknown;
   readonly participation?: unknown;
+  readonly translations?: unknown;
 }
 
 type RuntimeEnv = Readonly<Record<string, string | undefined>>;
+
+/** What names a registry, apart from the root a consultation pins. */
+type RegistryIdentity = Omit<FrozenCredentialRegistryReference, 'frozenRoot'>;
 
 /** Returns null when Passport v2 is intentionally disabled; partial config fails closed. */
 export function parsePassportV2RuntimeConfig(env: RuntimeEnv): PassportV2RuntimeConfig | null {
@@ -79,19 +95,33 @@ export function parsePassportV2RuntimeConfig(env: RuntimeEnv): PassportV2Runtime
     64,
   );
   const registryContractAddress = required(env, 'VITE_CICO_REGISTRY_ADDRESS');
-  const registry: FrozenCredentialRegistryReference = {
+  const registryIdentity: RegistryIdentity = {
     registryContractAddress,
     registryContractBinding: deriveRegistryContractBinding(registryContractAddress),
     registryId: bytes32(required(env, 'VITE_CICO_REGISTRY_ID_HEX'), 'registry ID'),
     issuerId: bytes32(required(env, 'VITE_CICO_ISSUER_ID_HEX'), 'issuer ID'),
     credentialEpoch: BigInt(credentialEpoch),
-    frozenRoot: {
-      field: unsignedBigInt(required(env, 'VITE_CICO_FROZEN_ROOT_FIELD'), 256),
-    },
   };
-  if (!equalBytes(registry.issuerId, padBytes32(issuerId))) {
+  if (!equalBytes(registryIdentity.issuerId, padBytes32(issuerId))) {
     throw new TypeError('CICO issuer text does not match the frozen registry issuer ID');
   }
+  // A frozen registry has one root, pinned by every consultation. A registry
+  // that keeps enrolling has none: each consultation is pinned to the root it
+  // was deployed against, which the catalogue carries as `initialRootField`.
+  const enrollmentModel = env.VITE_CICO_ENROLLMENT_MODEL?.trim() || 'frozen';
+  if (enrollmentModel !== 'frozen' && enrollmentModel !== 'open') {
+    throw new TypeError('VITE_CICO_ENROLLMENT_MODEL must be frozen or open');
+  }
+  const frozenRootField = env.VITE_CICO_FROZEN_ROOT_FIELD?.trim();
+  if (enrollmentModel === 'open' && frozenRootField) {
+    throw new TypeError(
+      'An open registry has no frozen root; leave VITE_CICO_FROZEN_ROOT_FIELD empty',
+    );
+  }
+  const frozenRoot =
+    enrollmentModel === 'frozen'
+      ? { field: unsignedBigInt(required(env, 'VITE_CICO_FROZEN_ROOT_FIELD'), 256) }
+      : null;
 
   let wire: unknown;
   try {
@@ -103,11 +133,15 @@ export function parsePassportV2RuntimeConfig(env: RuntimeEnv): PassportV2Runtime
     throw new TypeError('At least one v2 referendum must be configured');
   }
   const referenda = wire.map((candidate, index) =>
-    parseReferendum(candidate, index, registry, network),
+    parseReferendum(candidate, index, registryIdentity, frozenRoot, network),
   );
   if (new Set(referenda.map((entry) => entry.referendumId)).size !== referenda.length) {
     throw new TypeError('V2 referendum IDs must be unique');
   }
+  // The array is not empty, so the first entry exists. With an open registry
+  // this carries the first consultation's root; each consultation's own
+  // reference is in its `config.registry`.
+  const registry = (referenda[0] as PassportV2RuntimeReferendum).config.registry;
 
   return {
     network,
@@ -124,13 +158,28 @@ export function parsePassportV2RuntimeConfig(env: RuntimeEnv): PassportV2Runtime
 function parseReferendum(
   value: unknown,
   index: number,
-  registry: FrozenCredentialRegistryReference,
+  registryIdentity: RegistryIdentity,
+  frozenRoot: FrozenCredentialRegistryReference['frozenRoot'] | null,
   network: PassportV2RuntimeConfig['network'],
 ): PassportV2RuntimeReferendum {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`Referendum ${index} must be an object`);
   }
   const entry = value as ReferendumWireEntry;
+  let pinnedRoot = frozenRoot;
+  if (!pinnedRoot) {
+    try {
+      pinnedRoot = { field: unsignedBigInt(entry.initialRootField, 256) };
+    } catch {
+      throw new TypeError(
+        `Referendum ${index} needs initialRootField: its registry keeps enrolling`,
+      );
+    }
+  }
+  const registry: FrozenCredentialRegistryReference = {
+    ...registryIdentity,
+    frozenRoot: pinnedRoot,
+  };
   const referendumId = nonEmptyString(entry.referendumId, `referendum ${index} ID`);
   const contractAddress = nonEmptyString(entry.contractAddress, `referendum ${index} address`);
   const countryPolicy =
@@ -166,6 +215,7 @@ function parseReferendum(
     ...(optionalText(entry.participation)
       ? { participation: optionalText(entry.participation) }
       : {}),
+    ...translations(entry.translations, index),
     config: {
       registry,
       eventId: bytes32(entry.eventIdHex, `referendum ${index} event ID`),
@@ -189,6 +239,36 @@ function parseReferendum(
         : {}),
     },
   };
+}
+
+/**
+ * Text is the only thing a translation may carry. A translation cannot change
+ * a consultation's identity, its schedule or its rule, so nothing else is read.
+ */
+function translations(
+  value: unknown,
+  index: number,
+): { readonly translations?: ReferendumTranslations } {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`Referendum ${index} translations must be an object`);
+  }
+  const result: { es?: ReferendumText; en?: ReferendumText; fr?: ReferendumText } = {};
+  for (const locale of ['es', 'en', 'fr'] as const) {
+    const text = (value as Record<string, unknown>)[locale];
+    if (text === undefined) continue;
+    if (!text || typeof text !== 'object' || Array.isArray(text)) {
+      throw new TypeError(`Referendum ${index} ${locale} translation must be an object`);
+    }
+    const { title, question, description } = text as Record<string, unknown>;
+    const parsed = {
+      ...(optionalText(title) ? { title: optionalText(title) } : {}),
+      ...(optionalText(question) ? { question: optionalText(question) } : {}),
+      ...(optionalText(description) ? { description: optionalText(description) } : {}),
+    };
+    if (Object.keys(parsed).length > 0) result[locale] = parsed;
+  }
+  return Object.keys(result).length > 0 ? { translations: result } : {};
 }
 
 function required(env: RuntimeEnv, key: string): string {

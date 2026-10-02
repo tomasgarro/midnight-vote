@@ -57,6 +57,104 @@ describe('Passport v2 runtime config', () => {
     });
   });
 
+  describe('a registry that keeps enrolling', () => {
+    const [frozenEntry] = JSON.parse(env.VITE_CICO_REFERENDA_JSON);
+    const openEnv = (entries: readonly object[]) => ({
+      ...env,
+      VITE_CICO_ENROLLMENT_MODEL: 'open',
+      // The deploy writes this empty for an open registry.
+      VITE_CICO_FROZEN_ROOT_FIELD: '',
+      VITE_CICO_REFERENDA_JSON: JSON.stringify(entries),
+    });
+
+    it('pins each consultation to the root it was deployed against', () => {
+      const parsed = parsePassportV2RuntimeConfig(
+        openEnv([
+          { ...frozenEntry, initialRootField: '1001' },
+          {
+            ...frozenEntry,
+            referendumId: 'second',
+            contractAddress: 'second-address',
+            initialRootField: '2002',
+          },
+        ]),
+      );
+      expect(parsed?.referenda.map((entry) => entry.config.registry.frozenRoot.field)).toEqual([
+        1001n,
+        2002n,
+      ]);
+      // Both name the same registry.
+      expect(parsed?.referenda[1]?.config.registry.registryContractAddress).toBe(
+        `0x${'04'.repeat(32)}`,
+      );
+    });
+
+    it('refuses a consultation that does not say which root it started from', () => {
+      expect(() => parsePassportV2RuntimeConfig(openEnv([frozenEntry]))).toThrow(
+        'needs initialRootField',
+      );
+    });
+
+    it('refuses a frozen root beside the open model, and an unknown model', () => {
+      expect(() =>
+        parsePassportV2RuntimeConfig({
+          ...openEnv([{ ...frozenEntry, initialRootField: '1001' }]),
+          VITE_CICO_FROZEN_ROOT_FIELD: '42',
+        }),
+      ).toThrow('has no frozen root');
+      expect(() =>
+        parsePassportV2RuntimeConfig({ ...env, VITE_CICO_ENROLLMENT_MODEL: 'rolling' }),
+      ).toThrow('frozen or open');
+    });
+
+    it('reads a consultation in other languages, and takes nothing but text from them', () => {
+      const parsed = parsePassportV2RuntimeConfig(
+        openEnv([
+          {
+            ...frozenEntry,
+            initialRootField: '1001',
+            translations: {
+              fr: {
+                title: ' Terres rurales ',
+                question: 'Approuvez-vous cette consultation ?',
+                // A translation cannot move a consultation to another contract.
+                contractAddress: 'another-address',
+                closesAtUnix: '9999',
+              },
+              en: { description: '' },
+              de: { title: 'Ländlicher Boden' },
+            },
+          },
+        ]),
+      );
+      const [entry] = parsed?.referenda ?? [];
+      expect(entry?.translations).toEqual({
+        fr: { title: 'Terres rurales', question: 'Approuvez-vous cette consultation ?' },
+      });
+      expect(entry?.contractAddress).toBe('referendum-address');
+      expect(entry?.config.closesAtUnix).toBe(3000n);
+    });
+
+    it('refuses translations that are not text by language', () => {
+      for (const translations of ['fr', ['fr'], { fr: 'Terres rurales' }]) {
+        expect(() =>
+          parsePassportV2RuntimeConfig(
+            openEnv([{ ...frozenEntry, initialRootField: '1001', translations }]),
+          ),
+        ).toThrow(/translation/);
+      }
+    });
+
+    it('still requires the frozen root when the model is frozen', () => {
+      expect(() =>
+        parsePassportV2RuntimeConfig({ ...env, VITE_CICO_FROZEN_ROOT_FIELD: '' }),
+      ).toThrow('VITE_CICO_FROZEN_ROOT_FIELD');
+      expect(
+        parsePassportV2RuntimeConfig(env)?.referenda[0]?.config.registry.frozenRoot.field,
+      ).toBe(42n);
+    });
+  });
+
   it('uses the same v2 catalog on the local Undeployed network', () => {
     const parsed = parsePassportV2RuntimeConfig({
       ...env,

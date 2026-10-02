@@ -441,7 +441,7 @@ describe('App', () => {
     ).toEqual(['Consultations', 'Cleisthenes', 'You']);
     expect(screen.getByRole('heading', { name: 'Consultations' })).toBeTruthy();
     expect(document.documentElement.lang).toBe('en');
-    expect(document.title).toMatch(/Civic Referendum/i);
+    expect(document.title).toMatch(/midnight\.vote · Private, verifiable consultations/i);
   });
 
   it('reads public results without a credential or a Passport session', async () => {

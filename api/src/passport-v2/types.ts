@@ -182,10 +182,38 @@ export type CivicCredentialErrorCode =
   | 'ENROLLMENT_EXPIRED'
   | 'CREDENTIAL_NOT_FOUND'
   | 'POLICY_NOT_SATISFIED'
+  /**
+   * The pass is in the registry, and the consultation has not admitted a root
+   * that holds it yet. It passes by itself; retry shortly.
+   */
+  | 'CREDENTIAL_NOT_ADMITTED'
+  /**
+   * The pass was added after the consultation stopped admitting passes. No
+   * later root will be admitted, so waiting does not help.
+   */
+  | 'CREDENTIAL_ADMISSION_CLOSED'
   | 'INVALID_CREDENTIAL_CLAIMS'
+  /**
+   * The document already has a pass, held by another device or browser. One
+   * document gets one holder per registry epoch, so that a person cannot
+   * answer a consultation twice by being verified twice.
+   */
+  | 'DOCUMENT_ALREADY_ENROLLED'
   | 'ISSUANCE_FAILED'
   | 'ADAPTER_UNAVAILABLE'
   | 'CONFLICT'
+  /**
+   * This device already sealed an answer for this referendum. A consultation
+   * takes one answer per pass, so there is nothing to seal again.
+   */
+  | 'ANSWER_ALREADY_SEALED'
+  /**
+   * The contract refused the answer because the holder of this pass has
+   * already answered, and this device holds no record of that answer. A
+   * renewed pass has the same holder as the pass it replaced, so it cannot
+   * answer a second time.
+   */
+  | 'HOLDER_ALREADY_ANSWERED'
   /** This device holds no opening for a sealed answer on this referendum. */
   | 'BALLOT_OPENING_NOT_FOUND'
   /** The referendum is not in its counting phase, or the count has closed. */

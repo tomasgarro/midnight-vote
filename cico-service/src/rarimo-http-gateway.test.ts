@@ -20,12 +20,13 @@ const request: RarimoVerificationRequest = {
   eventId: '7',
   eventData: `0x${boundEventDataHex}`,
   eventDataDecimal: BigInt(`0x${boundEventDataHex}`).toString(10),
-  selector: '35361',
+  // What the app asks for on 24 August 2026, with the proof of age.
+  selector: '39457',
   birthDateLowerBound: '0x303030303030',
-  birthDateUpperBound: '0x3230303830383234',
+  birthDateUpperBound: '0x303830383234',
   identityCounterLowerBound: '0',
   identityCounterUpperBound: '1',
-  expirationDateLowerBound: '0x3230323630383234',
+  expirationDateLowerBound: '0x323630383234',
   expirationDateUpperBound: '0x393939393939',
   timestampLowerBound: '0',
   timestampUpperBound: '1787594400',
@@ -79,12 +80,15 @@ function proofBody(): unknown {
   };
 }
 
+/** The day the request above was made. */
+const onTheDay = () => new Date('2026-08-24T12:00:00.000Z');
+
 function makeGateway(fetcher: typeof fetch): RarimoHttpVerificationGateway {
   return new RarimoHttpVerificationGateway({
     baseUrl: 'https://verificator.example',
     fetcher,
     proofRequestBaseUrl: 'https://app.rarime.com/external',
-    now: () => new Date('2026-08-24T12:00:00.000Z'),
+    now: onTheDay,
   });
 }
 
@@ -288,6 +292,7 @@ describe('RarimoHttpVerificationGateway', () => {
       baseUrl: 'https://verificator.example',
       proofParamsAllowedOrigins: ['https://public.example'],
       fetcher,
+      now: onTheDay,
     });
     await expect(allowed.createVerificationRequest(request)).resolves.toMatchObject({
       userIdHash: 'hash',
@@ -307,9 +312,146 @@ describe('RarimoHttpVerificationGateway', () => {
       baseUrl: 'https://verificator.example',
       fetcher,
       timeoutMs: 5,
+      now: onTheDay,
     });
     await expect(timed.createVerificationRequest(request)).rejects.toMatchObject({
       code: 'TIMEOUT',
     } satisfies Partial<RarimoHttpGatewayError>);
+  });
+});
+
+describe('the opaque tag of the document behind a proof', () => {
+  /** A verificator that answers one request with a proof carrying this nullifier. */
+  function verified(nullifier: string, requestId = request.requestId, eventId = request.eventId) {
+    const asked = { ...request, requestId, eventId };
+    const proof = proofBody() as {
+      data: { attributes: { proof: { pub_signals: string[] } } };
+    };
+    proof.data.attributes.proof.pub_signals[0] = nullifier;
+    proof.data.attributes.proof.pub_signals[9] = eventId;
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/v2/private/verification-link')) {
+        return response({
+          data: {
+            id: requestId,
+            type: 'verification_link',
+            attributes: {
+              get_proof_params:
+                'https://verificator.example/integrations/verificator-svc/public/proof-params/user-hash',
+            },
+          },
+        });
+      }
+      if (url.endsWith(`/private/verification-status/${requestId}`)) {
+        return response({
+          data: { id: requestId, type: 'user_status', attributes: { status: 'verified' } },
+        });
+      }
+      if (url.endsWith(`/private/proof/${requestId}`)) return response(proof);
+      throw new Error(`unexpected URL ${url}`);
+    });
+    return { asked, gateway: makeGateway(fetcher) };
+  }
+
+  async function tagOf(nullifier: string, requestId?: string, eventId?: string) {
+    const { asked, gateway } = verified(nullifier, requestId, eventId);
+    await gateway.createVerificationRequest(asked);
+    const evidence = await gateway.getVerifiedEvidence(asked.requestId);
+    if (!evidence) throw new Error('expected verified evidence');
+    return { evidence, tag: gateway.documentTagFor(evidence.evidenceAuthorization) };
+  }
+
+  it('comes out the same when one document is verified twice under one event', async () => {
+    const first = await tagOf('123456789', 'request-a');
+    const second = await tagOf('123456789', 'request-b');
+    expect(first.tag).toMatch(/^[a-f0-9]{64}$/u);
+    expect(second.tag).toBe(first.tag);
+  });
+
+  it('differs for another document, and for the same document under another event', async () => {
+    const one = await tagOf('123456789');
+    expect((await tagOf('987654321')).tag).not.toBe(one.tag);
+    expect((await tagOf('123456789', request.requestId, '8')).tag).not.toBe(one.tag);
+  });
+
+  it('is not the nullifier, and does not travel with the evidence the browser gets', async () => {
+    const { evidence, tag } = await tagOf('123456789');
+    expect(tag).not.toContain('123456789');
+    expect(JSON.stringify(evidence)).not.toContain(String(tag));
+    expect(JSON.stringify(evidence)).not.toContain('123456789');
+    expect(Object.keys(evidence)).not.toContain('documentTag');
+  });
+
+  it('is absent when the proof shows no nullifier, and unknown for a foreign authorization', async () => {
+    expect((await tagOf('0')).tag).toBeNull();
+    const { gateway } = verified('123456789');
+    expect(gateway.documentTagFor('rarimo-evidence-v1:not-verified-here')).toBeUndefined();
+  });
+});
+
+describe('a verification the app would never ask for', () => {
+  // The browser chooses the bounds of its request, so a changed client can
+  // ask for a proof that is sound and proves less than a pass says.
+  const asking = (change: Partial<RarimoVerificationRequest>) => {
+    const fetcher = vi.fn();
+    const gateway = makeGateway(fetcher as unknown as typeof fetch);
+    return {
+      fetcher,
+      gateway,
+      attempt: gateway.createVerificationRequest({ ...request, ...change }),
+    };
+  };
+
+  it.each([
+    ['the proof of age switched off, the adult bound still named', { selector: '6689' }],
+    ['a birth-date bound everybody alive meets', { birthDateUpperBound: '0x323630383234' }],
+    ['no proof that the passport was registered once', { selector: String(39457 & ~(1 << 11)) }],
+    ['a passport registered again admitted', { identityCounterUpperBound: '5' }],
+    ['no nullifier shown', { selector: '39456' }],
+    ['an expiry bound long past', { expirationDateLowerBound: '0x303030303030' }],
+    ['the name revealed as well', { selector: String(39457 | (1 << 3)) }],
+  ])('refuses %s, before the verifier is asked anything', async (_what, change) => {
+    const { fetcher, gateway, attempt } = asking(change);
+    await expect(attempt).rejects.toMatchObject({ code: 'REQUEST_NOT_ALLOWED', status: 400 });
+    expect(fetcher).not.toHaveBeenCalled();
+    // Nothing was kept, so nothing can later be turned into a pass.
+    await expect(gateway.getVerifiedEvidence(request.requestId)).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    });
+  });
+
+  it('takes the request without the proof of age, which leads to a pass of unknown age', async () => {
+    const fetcher = vi.fn(async () =>
+      response({
+        data: {
+          id: request.requestId,
+          type: 'verification_link',
+          attributes: {
+            get_proof_params:
+              'https://verificator.example/integrations/verificator-svc/public/proof-params/user-hash',
+          },
+        },
+      }),
+    );
+    await expect(
+      makeGateway(fetcher).createVerificationRequest({
+        ...request,
+        selector: '6689',
+        birthDateUpperBound: '0x303030303030',
+      }),
+    ).resolves.toMatchObject({ requestId: request.requestId });
+  });
+
+  it('judges the dates by its own clock, not by the request', async () => {
+    // The same request, a month later: its "today" is no longer today.
+    const late = new RarimoHttpVerificationGateway({
+      baseUrl: 'https://verificator.example',
+      fetcher: vi.fn() as unknown as typeof fetch,
+      now: () => new Date('2026-09-24T12:00:00.000Z'),
+    });
+    await expect(late.createVerificationRequest(request)).rejects.toMatchObject({
+      code: 'REQUEST_NOT_ALLOWED',
+    });
   });
 });

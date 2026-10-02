@@ -4,6 +4,7 @@ import type { BallotOpening } from './passport-v2/ports.js';
 import {
   type BallotOpeningRecordStore,
   browserBallotOpeningVault,
+  browserRarimoEnrollmentVault,
   createBallotOpeningVault,
   deserializePrivateStateFromStorage,
   inMemoryPrivateStateProvider,
@@ -219,5 +220,52 @@ describe('ballot opening vault', () => {
 
     await again.clear('ch-2026-11-29-ahv');
     expect(await preview.list('ch-2026-11-29-ahv')).toEqual([]);
+  });
+});
+
+describe('the vault for a verification in progress', () => {
+  const attempt = {
+    enrollmentId: 'ab'.repeat(16),
+    requestId: 'cd'.repeat(16),
+    userIdHash: 'user-hash',
+    holderSecret: new Uint8Array(32).fill(1),
+    holderBlind: new Uint8Array(32).fill(2),
+    holderBinding: new Uint8Array(32).fill(3),
+    createdAt: '2026-10-02T06:00:00.000Z',
+    expiresAt: '2026-10-02T06:30:00.000Z',
+    request: {
+      requestId: 'cd'.repeat(16),
+      eventId: '7',
+      eventData: '0x01' as const,
+      eventDataDecimal: '1',
+      selector: '35361',
+      birthDateLowerBound: '0x303030303030',
+      birthDateUpperBound: '0x303830383234',
+      identityCounterLowerBound: '0',
+      identityCounterUpperBound: '1',
+      expirationDateLowerBound: '0x323630383234',
+      expirationDateUpperBound: '0x303030303030',
+      timestampLowerBound: '0',
+      timestampUpperBound: '1787594400',
+    },
+    policy: { requireAdult: true },
+  };
+
+  it('survives the encoding the encrypted store uses, bytes included', () => {
+    const restored = deserializePrivateStateFromStorage<typeof attempt>(
+      serializePrivateStateForStorage(attempt),
+    );
+    expect(restored).toEqual(attempt);
+    expect(restored.holderSecret).toBeInstanceOf(Uint8Array);
+  });
+
+  it('keeps one attempt per scope, and forgets it when asked', async () => {
+    const vault = browserRarimoEnrollmentVault('preview:issuer:1');
+    await expect(vault.load()).resolves.toBeNull();
+    await vault.save(attempt);
+    await expect(vault.load()).resolves.toEqual(attempt);
+    await vault.clear();
+    await expect(vault.load()).resolves.toBeNull();
+    expect(() => browserRarimoEnrollmentVault('  ')).toThrow('scope must not be empty');
   });
 });

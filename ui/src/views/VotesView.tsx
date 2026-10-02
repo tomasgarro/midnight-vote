@@ -328,8 +328,11 @@ export function VotesView({
                             `deadline` string: that one is authored per fixture
                             (French on the French one, whatever the reader
                             chose) and it disagreed with the date Activity
-                            computed for the same consultation. */}
-                            {copy.closes} {formatDate(poll.closesAt, locale) ?? poll.deadline}
+                            computed for the same consultation. A closed one
+                            shows the date alone: the chip beside it already
+                            says it is closed, and "Closes" was no longer true. */}
+                            {isOpen ? `${copy.closes} ` : ''}
+                            {formatDate(poll.closesAt, locale) ?? poll.deadline}
                           </span>
                         </div>
                         <h3 className="poll__title">{displayPoll.title}</h3>

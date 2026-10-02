@@ -12,7 +12,11 @@ import {
   padBytes32,
 } from 'midnight-referendum-api';
 import type { CredentialEpochMutationBoundary } from './credential-epoch-coordinator.js';
-import { type CredentialIssuanceStore, issuanceFingerprint } from './durable-stores.js';
+import {
+  type CredentialIssuanceStore,
+  type DocumentBindingStore,
+  issuanceFingerprint,
+} from './durable-stores.js';
 
 export interface EvidenceAuthorizationStore {
   /** Atomically claims the opaque authorization for this enrollment; same-enrollment retry is valid. */
@@ -37,6 +41,30 @@ export interface CredentialIssuerServiceOptions {
   /** Optional local idempotency journal used across service restarts. */
   readonly issuanceStore?: CredentialIssuanceStore;
   readonly randomBytes?: (length: number) => Uint8Array;
+  /** One holder per document. Absent: a document may be issued any number of passes. */
+  readonly documentHolders?: DocumentHolderPolicy;
+}
+
+/**
+ * One document, one holder, for a registry epoch.
+ *
+ * A consultation takes one answer per holder: its nullifier is drawn from the
+ * holder's secret. So "one answer per document" holds exactly when a document
+ * cannot have two holders. The same holder may be issued a pass again, which
+ * is how a pass that expired is renewed, and it still answers once.
+ */
+export interface DocumentHolderPolicy {
+  /**
+   * The opaque tag of the document behind a verified authorization. Null when
+   * the proof showed no nullifier; undefined when the authorization is unknown.
+   */
+  readonly tagFor: (evidenceAuthorization: string) => string | null | undefined;
+  readonly bindings: DocumentBindingStore;
+  /** `observe` records and reports, and refuses nothing. */
+  readonly mode: 'enforce' | 'observe';
+  readonly report?: (
+    outcome: 'bound' | 'renewed' | 'refused' | 'would-refuse' | 'no-nullifier',
+  ) => void;
 }
 
 /** Canonical Preview issuer; it serializes registry mutations and never receives voter secrets. */
@@ -50,6 +78,7 @@ export class CredentialIssuerService implements CivicCredentialIssuerPort {
   private readonly epochMutations?: CredentialEpochMutationBoundary;
   private readonly validateEvidenceAuthorization: CredentialIssuerServiceOptions['validateEvidenceAuthorization'];
   private readonly issuanceStore?: CredentialIssuanceStore;
+  private readonly documentHolders?: DocumentHolderPolicy;
   private readonly randomBytes: (length: number) => Uint8Array;
   private readonly issuances = new Map<
     string,
@@ -68,6 +97,7 @@ export class CredentialIssuerService implements CivicCredentialIssuerPort {
     this.epochMutations = options.epochMutations;
     this.validateEvidenceAuthorization = options.validateEvidenceAuthorization;
     this.issuanceStore = options.issuanceStore;
+    this.documentHolders = options.documentHolders;
     this.randomBytes = options.randomBytes ?? secureRandomBytes;
   }
 
@@ -122,6 +152,8 @@ export class CredentialIssuerService implements CivicCredentialIssuerPort {
     const credentialBlind = requireBytes32(this.randomBytes(32), 'credentialBlind');
     const privateState = privateStateFor(request, this.issuerSecret, credentialBlind);
     const mutate = async () => {
+      // Before the evidence is spent and before anything goes on chain.
+      await this.assertDocumentHolder(request);
       if (
         !(await this.evidenceAuthorizations.claim(
           request.evidenceAuthorization,
@@ -168,6 +200,37 @@ export class CredentialIssuerService implements CivicCredentialIssuerPort {
       await issuanceStore.put(request.enrollmentId, fingerprintHash, result);
     }
     return result;
+  }
+
+  private async assertDocumentHolder(request: CivicCredentialIssuanceRequest): Promise<void> {
+    const policy = this.documentHolders;
+    if (!policy) return;
+    const enforce = policy.mode === 'enforce';
+    const tag = policy.tagFor(request.evidenceAuthorization);
+    if (!tag) {
+      // A proof made without its nullifier cannot be told from another one of
+      // the same document. Accepting it would be the way around this rule.
+      policy.report?.('no-nullifier');
+      if (enforce) {
+        throw new CivicCredentialError(
+          'INVALID_CREDENTIAL_CLAIMS',
+          'The verification did not show the document nullifier this registry requires',
+        );
+      }
+      return;
+    }
+    const outcome = await policy.bindings.bind(tag, bytesToHex(request.holderBinding));
+    if (outcome === 'other') {
+      policy.report?.(enforce ? 'refused' : 'would-refuse');
+      if (enforce) {
+        throw new CivicCredentialError(
+          'DOCUMENT_ALREADY_ENROLLED',
+          'This document already has a pass, held by another device or browser',
+        );
+      }
+      return;
+    }
+    policy.report?.(outcome === 'bound' ? 'bound' : 'renewed');
   }
 
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {

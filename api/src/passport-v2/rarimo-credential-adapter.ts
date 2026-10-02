@@ -13,6 +13,13 @@ import type {
   CivicCredentialVaultPort,
   StoredCivicCredential,
 } from './ports.js';
+import {
+  RARIMO_IDENTITY_COUNTER_UPPER_BOUND,
+  RARIMO_UNUSED_DATE_HEX,
+  rarimoAdultBirthDateBound,
+  rarimoAsciiDateHex,
+  rarimoQuerySelector,
+} from './rarimo-query.js';
 import type {
   RarimoCountryMapper,
   RarimoDerivedClaims,
@@ -37,15 +44,7 @@ const EVENT_ID_BYTES = 31;
 const REQUEST_ID_BYTES = 16;
 const DEFAULT_ENROLLMENT_TTL_MS = 10 * 60 * 1_000;
 const DEFAULT_CREDENTIAL_TTL_MS = 24 * 60 * 60 * 1_000;
-const DEFAULT_DATE_HEX = '0x303030303030';
-
-// Rarimo query selector bits: nullifier, citizenship, range checks.
-const NULLIFIER_BIT = 1 << 0;
-const CITIZENSHIP_BIT = 1 << 5;
-const TIMESTAMP_UPPER_BOUND_BIT = 1 << 9;
-const IDENTITY_COUNTER_UPPER_BOUND_BIT = 1 << 11;
-const EXPIRATION_DATE_LOWER_BOUND_BIT = 1 << 12;
-const BIRTH_DATE_UPPER_BOUND_BIT = 1 << 15;
+const DEFAULT_DATE_HEX = RARIMO_UNUSED_DATE_HEX;
 
 const RARIMO_ASSURANCE = 'document-nfc' as const;
 
@@ -67,6 +66,69 @@ export interface RarimoCivicCredentialAdapterOptions {
   readonly credentialTtlMs?: number;
   /** Encrypted browser-local persistence; omitted only for ephemeral tests/SSR. */
   readonly vault?: CivicCredentialVaultPort;
+  /**
+   * Encrypted persistence for a verification in progress. Without it a page
+   * reload during the scan loses the secret the scan is bound to, and the
+   * person has to start again.
+   */
+  readonly pendingVault?: RarimoEnrollmentVaultPort;
+  /**
+   * The Rarimo event every verification is made under, from
+   * `deriveRarimoEventId`. With it, a document shows the issuer the same
+   * nullifier every time, and the issuer gives it one holder. Without it each
+   * attempt draws its own event, and nothing ties two passes of one document
+   * together.
+   */
+  readonly verificationEventId?: string;
+  /**
+   * Encrypted persistence for this device's holder secret. With it, every
+   * pass this device is issued in this scope has the same holder: the issuer
+   * recognises a renewal, and the contract's nullifier lets the device answer
+   * a consultation once whichever pass it proves with. Without it each
+   * attempt draws a new holder.
+   */
+  readonly holderKeyVault?: HolderKeyVaultPort;
+}
+
+/** The secret behind a device's passes, and the blind of its public binding. */
+export interface StoredHolderKey {
+  readonly holderSecret: Uint8Array;
+  readonly holderBlind: Uint8Array;
+}
+
+export interface HolderKeyVaultPort {
+  load(): Promise<StoredHolderKey | null>;
+  save(key: StoredHolderKey): Promise<void>;
+}
+
+/**
+ * A verification in progress, as it is kept across a reload.
+ *
+ * On a phone the person leaves the browser for the scanning app, which builds
+ * a heavy proof. The browser may drop the page in the meantime. The scan is
+ * bound to a holder secret drawn before it started, so that secret has to
+ * outlive the page. It is the same secret the issued pass will hold, and it is
+ * kept the same way: in the device's encrypted vault, never sent anywhere.
+ */
+export interface StoredRarimoEnrollment {
+  readonly enrollmentId: string;
+  readonly requestId: string;
+  readonly userIdHash: string;
+  readonly holderSecret: Uint8Array;
+  readonly holderBlind: Uint8Array;
+  readonly holderBinding: Uint8Array;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly request: RarimoVerificationRequest;
+  readonly policy?: CredentialPolicy;
+  /** The claims the issuer was first asked for; every retry asks for the same. */
+  readonly issuanceClaims?: CivicCredentialClaims;
+}
+
+export interface RarimoEnrollmentVaultPort {
+  load(): Promise<StoredRarimoEnrollment | null>;
+  save(enrollment: StoredRarimoEnrollment): Promise<void>;
+  clear(): Promise<void>;
 }
 
 interface RarimoEnrollmentRecord {
@@ -82,7 +144,16 @@ interface RarimoEnrollmentRecord {
   readonly policy?: CredentialPolicy;
   status: EnrollmentStatus;
   updatedAt: string;
+  /** Why the attempt failed, when the reason is one the person can act on. */
+  failureCode?: EnrollmentStatusSnapshot['errorCode'];
   summary?: CredentialSummary;
+  /**
+   * The claims of the pass, fixed the first time the issuer is asked. The
+   * issuer recognises a retry by them: asked again with later timestamps, it
+   * refuses the retry as a different pass, although the first one may already
+   * be on chain.
+   */
+  issuanceClaims?: CivicCredentialClaims;
   credentialBlind?: Uint8Array;
   credentialLeaf?: Uint8Array;
   actionAuthorizationHandle?: string;
@@ -114,6 +185,9 @@ export class RarimoCivicCredentialAdapter
   private readonly enrollmentTtlMs: number;
   private readonly credentialTtlMs: number;
   private readonly vault?: CivicCredentialVaultPort;
+  private readonly pendingVault?: RarimoEnrollmentVaultPort;
+  private readonly verificationEventId?: string;
+  private readonly holderKeyVault?: HolderKeyVaultPort;
   private readonly enrollments = new Map<string, RarimoEnrollmentRecord>();
   private readonly statusChecks = new Map<string, Promise<EnrollmentStatusSnapshot>>();
   private activeEnrollmentId: string | null = null;
@@ -149,6 +223,15 @@ export class RarimoCivicCredentialAdapter
     this.enrollmentTtlMs = options.enrollmentTtlMs ?? DEFAULT_ENROLLMENT_TTL_MS;
     this.credentialTtlMs = options.credentialTtlMs ?? DEFAULT_CREDENTIAL_TTL_MS;
     this.vault = options.vault;
+    this.pendingVault = options.pendingVault;
+    if (
+      options.verificationEventId !== undefined &&
+      !/^[1-9][0-9]{0,76}$/u.test(options.verificationEventId)
+    ) {
+      throw new TypeError('verificationEventId must be a positive decimal field element');
+    }
+    this.verificationEventId = options.verificationEventId;
+    this.holderKeyVault = options.holderKeyVault;
   }
 
   async beginEnrollment(request: CredentialEnrollmentRequest): Promise<CredentialEnrollment> {
@@ -160,6 +243,8 @@ export class RarimoCivicCredentialAdapter
     if (this.enrollments.size > 0 || (await this.loadRestoredCredential())) {
       await this.clearCredential();
     }
+    // An attempt left behind by a page that was dropped is replaced as well.
+    await this.forgetPending();
 
     const created = this.now();
     const expires = new Date(created.getTime() + this.enrollmentTtlMs);
@@ -172,8 +257,7 @@ export class RarimoCivicCredentialAdapter
 
     const enrollmentId = bytesToHex(this.randomBytes(REQUEST_ID_BYTES));
     const requestId = bytesToHex(this.randomBytes(REQUEST_ID_BYTES));
-    const holderSecret = this.randomBytes(HOLDER_MATERIAL_BYTES);
-    const holderBlind = this.randomBytes(HOLDER_MATERIAL_BYTES);
+    const { holderSecret, holderBlind } = await this.holderKey();
     const holderBinding = deriveHolderBinding(holderSecret, holderBlind);
     const verificationRequest = this.buildVerificationRequest(
       requestId,
@@ -206,6 +290,7 @@ export class RarimoCivicCredentialAdapter
 
       this.enrollments.set(enrollmentId, record);
       this.activeEnrollmentId = enrollmentId;
+      await this.rememberPending(record);
 
       return {
         enrollmentId,
@@ -245,7 +330,7 @@ export class RarimoCivicCredentialAdapter
   }
 
   private async pollEnrollmentStatus(enrollmentId: string): Promise<EnrollmentStatusSnapshot> {
-    const record = this.getRecord(enrollmentId);
+    const record = await this.resolveRecord(enrollmentId);
     if (isTerminal(record.status)) return toStatusSnapshot(record);
 
     if (this.now().getTime() >= Date.parse(record.expiresAt)) {
@@ -295,16 +380,22 @@ export class RarimoCivicCredentialAdapter
       validateEvidenceBinding(record, verifiedEvidence);
       const derivedClaims = deriveClaims(verifiedEvidence, this.countryMapper, record);
       const now = new Date(Math.floor(this.now().getTime() / 1_000) * 1_000);
-      const validUntil = new Date(now.getTime() + this.credentialTtlMs);
-      const claims: CivicCredentialClaims = {
-        issuerId: this.issuerId,
-        country: derivedClaims.country,
-        ageClass: derivedClaims.ageClass,
-        assurance: derivedClaims.assurance,
-        credentialEpoch: this.credentialEpoch,
-        validFrom: now.toISOString(),
-        validUntil: validUntil.toISOString(),
-      };
+      if (!record.issuanceClaims) {
+        const validUntil = new Date(now.getTime() + this.credentialTtlMs);
+        record.issuanceClaims = {
+          issuerId: this.issuerId,
+          country: derivedClaims.country,
+          ageClass: derivedClaims.ageClass,
+          assurance: derivedClaims.assurance,
+          credentialEpoch: this.credentialEpoch,
+          validFrom: now.toISOString(),
+          validUntil: validUntil.toISOString(),
+        };
+        // Kept before the issuer is asked, so a page that is dropped while the
+        // pass is being issued asks for the same pass when it comes back.
+        await this.rememberPending(record);
+      }
+      const claims = record.issuanceClaims;
       const proofFingerprint = verifiedEvidence.evidenceFingerprint;
       let issuance: CivicCredentialIssuanceResult;
       try {
@@ -315,7 +406,14 @@ export class RarimoCivicCredentialAdapter
           holderBinding: new Uint8Array(record.holderBinding),
           claims,
         });
-      } catch {
+      } catch (error) {
+        // The issuer knows this document under another holder. Asking again
+        // cannot change that, so the attempt ends here and says why.
+        if (error instanceof CivicCredentialError && error.code === 'DOCUMENT_ALREADY_ENROLLED') {
+          record.failureCode = 'DOCUMENT_ALREADY_ENROLLED';
+          await this.failAndCleanup(record);
+          return toStatusSnapshot(record);
+        }
         throw new CivicCredentialError(
           'ISSUANCE_FAILED',
           'The verified evidence has not yet been issued on Midnight',
@@ -335,6 +433,8 @@ export class RarimoCivicCredentialAdapter
       await this.persistIssuedRecord(record);
       record.status = 'issued';
       record.updatedAt = now.toISOString();
+      // The pass is in its own vault now. The attempt has done its work.
+      await this.forgetPending();
       await this.cleanupProviderRecord(record).catch(() => {
         // Issuance is canonical. Provider deletion is retried by backend retention work.
       });
@@ -454,6 +554,7 @@ export class RarimoCivicCredentialAdapter
     if (this.restoredCredential) zeroizeStoredCredential(this.restoredCredential);
     this.restoredCredential = null;
     await this.vault?.clear();
+    await this.forgetPending();
 
     const failedCleanup = cleanupResults.find(
       (result): result is PromiseRejectedResult => result.status === 'rejected',
@@ -543,16 +644,12 @@ export class RarimoCivicCredentialAdapter
     const eventDataBytes = deriveRarimoIssuanceEventData(enrollmentId, holderBinding);
     const eventData = `0x${bytesToHex(eventDataBytes)}` as `0x${string}`;
     const eventDataDecimal = bytesToBigInt(eventDataBytes).toString(10);
-    const eventId = bytesToPositiveFieldDecimal(this.randomBytes(EVENT_ID_BYTES));
+    const eventId =
+      this.verificationEventId ?? bytesToPositiveFieldDecimal(this.randomBytes(EVENT_ID_BYTES));
     const requireAdult = policy?.requireAdult === true;
-    const requireExpiry = true;
-    const selector =
-      NULLIFIER_BIT |
-      CITIZENSHIP_BIT |
-      TIMESTAMP_UPPER_BOUND_BIT |
-      IDENTITY_COUNTER_UPPER_BOUND_BIT |
-      (requireExpiry ? EXPIRATION_DATE_LOWER_BOUND_BIT : 0) |
-      (requireAdult ? BIRTH_DATE_UPPER_BOUND_BIT : 0);
+    // The shape of the query is fixed in rarimo-query.ts, where the credential
+    // service reads it too: it refuses a request of any other shape.
+    const selector = rarimoQuerySelector(requireAdult);
 
     let citizenshipMask: string | undefined;
     if (policy?.allowedCountries?.length === 1) {
@@ -567,29 +664,143 @@ export class RarimoCivicCredentialAdapter
       selector: String(selector),
       citizenshipMask,
       birthDateLowerBound: DEFAULT_DATE_HEX,
-      birthDateUpperBound: requireAdult
-        ? asciiDateHex(ageThresholdDate(now, 18))
-        : DEFAULT_DATE_HEX,
+      birthDateUpperBound: requireAdult ? rarimoAdultBirthDateBound(now) : DEFAULT_DATE_HEX,
       identityCounterLowerBound: '0',
-      identityCounterUpperBound: '1',
-      expirationDateLowerBound: asciiDateHex(now),
+      identityCounterUpperBound: RARIMO_IDENTITY_COUNTER_UPPER_BOUND,
+      expirationDateLowerBound: rarimoAsciiDateHex(now),
       expirationDateUpperBound: DEFAULT_DATE_HEX,
       timestampLowerBound: '0',
       timestampUpperBound: String(this.uniquenessTimestampUpperBoundUnixSeconds),
     };
   }
 
-  private getRecord(enrollmentId: string): RarimoEnrollmentRecord {
-    const record = this.enrollments.get(enrollmentId);
-    if (!record) {
-      throw new CivicCredentialError('ENROLLMENT_NOT_FOUND', 'The Rarimo enrollment was not found');
+  /**
+   * The attempt this page holds, or the one a dropped page left in the vault.
+   * A kept attempt is taken only if it is the one asked for and its holder
+   * binding still follows from its secret; anything else is forgotten.
+   */
+  private async resolveRecord(enrollmentId: string): Promise<RarimoEnrollmentRecord> {
+    const held = this.enrollments.get(enrollmentId);
+    if (held) return held;
+    let kept: StoredRarimoEnrollment | null = null;
+    try {
+      kept = (await this.pendingVault?.load()) ?? null;
+    } catch {
+      kept = null;
     }
-    return record;
+    if (kept?.enrollmentId === enrollmentId && isSoundPendingEnrollment(kept)) {
+      const record: RarimoEnrollmentRecord = {
+        enrollmentId: kept.enrollmentId,
+        requestId: kept.requestId,
+        userIdHash: kept.userIdHash,
+        holderSecret: new Uint8Array(kept.holderSecret),
+        holderBlind: new Uint8Array(kept.holderBlind),
+        holderBinding: new Uint8Array(kept.holderBinding),
+        createdAt: kept.createdAt,
+        expiresAt: kept.expiresAt,
+        request: { ...kept.request },
+        ...(kept.policy ? { policy: kept.policy } : {}),
+        ...(kept.issuanceClaims ? { issuanceClaims: { ...kept.issuanceClaims } } : {}),
+        status: 'pending',
+        updatedAt: this.now().toISOString(),
+        cleanupRequested: false,
+      };
+      this.enrollments.set(enrollmentId, record);
+      this.activeEnrollmentId = enrollmentId;
+      return record;
+    }
+    if (kept) await this.forgetPending();
+    throw new CivicCredentialError('ENROLLMENT_NOT_FOUND', 'The Rarimo enrollment was not found');
+  }
+
+  /**
+   * This device's holder secret: the one it already has, or a new one that is
+   * kept before it is used. A pass whose holder cannot be kept would leave its
+   * document tied to a secret nobody holds, so a vault that refuses the new
+   * key stops the attempt.
+   */
+  private async holderKey(): Promise<StoredHolderKey> {
+    if (!this.holderKeyVault) {
+      return {
+        holderSecret: this.randomBytes(HOLDER_MATERIAL_BYTES),
+        holderBlind: this.randomBytes(HOLDER_MATERIAL_BYTES),
+      };
+    }
+    let kept: StoredHolderKey | null;
+    try {
+      kept = await this.holderKeyVault.load();
+    } catch {
+      throw new CivicCredentialError(
+        'ADAPTER_UNAVAILABLE',
+        'This browser could not read the key its pass depends on',
+        true,
+      );
+    }
+    if (
+      kept &&
+      kept.holderSecret instanceof Uint8Array &&
+      kept.holderSecret.length === HOLDER_MATERIAL_BYTES &&
+      kept.holderBlind instanceof Uint8Array &&
+      kept.holderBlind.length === HOLDER_MATERIAL_BYTES
+    ) {
+      return {
+        holderSecret: new Uint8Array(kept.holderSecret),
+        holderBlind: new Uint8Array(kept.holderBlind),
+      };
+    }
+    const created = {
+      holderSecret: this.randomBytes(HOLDER_MATERIAL_BYTES),
+      holderBlind: this.randomBytes(HOLDER_MATERIAL_BYTES),
+    };
+    try {
+      await this.holderKeyVault.save({
+        holderSecret: new Uint8Array(created.holderSecret),
+        holderBlind: new Uint8Array(created.holderBlind),
+      });
+    } catch {
+      zeroize(created.holderSecret, created.holderBlind);
+      throw new CivicCredentialError(
+        'ADAPTER_UNAVAILABLE',
+        'This browser could not keep the key its pass depends on',
+      );
+    }
+    return created;
+  }
+
+  /** Keeping the attempt is a convenience: a vault that fails must not stop the scan. */
+  private async rememberPending(record: RarimoEnrollmentRecord): Promise<void> {
+    if (!this.pendingVault) return;
+    try {
+      await this.pendingVault.save({
+        enrollmentId: record.enrollmentId,
+        requestId: record.requestId,
+        userIdHash: record.userIdHash,
+        holderSecret: new Uint8Array(record.holderSecret),
+        holderBlind: new Uint8Array(record.holderBlind),
+        holderBinding: new Uint8Array(record.holderBinding),
+        createdAt: record.createdAt,
+        expiresAt: record.expiresAt,
+        request: { ...record.request },
+        ...(record.policy ? { policy: record.policy } : {}),
+        ...(record.issuanceClaims ? { issuanceClaims: { ...record.issuanceClaims } } : {}),
+      });
+    } catch {
+      // Without it, a reload loses the attempt, as before.
+    }
+  }
+
+  private async forgetPending(): Promise<void> {
+    try {
+      await this.pendingVault?.clear();
+    } catch {
+      // A record that outlives its attempt is refused when it is next read.
+    }
   }
 
   private async expireRecord(record: RarimoEnrollmentRecord): Promise<void> {
     record.status = 'expired';
     record.updatedAt = this.now().toISOString();
+    await this.forgetPending();
     try {
       await this.cleanupProviderRecord(record);
     } finally {
@@ -599,6 +810,7 @@ export class RarimoCivicCredentialAdapter
 
   private async failAndCleanup(record: RarimoEnrollmentRecord): Promise<void> {
     failRecord(record, this.now());
+    await this.forgetPending();
     try {
       await this.cleanupProviderRecord(record);
     } catch {
@@ -612,6 +824,27 @@ export class RarimoCivicCredentialAdapter
     await this.gateway.deleteVerification(record.requestId);
     record.cleanupRequested = true;
   }
+}
+
+function isSoundPendingEnrollment(kept: StoredRarimoEnrollment): boolean {
+  const bytes32 = (value: unknown): value is Uint8Array =>
+    value instanceof Uint8Array && value.length === HOLDER_MATERIAL_BYTES;
+  if (
+    !bytes32(kept.holderSecret) ||
+    !bytes32(kept.holderBlind) ||
+    !bytes32(kept.holderBinding) ||
+    typeof kept.requestId !== 'string' ||
+    !kept.requestId ||
+    typeof kept.userIdHash !== 'string' ||
+    !Number.isFinite(Date.parse(kept.expiresAt)) ||
+    typeof kept.request?.eventDataDecimal !== 'string' ||
+    kept.request.requestId !== kept.requestId
+  ) {
+    return false;
+  }
+  // The scan was bound to this binding. A record whose secret does not lead
+  // to it could not be issued anyway.
+  return equalBytes(deriveHolderBinding(kept.holderSecret, kept.holderBlind), kept.holderBinding);
 }
 
 function validateIssuance(
@@ -789,28 +1022,13 @@ function toStatusSnapshot(
   record: RarimoEnrollmentRecord,
   errorCode?: EnrollmentStatusSnapshot['errorCode'],
 ): EnrollmentStatusSnapshot {
+  const code = errorCode ?? record.failureCode;
   return {
     enrollmentId: record.enrollmentId,
     status: record.status,
     updatedAt: record.updatedAt,
-    ...(errorCode ? { errorCode } : {}),
+    ...(code ? { errorCode: code } : {}),
   };
-}
-
-function ageThresholdDate(now: Date, age: number): Date {
-  const threshold = new Date(now);
-  threshold.setUTCFullYear(threshold.getUTCFullYear() - age);
-  return threshold;
-}
-
-function asciiDateHex(date: Date): string {
-  const yy = String(date.getUTCFullYear() % 100).padStart(2, '0');
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  const value = `${yy}${mm}${dd}`;
-  let hex = '';
-  for (const character of value) hex += character.charCodeAt(0).toString(16).padStart(2, '0');
-  return `0x${hex}`;
 }
 
 function hexToDecimal(value: string): string {

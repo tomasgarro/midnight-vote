@@ -1,5 +1,8 @@
 import type { CredentialSummary, ReferendumV2CatalogEntry } from 'midnight-referendum-api';
-import type { PassportV2RuntimeReferendum } from './passport-v2-runtime-config';
+import type {
+  PassportV2RuntimeReferendum,
+  ReferendumTranslations,
+} from './passport-v2-runtime-config';
 
 export type PassportReferendumScope = 'global' | 'country';
 
@@ -16,6 +19,8 @@ export interface PassportV2CatalogItem {
   readonly eligible?: string;
   readonly participation?: string;
   readonly scope: PassportReferendumScope;
+  /** Title, question and description in other languages, when the catalogue has them. */
+  readonly translations?: ReferendumTranslations;
   readonly source?: ReferendumV2CatalogEntry;
 }
 
@@ -34,6 +39,7 @@ export function toPassportV2Catalog(
     ...(entry.eligible ? { eligible: entry.eligible } : {}),
     ...(entry.participation ? { participation: entry.participation } : {}),
     scope: entry.config.countryPolicyEnabled ? 'country' : 'global',
+    ...(entry.translations ? { translations: entry.translations } : {}),
     source: entry,
   }));
 }

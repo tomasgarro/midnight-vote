@@ -8,6 +8,36 @@ midnight.vote is a Passport-first civic participation project built on Midnight.
 
 [Try midnight.vote](https://midnight.vote) · [Public Docs](https://midnight.vote/docs) · [Submission brief](docs/SUBMISSION.md) · [Run locally](docs/QUICKSTART.md) · [All documentation](docs/README.md)
 
+## On Midnight Preview
+
+A credential registry and a consultation that is open now are deployed on Midnight's public test network. Beside them stand rehearsal consultations, each taken to a final tally by the operator, without a passport and without a person.
+
+| Contract | Address | Deployed |
+| --- | --- | --- |
+| `credential-registry-v1` | `9f8fe7c54d9907543cbcde82943c2be35ccb20f404e477ca2c29b8fc84a52132` | 2 September 2026, block 683016 |
+| `referendum-v2`: "Should the result of a consultation stay hidden until it closes?" | `862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4` | 2 October 2026, block 1113403 |
+| `referendum-v2`: rehearsal 1, finalized | `1a01b1afe280aab0c08fabe5a3699ed7b0ff0d80b8a20d0983b03948fbbe5030` | 2 October 2026, block 1114976 |
+| `referendum-v2`: rehearsal 2, finalized | `9f7ebe9d972a8d0794ee1448317ad619970713fb1f62f7c30263795299f90be8` | 2 October 2026, block 1115944 |
+| `credential-registry-v1` of the dress rehearsal | `bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387` | 2 October 2026, block 1116397 |
+| `referendum-v2`: the dress rehearsal, finalized | `8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17` | 2 October 2026, block 1116410 |
+
+Check either one against the network's own indexer, not against this repository:
+
+```bash
+curl -s https://indexer.preview.midnight.network/api/v4/graphql -H 'content-type: application/json' -d '{"query":"{ contractAction(address: \"862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4\") { __typename transaction { hash block { height } } } }"}'
+```
+
+| | State on 2 October 2026 |
+| --- | --- |
+| The consultation | Open until 9 October 2026, 16:00 UTC. Any adult with a passport read by its chip may answer |
+| The app in Preview mode | Reads the consultation and its count of sealed answers from the chain |
+| The whole life of a consultation on chain | Rehearsed: sealed, closed, counted and finalized, with a fixture pass held by the operator. [Its five transactions](docs/evidence/preview-2026-10-02/REHEARSAL.md) |
+| A pass answering after later passes changed the registry | Rehearsed: the proof is built against the newest root the consultation admitted that holds the pass. [What happened, in order](docs/evidence/preview-2026-10-02/REHEARSAL-2.md) |
+| The credential service and the relay, end to end | Rehearsed on the operator's machine, on a registry of its own: two passes issued on chain by the credential service, admitted, sealed with its permission, counted. Only the passport scan was a stand-in. [The sixteen transactions](docs/evidence/preview-2026-10-02/DRESS-REHEARSAL.md) |
+| A sealed and counted answer by a real person | **Not yet.** It needs the relay and the credential service to be switched on, and a passport |
+
+What was observed, and what was not, is recorded in [docs/evidence/preview-2026-10-02](docs/evidence/preview-2026-10-02/README.md). How it is operated is in the [Preview runbook](docs/PREVIEW-RUNBOOK.md).
+
 ## The four pillars
 
 | Pillar | What we are building | What exists today |
