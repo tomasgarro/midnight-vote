@@ -10,12 +10,13 @@ midnight.vote is a Passport-first civic participation project built on Midnight.
 
 ## On Midnight Preview
 
-Two contracts are deployed on Midnight's public test network. A consultation is open on them now.
+A credential registry and two consultations are deployed on Midnight's public test network. One consultation is open now. The other was a rehearsal, taken from a sealed answer to a final tally.
 
 | Contract | Address | Deployed |
 | --- | --- | --- |
-| `credential-registry-v1` | `9f8fe7c54d9907543cbcde82943c2be35ccb20f404e477ca2c29b8fc84a52132` | 2 September 2026, block 683026 |
+| `credential-registry-v1` | `9f8fe7c54d9907543cbcde82943c2be35ccb20f404e477ca2c29b8fc84a52132` | 2 September 2026, block 683016 |
 | `referendum-v2`: "Should the result of a consultation stay hidden until it closes?" | `862387442d89fc422fc93ae44d3e77c8c7dfaaeba76bc0cf7dc4e52f823a26f4` | 2 October 2026, block 1113403 |
+| `referendum-v2`: the rehearsal, finalized | `1a01b1afe280aab0c08fabe5a3699ed7b0ff0d80b8a20d0983b03948fbbe5030` | 2 October 2026, block 1114976 |
 
 Check either one against the network's own indexer, not against this repository:
 
@@ -27,6 +28,7 @@ curl -s https://indexer.preview.midnight.network/api/v4/graphql -H 'content-type
 | --- | --- |
 | The consultation | Open until 9 October 2026, 16:00 UTC. Any adult with a passport read by its chip may answer |
 | The app in Preview mode | Reads the consultation and its count of sealed answers from the chain |
+| The whole life of a consultation on chain | Rehearsed once: sealed, closed, counted and finalized, with a fixture pass held by the operator. [Its five transactions](docs/evidence/preview-2026-10-02/REHEARSAL.md) |
 | A sealed and counted answer by a real person | **Not yet.** It needs the relay and the credential service to be switched on, and a passport |
 
 What was observed, and what was not, is recorded in [docs/evidence/preview-2026-10-02](docs/evidence/preview-2026-10-02/README.md). How it is operated is in the [Preview runbook](docs/PREVIEW-RUNBOOK.md).

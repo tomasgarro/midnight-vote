@@ -10,6 +10,11 @@ named.
 until 9 October 2026, 16:00 UTC. No person has sealed or counted an answer on
 Preview, and none may be claimed.
 
+A separate consultation was taken from a sealed answer to a final tally the
+same night, as a rehearsal with a fixture pass:
+[REHEARSAL.md](REHEARSAL.md). It is not this consultation, and its one answer
+is not a person's.
+
 ## Contracts
 
 | Contract | Address | Block | Indexer type | Block time (UTC) |
@@ -19,8 +24,9 @@ Preview, and none may be claimed.
 
 Confirmed by querying `contractAction(address:)` on
 `https://indexer.preview.midnight.network/api/v4/graphql`, the canonical
-indexer, not our own manifest. The registry row is the latest action on the
-registry: the attestation of its current root, made for this consultation.
+indexer, not our own manifest. The registry row is the attestation of the
+registry's current root, made for this consultation. The registry itself was
+deployed on 2 September 2026, at block 683016.
 
 | Transaction | Hash as the indexer reports it |
 | --- | --- |
@@ -71,5 +77,5 @@ the public indexer.
 - **Supports:** a second consultation deployed on a public Midnight network
   against an existing registry; the app reading its state from the chain.
 - **Does not support:** any claim of a sealed answer, a counted answer, a
-  receipt or a tally on Preview; any claim about proving time on a phone. No
-  passport has been read for this consultation.
+  receipt or a tally in this consultation; any claim about proving time on a
+  phone. No passport has been read for this consultation.
