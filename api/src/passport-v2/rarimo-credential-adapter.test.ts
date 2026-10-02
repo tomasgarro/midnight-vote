@@ -6,7 +6,11 @@ import type {
   CivicCredentialVaultPort,
   StoredCivicCredential,
 } from './ports.js';
-import { RarimoCivicCredentialAdapter } from './rarimo-credential-adapter.js';
+import {
+  RarimoCivicCredentialAdapter,
+  type RarimoEnrollmentVaultPort,
+  type StoredRarimoEnrollment,
+} from './rarimo-credential-adapter.js';
 import type {
   RarimoVerificationGateway,
   RarimoVerificationLink,
@@ -405,5 +409,184 @@ describe('Rarimo civic credential boundary', () => {
     });
     await expect(adapter.getCredentialSummary()).resolves.toBeNull();
     await expect(adapter.getPrivateCredentialMaterial()).resolves.toBeNull();
+  });
+});
+
+/** The device's vault for a verification in progress. It outlives a page. */
+class MemoryEnrollmentVault implements RarimoEnrollmentVaultPort {
+  stored: StoredRarimoEnrollment | null = null;
+  failing = false;
+
+  async load() {
+    if (this.failing) throw new Error('vault unavailable');
+    return this.stored ? structuredClone(this.stored) : null;
+  }
+
+  async save(enrollment: StoredRarimoEnrollment) {
+    if (this.failing) throw new Error('vault unavailable');
+    this.stored = structuredClone(enrollment);
+  }
+
+  async clear() {
+    this.stored = null;
+  }
+}
+
+describe('a verification in progress when the page is dropped', () => {
+  // One gateway, one issuer and two vaults stand for the services and the
+  // device. Each call to `page()` is the app starting again on that device.
+  function device() {
+    const gateway = new FakeRarimoGateway();
+    const issuer = new FakeCicoIssuer();
+    const vault = new MemoryCredentialVault();
+    const pendingVault = new MemoryEnrollmentVault();
+    const page = () =>
+      new RarimoCivicCredentialAdapter({
+        gateway,
+        issuer,
+        issuerId: 'cico-rarimo-preview',
+        credentialEpoch: 7,
+        countryMapper: mapper,
+        uniquenessTimestampUpperBoundUnixSeconds: 1_800_000_000,
+        now: () => new Date(now),
+        vault,
+        pendingVault,
+      });
+    return { gateway, issuer, vault, pendingVault, page };
+  }
+
+  it('picks the attempt up again and issues the pass the scan was bound to', async () => {
+    const { gateway, issuer, vault, pendingVault, page } = device();
+    const enrollment = await page().beginEnrollment(request({ requireAdult: true }));
+    const requestId = [...gateway.requests.keys()][0];
+    expect(pendingVault.stored?.enrollmentId).toBe(enrollment.enrollmentId);
+
+    // The person scans in the other app. Meanwhile the browser drops the page.
+    gateway.statuses.set(requestId, 'verified');
+    const reloaded = page();
+
+    await expect(reloaded.getEnrollmentStatus(enrollment.enrollmentId)).resolves.toMatchObject({
+      status: 'issued',
+    });
+    // Issued for the binding the scan carried, not for a new one.
+    expect(issuer.requests).toHaveLength(1);
+    expect(issuer.requests[0]?.holderBinding).toEqual(enrollment.holderBinding);
+    const material = await reloaded.getPrivateCredentialMaterial();
+    expect(material?.holderBinding).toEqual(enrollment.holderBinding);
+    expect(
+      deriveHolderBinding(material?.voterSecret as Uint8Array, material?.holderBlind as Uint8Array),
+    ).toEqual(enrollment.holderBinding);
+    // The pass is in its own vault; the attempt is gone.
+    expect(vault.stored?.summary.status).toBe('issued');
+    expect(pendingVault.stored).toBeNull();
+  });
+
+  it('keeps waiting after a reload while the scan is not done', async () => {
+    const { gateway, pendingVault, page } = device();
+    const enrollment = await page().beginEnrollment(request());
+    const reloaded = page();
+
+    await expect(reloaded.getEnrollmentStatus(enrollment.enrollmentId)).resolves.toMatchObject({
+      status: 'pending',
+    });
+    expect(pendingVault.stored?.enrollmentId).toBe(enrollment.enrollmentId);
+    expect(gateway.deleted).toEqual([]);
+  });
+
+  it('keeps nothing of the attempt that names the person or the document', async () => {
+    const { pendingVault, page } = device();
+    await page().beginEnrollment(request({ requireAdult: true }));
+    const kept = pendingVault.stored;
+    if (!kept) throw new Error('expected a kept attempt');
+    expect(Object.keys(kept).sort()).toEqual(
+      [
+        'createdAt',
+        'enrollmentId',
+        'expiresAt',
+        'holderBinding',
+        'holderBlind',
+        'holderSecret',
+        'policy',
+        'request',
+        'requestId',
+        'userIdHash',
+      ].sort(),
+    );
+    expect(JSON.stringify(kept)).not.toMatch(/mrz|passport|birthDate"|nfc|proof"/iu);
+  });
+
+  it('forgets the attempt when it fails, expires, is cleared or is replaced', async () => {
+    const failed = device();
+    const first = await failed.page().beginEnrollment(request());
+    failed.gateway.statuses.set([...failed.gateway.requests.keys()][0], 'failed_verification');
+    await expect(failed.page().getEnrollmentStatus(first.enrollmentId)).resolves.toMatchObject({
+      status: 'failed',
+    });
+    expect(failed.pendingVault.stored).toBeNull();
+
+    const cleared = device();
+    const adapter = cleared.page();
+    await adapter.beginEnrollment(request());
+    await adapter.clearCredential();
+    expect(cleared.pendingVault.stored).toBeNull();
+
+    const replaced = device();
+    const old = await replaced.page().beginEnrollment(request());
+    const next = await replaced.page().beginEnrollment(request());
+    expect(replaced.pendingVault.stored?.enrollmentId).toBe(next.enrollmentId);
+    await expect(replaced.page().getEnrollmentStatus(old.enrollmentId)).rejects.toMatchObject({
+      code: 'ENROLLMENT_NOT_FOUND',
+    });
+
+    const expired = device();
+    const late = await expired.page().beginEnrollment(request());
+    const afterTheWindow = new RarimoCivicCredentialAdapter({
+      gateway: expired.gateway,
+      issuer: expired.issuer,
+      issuerId: 'cico-rarimo-preview',
+      credentialEpoch: 7,
+      countryMapper: mapper,
+      uniquenessTimestampUpperBoundUnixSeconds: 1_800_000_000,
+      now: () => new Date(now.getTime() + 11 * 60 * 1_000),
+      pendingVault: expired.pendingVault,
+    });
+    await expect(afterTheWindow.getEnrollmentStatus(late.enrollmentId)).resolves.toMatchObject({
+      status: 'expired',
+    });
+    expect(expired.pendingVault.stored).toBeNull();
+  });
+
+  it('refuses a kept attempt whose secret does not lead to its binding', async () => {
+    const { gateway, issuer, pendingVault, page } = device();
+    const enrollment = await page().beginEnrollment(request());
+    gateway.statuses.set([...gateway.requests.keys()][0], 'verified');
+    if (!pendingVault.stored) throw new Error('expected a kept attempt');
+    pendingVault.stored = {
+      ...pendingVault.stored,
+      holderSecret: new Uint8Array(32).fill(250),
+    };
+
+    await expect(page().getEnrollmentStatus(enrollment.enrollmentId)).rejects.toMatchObject({
+      code: 'ENROLLMENT_NOT_FOUND',
+    });
+    expect(issuer.requests).toHaveLength(0);
+    expect(pendingVault.stored).toBeNull();
+  });
+
+  it('still runs the scan when the vault cannot be written or read', async () => {
+    const { gateway, pendingVault, page } = device();
+    pendingVault.failing = true;
+    const adapter = page();
+    const enrollment = await adapter.beginEnrollment(request());
+    gateway.statuses.set([...gateway.requests.keys()][0], 'verified');
+
+    // The same page still holds the attempt and completes it.
+    await expect(adapter.getEnrollmentStatus(enrollment.enrollmentId)).resolves.toMatchObject({
+      status: 'issued',
+    });
+    // A new page finds nothing, as before this vault existed.
+    await expect(page().getEnrollmentStatus(enrollment.enrollmentId)).rejects.toMatchObject({
+      code: 'ENROLLMENT_NOT_FOUND',
+    });
   });
 });

@@ -6,6 +6,10 @@ import type {
   CivicCredentialVaultPort,
   StoredCivicCredential,
 } from './passport-v2/ports.js';
+import type {
+  RarimoEnrollmentVaultPort,
+  StoredRarimoEnrollment,
+} from './passport-v2/rarimo-credential-adapter.js';
 
 const PRIVATE_STATE_DB = 'midnight-referendum-private-state';
 const PRIVATE_STATE_DB_VERSION = 2;
@@ -324,6 +328,28 @@ export function browserCivicCredentialVault(scope: string): CivicCredentialVault
     load: async () => provider.get(CIVIC_CREDENTIAL_VAULT_ID),
     save: async (credential) => provider.set(CIVIC_CREDENTIAL_VAULT_ID, credential),
     clear: async () => provider.remove(CIVIC_CREDENTIAL_VAULT_ID),
+  };
+}
+
+const PENDING_ENROLLMENT_VAULT_ID = 'cico-pending-enrollment-v1' as const;
+
+/**
+ * Stores a verification in progress beside the civic credential, in the same
+ * encrypted boundary and under the same scope. It lets a page that was
+ * dropped during the passport scan pick the attempt up again.
+ */
+export function browserRarimoEnrollmentVault(scope: string): RarimoEnrollmentVaultPort {
+  const normalizedScope = scope.trim();
+  if (!normalizedScope) throw new TypeError('Enrollment vault scope must not be empty');
+  const provider = browserPrivateStateProvider<
+    typeof PENDING_ENROLLMENT_VAULT_ID,
+    StoredRarimoEnrollment
+  >();
+  provider.setContractAddress(normalizedScope as ContractAddress);
+  return {
+    load: async () => provider.get(PENDING_ENROLLMENT_VAULT_ID),
+    save: async (enrollment) => provider.set(PENDING_ENROLLMENT_VAULT_ID, enrollment),
+    clear: async () => provider.remove(PENDING_ENROLLMENT_VAULT_ID),
   };
 }
 

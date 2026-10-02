@@ -67,6 +67,40 @@ export interface RarimoCivicCredentialAdapterOptions {
   readonly credentialTtlMs?: number;
   /** Encrypted browser-local persistence; omitted only for ephemeral tests/SSR. */
   readonly vault?: CivicCredentialVaultPort;
+  /**
+   * Encrypted persistence for a verification in progress. Without it a page
+   * reload during the scan loses the secret the scan is bound to, and the
+   * person has to start again.
+   */
+  readonly pendingVault?: RarimoEnrollmentVaultPort;
+}
+
+/**
+ * A verification in progress, as it is kept across a reload.
+ *
+ * On a phone the person leaves the browser for the scanning app, which builds
+ * a heavy proof. The browser may drop the page in the meantime. The scan is
+ * bound to a holder secret drawn before it started, so that secret has to
+ * outlive the page. It is the same secret the issued pass will hold, and it is
+ * kept the same way: in the device's encrypted vault, never sent anywhere.
+ */
+export interface StoredRarimoEnrollment {
+  readonly enrollmentId: string;
+  readonly requestId: string;
+  readonly userIdHash: string;
+  readonly holderSecret: Uint8Array;
+  readonly holderBlind: Uint8Array;
+  readonly holderBinding: Uint8Array;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly request: RarimoVerificationRequest;
+  readonly policy?: CredentialPolicy;
+}
+
+export interface RarimoEnrollmentVaultPort {
+  load(): Promise<StoredRarimoEnrollment | null>;
+  save(enrollment: StoredRarimoEnrollment): Promise<void>;
+  clear(): Promise<void>;
 }
 
 interface RarimoEnrollmentRecord {
@@ -114,6 +148,7 @@ export class RarimoCivicCredentialAdapter
   private readonly enrollmentTtlMs: number;
   private readonly credentialTtlMs: number;
   private readonly vault?: CivicCredentialVaultPort;
+  private readonly pendingVault?: RarimoEnrollmentVaultPort;
   private readonly enrollments = new Map<string, RarimoEnrollmentRecord>();
   private readonly statusChecks = new Map<string, Promise<EnrollmentStatusSnapshot>>();
   private activeEnrollmentId: string | null = null;
@@ -149,6 +184,7 @@ export class RarimoCivicCredentialAdapter
     this.enrollmentTtlMs = options.enrollmentTtlMs ?? DEFAULT_ENROLLMENT_TTL_MS;
     this.credentialTtlMs = options.credentialTtlMs ?? DEFAULT_CREDENTIAL_TTL_MS;
     this.vault = options.vault;
+    this.pendingVault = options.pendingVault;
   }
 
   async beginEnrollment(request: CredentialEnrollmentRequest): Promise<CredentialEnrollment> {
@@ -160,6 +196,8 @@ export class RarimoCivicCredentialAdapter
     if (this.enrollments.size > 0 || (await this.loadRestoredCredential())) {
       await this.clearCredential();
     }
+    // An attempt left behind by a page that was dropped is replaced as well.
+    await this.forgetPending();
 
     const created = this.now();
     const expires = new Date(created.getTime() + this.enrollmentTtlMs);
@@ -206,6 +244,7 @@ export class RarimoCivicCredentialAdapter
 
       this.enrollments.set(enrollmentId, record);
       this.activeEnrollmentId = enrollmentId;
+      await this.rememberPending(record);
 
       return {
         enrollmentId,
@@ -245,7 +284,7 @@ export class RarimoCivicCredentialAdapter
   }
 
   private async pollEnrollmentStatus(enrollmentId: string): Promise<EnrollmentStatusSnapshot> {
-    const record = this.getRecord(enrollmentId);
+    const record = await this.resolveRecord(enrollmentId);
     if (isTerminal(record.status)) return toStatusSnapshot(record);
 
     if (this.now().getTime() >= Date.parse(record.expiresAt)) {
@@ -335,6 +374,8 @@ export class RarimoCivicCredentialAdapter
       await this.persistIssuedRecord(record);
       record.status = 'issued';
       record.updatedAt = now.toISOString();
+      // The pass is in its own vault now. The attempt has done its work.
+      await this.forgetPending();
       await this.cleanupProviderRecord(record).catch(() => {
         // Issuance is canonical. Provider deletion is retried by backend retention work.
       });
@@ -454,6 +495,7 @@ export class RarimoCivicCredentialAdapter
     if (this.restoredCredential) zeroizeStoredCredential(this.restoredCredential);
     this.restoredCredential = null;
     await this.vault?.clear();
+    await this.forgetPending();
 
     const failedCleanup = cleanupResults.find(
       (result): result is PromiseRejectedResult => result.status === 'rejected',
@@ -579,17 +621,77 @@ export class RarimoCivicCredentialAdapter
     };
   }
 
-  private getRecord(enrollmentId: string): RarimoEnrollmentRecord {
-    const record = this.enrollments.get(enrollmentId);
-    if (!record) {
-      throw new CivicCredentialError('ENROLLMENT_NOT_FOUND', 'The Rarimo enrollment was not found');
+  /**
+   * The attempt this page holds, or the one a dropped page left in the vault.
+   * A kept attempt is taken only if it is the one asked for and its holder
+   * binding still follows from its secret; anything else is forgotten.
+   */
+  private async resolveRecord(enrollmentId: string): Promise<RarimoEnrollmentRecord> {
+    const held = this.enrollments.get(enrollmentId);
+    if (held) return held;
+    let kept: StoredRarimoEnrollment | null = null;
+    try {
+      kept = (await this.pendingVault?.load()) ?? null;
+    } catch {
+      kept = null;
     }
-    return record;
+    if (kept?.enrollmentId === enrollmentId && isSoundPendingEnrollment(kept)) {
+      const record: RarimoEnrollmentRecord = {
+        enrollmentId: kept.enrollmentId,
+        requestId: kept.requestId,
+        userIdHash: kept.userIdHash,
+        holderSecret: new Uint8Array(kept.holderSecret),
+        holderBlind: new Uint8Array(kept.holderBlind),
+        holderBinding: new Uint8Array(kept.holderBinding),
+        createdAt: kept.createdAt,
+        expiresAt: kept.expiresAt,
+        request: { ...kept.request },
+        ...(kept.policy ? { policy: kept.policy } : {}),
+        status: 'pending',
+        updatedAt: this.now().toISOString(),
+        cleanupRequested: false,
+      };
+      this.enrollments.set(enrollmentId, record);
+      this.activeEnrollmentId = enrollmentId;
+      return record;
+    }
+    if (kept) await this.forgetPending();
+    throw new CivicCredentialError('ENROLLMENT_NOT_FOUND', 'The Rarimo enrollment was not found');
+  }
+
+  /** Keeping the attempt is a convenience: a vault that fails must not stop the scan. */
+  private async rememberPending(record: RarimoEnrollmentRecord): Promise<void> {
+    if (!this.pendingVault) return;
+    try {
+      await this.pendingVault.save({
+        enrollmentId: record.enrollmentId,
+        requestId: record.requestId,
+        userIdHash: record.userIdHash,
+        holderSecret: new Uint8Array(record.holderSecret),
+        holderBlind: new Uint8Array(record.holderBlind),
+        holderBinding: new Uint8Array(record.holderBinding),
+        createdAt: record.createdAt,
+        expiresAt: record.expiresAt,
+        request: { ...record.request },
+        ...(record.policy ? { policy: record.policy } : {}),
+      });
+    } catch {
+      // Without it, a reload loses the attempt, as before.
+    }
+  }
+
+  private async forgetPending(): Promise<void> {
+    try {
+      await this.pendingVault?.clear();
+    } catch {
+      // A record that outlives its attempt is refused when it is next read.
+    }
   }
 
   private async expireRecord(record: RarimoEnrollmentRecord): Promise<void> {
     record.status = 'expired';
     record.updatedAt = this.now().toISOString();
+    await this.forgetPending();
     try {
       await this.cleanupProviderRecord(record);
     } finally {
@@ -599,6 +701,7 @@ export class RarimoCivicCredentialAdapter
 
   private async failAndCleanup(record: RarimoEnrollmentRecord): Promise<void> {
     failRecord(record, this.now());
+    await this.forgetPending();
     try {
       await this.cleanupProviderRecord(record);
     } catch {
@@ -612,6 +715,27 @@ export class RarimoCivicCredentialAdapter
     await this.gateway.deleteVerification(record.requestId);
     record.cleanupRequested = true;
   }
+}
+
+function isSoundPendingEnrollment(kept: StoredRarimoEnrollment): boolean {
+  const bytes32 = (value: unknown): value is Uint8Array =>
+    value instanceof Uint8Array && value.length === HOLDER_MATERIAL_BYTES;
+  if (
+    !bytes32(kept.holderSecret) ||
+    !bytes32(kept.holderBlind) ||
+    !bytes32(kept.holderBinding) ||
+    typeof kept.requestId !== 'string' ||
+    !kept.requestId ||
+    typeof kept.userIdHash !== 'string' ||
+    !Number.isFinite(Date.parse(kept.expiresAt)) ||
+    typeof kept.request?.eventDataDecimal !== 'string' ||
+    kept.request.requestId !== kept.requestId
+  ) {
+    return false;
+  }
+  // The scan was bound to this binding. A record whose secret does not lead
+  // to it could not be issued anyway.
+  return equalBytes(deriveHolderBinding(kept.holderSecret, kept.holderBlind), kept.holderBinding);
 }
 
 function validateIssuance(

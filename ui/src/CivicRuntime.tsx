@@ -3,6 +3,7 @@ import type { CivicPassportSession, CredentialSummary } from 'midnight-referendu
 import {
   browserBallotOpeningVault,
   browserCivicCredentialVault,
+  browserRarimoEnrollmentVault,
   createIndexerRegistryHistory,
   MidnightCivicActionAdapter,
   RarimoCivicCredentialAdapter,
@@ -352,7 +353,14 @@ function CivicApp() {
       issuerId: passportV2Runtime.config.issuerId,
       credentialEpoch: passportV2Runtime.config.credentialEpoch,
       credentialTtlMs: passportV2Runtime.config.credentialTtlMs,
+      // Time to finish the scan. A first scan includes registering the
+      // document in the scanning app, which ten minutes did not always cover.
+      enrollmentTtlMs: 30 * 60 * 1_000,
       vault: browserCivicCredentialVault(
+        `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`,
+      ),
+      // A scan in progress survives the phone dropping this page.
+      pendingVault: browserRarimoEnrollmentVault(
         `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`,
       ),
       countryMapper: rarimoIsoCountryMapper,

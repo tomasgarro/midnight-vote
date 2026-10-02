@@ -45,6 +45,7 @@ export {
   browserBallotOpeningVault,
   browserCivicCredentialVault,
   browserPrivateStateProvider,
+  browserRarimoEnrollmentVault,
   createBallotOpeningVault,
   deserializePrivateStateFromStorage,
   inMemoryPrivateStateProvider,

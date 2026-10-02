@@ -4,6 +4,7 @@ import type { CivicCredentialPort, PassportSessionPort } from 'midnight-referend
 import { isoNumericCountry } from 'midnight-referendum-api';
 import { describe, expect, it, vi } from 'vitest';
 import { PreviewPassportJourney as PassportJourney } from '../components/passport-v2/PreviewPassportJourney';
+import { PASSPORT_ATTEMPT_STORAGE_KEY } from '../integration/passport-enrollment-state';
 
 const session = {
   sessionId: 'passport-session',
@@ -157,5 +158,49 @@ describe('Preview Passport journey', () => {
       await screen.findByRole('heading', { name: /Tu pasaporte\.\s*Solo lo esencial\./ }),
     ).toBeTruthy();
     expect(clearCredential).toHaveBeenCalledOnce();
+  });
+
+  it('resumes the scan that was under way when the page was dropped, instead of starting another', async () => {
+    const user = userEvent.setup();
+    // What a reload leaves in the tab: the attempt's handle and its expiry.
+    window.sessionStorage.setItem(
+      PASSPORT_ATTEMPT_STORAGE_KEY,
+      JSON.stringify({
+        enrollmentId: 'kept-enrollment',
+        expiresAt: new Date(Date.now() + 20 * 60_000).toISOString(),
+      }),
+    );
+    const beginEnrollment = vi.fn();
+    const getEnrollmentStatus = vi.fn().mockResolvedValue({
+      enrollmentId: 'kept-enrollment',
+      status: 'issued',
+      updatedAt: new Date().toISOString(),
+    });
+    const onCredentialReady = vi.fn();
+    try {
+      render(
+        <PassportJourney
+          mode="preview"
+          onClose={vi.fn()}
+          onCredentialReady={onCredentialReady}
+          initialSession={session}
+          ports={{
+            passport: passportPort(),
+            credential: { ...credentialPort(), beginEnrollment, getEnrollmentStatus },
+          }}
+        />,
+      );
+
+      // The journey goes straight to the attempt. The person did not scan again.
+      expect(await screen.findByText('esperando al proveedor')).toBeTruthy();
+      await user.click(screen.getByRole('button', { name: /Comprobar ahora/i }));
+      expect(await screen.findByRole('heading', { name: 'Tu credencial está lista' })).toBeTruthy();
+      expect(getEnrollmentStatus).toHaveBeenCalledWith('kept-enrollment');
+      expect(beginEnrollment).not.toHaveBeenCalled();
+      // Once the pass exists, the handle has no further use.
+      expect(window.sessionStorage.getItem(PASSPORT_ATTEMPT_STORAGE_KEY)).toBeNull();
+    } finally {
+      window.sessionStorage.removeItem(PASSPORT_ATTEMPT_STORAGE_KEY);
+    }
   });
 });

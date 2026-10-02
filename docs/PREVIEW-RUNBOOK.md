@@ -292,6 +292,7 @@ What can go wrong, and what it means:
 | "Origin is not allowed" in the browser console | The credential service or the relayer does not know `https://midnight.vote` | The new credential manifest is not deployed |
 | The relayer is unavailable | `relay.midnight.vote/ready` is not 200 | Its wallet is still replaying, or it holds no DUST |
 | RariMe refuses the document | The passport is not supported or was registered before | Record the exact message. Try the second passport |
+| The app is back at its first screen after the scan | The phone dropped the page while RariMe was in front. The scan is not lost: the attempt is kept in the device's encrypted vault for thirty minutes | Tap "Add eligibility" again and sign in to Passport. The app goes back to the same attempt and finishes it. Do not scan again |
 | The proof stops or the tab reloads | The phone ran out of memory | Close other apps and try again. Record the model. This is a result worth reporting |
 
 A sealed answer is kept on the device that sealed it. Private browsing, or
