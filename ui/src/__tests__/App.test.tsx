@@ -135,8 +135,14 @@ describe('App', () => {
 
     window.history.replaceState(null, '', '#app/pulse');
     render(<App />);
+    // The pulse is loaded on demand. One second is not always enough for that
+    // chunk on a busy machine, where the page still reads "Cargando…".
     expect(
-      await screen.findByRole('heading', { name: /Empezá por lo\s*que te importa/iu }),
+      await screen.findByRole(
+        'heading',
+        { name: /Empezá por lo\s*que te importa/iu },
+        { timeout: 5_000 },
+      ),
     ).toBeTruthy();
     expect(screen.queryByRole('navigation')).toBeNull();
 
