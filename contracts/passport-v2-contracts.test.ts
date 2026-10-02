@@ -1130,5 +1130,63 @@ describe('ReferendumV2 credential policy', () => {
         'This voter has already voted in this referendum',
       );
     });
+
+    // The issuer gives a document one holder and renews its pass only for that
+    // holder. These two cases are why that is enough: a renewed pass is a new
+    // leaf, but the nullifier follows the holder's secret, not the leaf.
+    function renew(item: ReturnType<typeof setupReferendum>, after: typeof item.context) {
+      const claims: Claims = {
+        ...item.registry.claims,
+        validUntil: 2_100_000_000n,
+        blind: bytes(150),
+      };
+      const renewed = enroll(item.registry, claims);
+      expect(renewed.leaf).not.toEqual(item.leaf);
+      const published = item.contract.impureCircuits.publishCredentialRoot(after, renewed.root);
+      const context: CircuitContext<ReferendumPrivateState> = {
+        ...published.context,
+        currentPrivateState: privateStateFromVoter(
+          ORGANIZER_SECRET,
+          ROOT_PUBLISHER_SECRET,
+          item.registry.voterSecret,
+          item.registry.holderBlind,
+          claims,
+          renewed.path,
+          bytes(151),
+        ),
+      };
+      return { context, contract: new ReferendumContract(referendumWitnesses()) };
+    }
+
+    it('refuses a second answer from a renewed pass of the same holder', () => {
+      const item = setupReferendum();
+      const firstVote = item.contract.impureCircuits.castVote(item.context);
+      const renewed = renew(item, firstVote.context);
+
+      expect(() => renewed.contract.impureCircuits.castVote(renewed.context)).toThrow(
+        'This voter has already voted in this referendum',
+      );
+    });
+
+    it('takes one answer from the renewed pass when the first pass gave none, and then none from the first', () => {
+      const item = setupReferendum();
+      const renewed = renew(item, item.context);
+      const vote = renewed.contract.impureCircuits.castVote(renewed.context);
+      const state = referendumLedger(vote.context.currentQueryContext.state);
+      expect(state.issuedVotes).toBe(1n);
+      expect(
+        state.spentVoteNullifiers.member(
+          deriveVoteNullifier(item.registry.voterSecret, item.eventId),
+        ),
+      ).toBe(true);
+
+      // The first pass is still in an admitted root, and still the same holder.
+      expect(() =>
+        item.contract.impureCircuits.castVote({
+          ...vote.context,
+          currentPrivateState: item.privateState,
+        }),
+      ).toThrow('This voter has already voted in this referendum');
+    });
   });
 });

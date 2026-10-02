@@ -11,6 +11,7 @@ export * from './midnight-v2-relayer-providers.js';
 export * from './ports.js';
 export * from './public-state.js';
 export * from './rarimo-credential-adapter.js';
+export * from './rarimo-query.js';
 export type {
   RarimoCountryMapper,
   RarimoDerivedClaims,

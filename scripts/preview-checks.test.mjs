@@ -37,9 +37,11 @@ function healthy() {
           circuits: ['castVote', 'revealVote'],
         },
         issuerWallet: { address: 'mn_addr_preview1issuer', dustAvailable: true },
+        documents: { onePassPerDocument: 'enforce', eventId: '424242' },
       },
     },
     chain: {
+      documentEventId: '424242',
       consultations: [
         {
           slug: 'test',
@@ -177,6 +179,52 @@ describe('what the Preview services say about a person being able to answer', ()
       o.cico.body.issuerWallet = { address: null, dustAvailable: null };
     });
     expect(verdictOf(silent, 'Credential service can pay').verdict).toBe('unknown');
+  });
+
+  it('says whether a document is kept to one holder, and catches the app and the service disagreeing', () => {
+    const check = 'One pass per document';
+    expect(verdictOf(evaluatePreviewServices(healthy()), check)).toMatchObject({
+      verdict: 'ok',
+      detail: 'a document has one holder; a second device is refused',
+    });
+
+    // The service asks for another event than the app: it would refuse every verification.
+    const disagreeing = evaluate((o) => {
+      o.cico.body.documents.eventId = '999';
+    });
+    expect(verdictOf(disagreeing, check).verdict).toBe('fail');
+    expect(verdictOf(disagreeing, check).todo).toContain('CICO_REGISTRY_CONTRACT_ADDRESS');
+    expect(summarize(disagreeing).ready).toBe(false);
+
+    // An image from before the rule says nothing: nothing is claimed for it.
+    const old = evaluate((o) => {
+      delete o.cico.body.documents;
+    });
+    expect(verdictOf(old, check).verdict).toBe('unknown');
+    expect(verdictOf(old, check).todo).toContain('0.2.4');
+
+    const observing = evaluate((o) => {
+      o.cico.body.documents.onePassPerDocument = 'observe';
+    });
+    expect(verdictOf(observing, check).detail).toContain('logged, not refused');
+
+    const off = evaluate((o) => {
+      o.cico.body.documents = { onePassPerDocument: 'off', eventId: null };
+    });
+    expect(verdictOf(off, check)).toMatchObject({ verdict: 'ok' });
+    expect(verdictOf(off, check).detail).toContain('off by configuration');
+
+    // The chain could not be read, so the app's event is not known here: the
+    // service's own word is reported, and no disagreement is invented.
+    const blind = evaluate((o) => {
+      o.chain = { error: 'ETIMEDOUT' };
+    });
+    expect(verdictOf(blind, check).verdict).toBe('ok');
+
+    const silent = evaluate((o) => {
+      o.cico = { error: 'ENOTFOUND' };
+    });
+    expect(verdictOf(silent, check).verdict).toBe('unknown');
   });
 
   it('refuses a service that does not accept the app as an origin', () => {

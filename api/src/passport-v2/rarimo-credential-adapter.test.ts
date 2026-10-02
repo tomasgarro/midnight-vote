@@ -7,10 +7,13 @@ import type {
   StoredCivicCredential,
 } from './ports.js';
 import {
+  type HolderKeyVaultPort,
   RarimoCivicCredentialAdapter,
   type RarimoEnrollmentVaultPort,
+  type StoredHolderKey,
   type StoredRarimoEnrollment,
 } from './rarimo-credential-adapter.js';
+import { rarimoVerificationRequestProblem } from './rarimo-query.js';
 import type {
   RarimoVerificationGateway,
   RarimoVerificationLink,
@@ -19,6 +22,7 @@ import type {
   RarimoVerifiedEvidence,
 } from './rarimo-types.js';
 import {
+  CivicCredentialError,
   type CredentialEnrollmentRequest,
   isoNumericCountry,
   type PassportSession,
@@ -214,6 +218,24 @@ describe('Rarimo civic credential boundary', () => {
       status: 'pending',
     });
     await expect(adapter.getCredentialSummary()).resolves.toBeNull();
+  });
+
+  it('asks only for verifications the credential service takes', async () => {
+    // The service refuses a request of any other shape than the one it shares
+    // with this adapter. Each policy the app can ask for must pass that check.
+    for (const policy of [
+      undefined,
+      { requireAdult: true },
+      { requireAdult: false, minimumAssurance: 'document-nfc' as const },
+      { allowedCountries: [argentina], requireAdult: true },
+    ]) {
+      const gateway = new FakeRarimoGateway();
+      await makeAdapter(gateway).beginEnrollment(request(policy));
+      const asked = [...gateway.requests.values()][0];
+      if (!asked) throw new Error('expected a verification request');
+      expect(rarimoVerificationRequestProblem(asked, now)).toBeNull();
+      expect(asked.identityCounterUpperBound).toBe('1');
+    }
   });
 
   it('issues only after exact verified status and request-bound proof checks', async () => {
@@ -669,5 +691,255 @@ describe('asking the issuer again for the same pass', () => {
     });
     expect(issuer.requests[1]?.claims).toEqual(issuer.requests[0]?.claims);
     expect(issuer.requests[1]?.holderBinding).toEqual(issuer.requests[0]?.holderBinding);
+  });
+});
+
+/** The device's vault for its holder secret. It outlives every pass. */
+class MemoryHolderKeyVault implements HolderKeyVaultPort {
+  stored: StoredHolderKey | null = null;
+  saves = 0;
+  failing: 'load' | 'save' | null = null;
+
+  async load() {
+    if (this.failing === 'load') throw new Error('vault unavailable');
+    return this.stored ? structuredClone(this.stored) : null;
+  }
+
+  async save(key: StoredHolderKey) {
+    if (this.failing === 'save') throw new Error('vault unavailable');
+    this.saves += 1;
+    this.stored = structuredClone(key);
+  }
+}
+
+describe('one holder for every pass a device is issued', () => {
+  const event = '424242';
+
+  // One gateway and one issuer stand for the services; a device is its vaults.
+  function services() {
+    return { gateway: new FakeRarimoGateway(), issuer: new FakeCicoIssuer() };
+  }
+
+  function device(
+    { gateway, issuer }: { gateway: FakeRarimoGateway; issuer: CivicCredentialIssuerPort },
+    holderKeyVault: HolderKeyVaultPort | null = new MemoryHolderKeyVault(),
+  ) {
+    const vault = new MemoryCredentialVault();
+    const pendingVault = new MemoryEnrollmentVault();
+    const page = () =>
+      new RarimoCivicCredentialAdapter({
+        gateway,
+        issuer,
+        issuerId: 'cico-rarimo-preview',
+        credentialEpoch: 7,
+        countryMapper: mapper,
+        uniquenessTimestampUpperBoundUnixSeconds: 1_800_000_000,
+        now: () => new Date(now),
+        vault,
+        pendingVault,
+        verificationEventId: event,
+        ...(holderKeyVault ? { holderKeyVault } : {}),
+      });
+    return { vault, pendingVault, page };
+  }
+
+  it('asks for every verification under the event of its registry', async () => {
+    const shared = services();
+    await device(shared).page().beginEnrollment(request());
+    await device(shared)
+      .page()
+      .beginEnrollment(request({ requireAdult: true }));
+
+    const asked = [...shared.gateway.requests.values()];
+    expect(asked).toHaveLength(2);
+    // The same event on two devices: a document shows both the same nullifier.
+    expect(asked.map((one) => one.eventId)).toEqual([event, event]);
+    // What ties a proof to its attempt is still its own.
+    expect(asked[0]?.eventData).not.toBe(asked[1]?.eventData);
+  });
+
+  it('refuses an event that is not a positive decimal', () => {
+    for (const malformed of ['0', '', '0x2a', '-1', '1'.repeat(78)]) {
+      expect(
+        () =>
+          new RarimoCivicCredentialAdapter({
+            ...services(),
+            issuerId: 'cico-rarimo-preview',
+            credentialEpoch: 7,
+            countryMapper: mapper,
+            uniquenessTimestampUpperBoundUnixSeconds: 1_800_000_000,
+            verificationEventId: malformed,
+          }),
+      ).toThrow('verificationEventId must be a positive decimal field element');
+    }
+  });
+
+  it('keeps one holder across attempts, reloads and renewals', async () => {
+    const shared = services();
+    const keys = new MemoryHolderKeyVault();
+    const { page } = device(shared, keys);
+
+    const first = await page().beginEnrollment(request());
+    // The person starts again, then the page is dropped, then they come back.
+    const second = await page().beginEnrollment(request());
+    expect(second.holderBinding).toEqual(first.holderBinding);
+    expect(keys.saves).toBe(1);
+
+    shared.gateway.statuses.set([...shared.gateway.requests.keys()][1] as string, 'verified');
+    const issuing = page();
+    await expect(issuing.getEnrollmentStatus(second.enrollmentId)).resolves.toMatchObject({
+      status: 'issued',
+    });
+
+    // A renewal, weeks later: the pass is replaced, the holder is not.
+    const renewal = await page().beginEnrollment(request());
+    expect(renewal.holderBinding).toEqual(first.holderBinding);
+    expect(keys.saves).toBe(1);
+    const kept = keys.stored;
+    if (!kept) throw new Error('expected a kept holder key');
+    expect(deriveHolderBinding(kept.holderSecret, kept.holderBlind)).toEqual(first.holderBinding);
+  });
+
+  it('survives the pass being cleared: the document still has this holder', async () => {
+    const shared = services();
+    const keys = new MemoryHolderKeyVault();
+    const { page } = device(shared, keys);
+    const adapter = page();
+    const first = await adapter.beginEnrollment(request());
+    await adapter.clearCredential();
+
+    const again = await page().beginEnrollment(request());
+    expect(again.holderBinding).toEqual(first.holderBinding);
+  });
+
+  it('gives two devices two holders, and a device without the vault a new one each time', async () => {
+    const shared = services();
+    const one = await device(shared).page().beginEnrollment(request());
+    const other = await device(shared).page().beginEnrollment(request());
+    expect(other.holderBinding).not.toEqual(one.holderBinding);
+
+    const forgetful = device(shared, null);
+    const early = await forgetful.page().beginEnrollment(request());
+    const late = await forgetful.page().beginEnrollment(request());
+    expect(late.holderBinding).not.toEqual(early.holderBinding);
+  });
+
+  it('keeps the holder key and nothing else beside it', async () => {
+    const keys = new MemoryHolderKeyVault();
+    await device(services(), keys)
+      .page()
+      .beginEnrollment(request({ requireAdult: true }));
+    const kept = keys.stored;
+    if (!kept) throw new Error('expected a kept holder key');
+    expect(Object.keys(kept).sort()).toEqual(['holderBlind', 'holderSecret']);
+    expect(kept.holderSecret).toHaveLength(32);
+    expect(kept.holderBlind).toHaveLength(32);
+  });
+
+  it('does not start a verification when the key cannot be kept or read', async () => {
+    const shared = services();
+    const keys = new MemoryHolderKeyVault();
+    keys.failing = 'save';
+    await expect(device(shared, keys).page().beginEnrollment(request())).rejects.toMatchObject({
+      code: 'ADAPTER_UNAVAILABLE',
+    });
+    keys.failing = 'load';
+    await expect(device(shared, keys).page().beginEnrollment(request())).rejects.toMatchObject({
+      code: 'ADAPTER_UNAVAILABLE',
+      retryable: true,
+    });
+    // No scan was asked for: a pass with a holder nobody kept would lock the
+    // document out for the whole epoch.
+    expect(shared.gateway.requests.size).toBe(0);
+  });
+
+  it('replaces a kept key that is not a key, rather than issuing under it', async () => {
+    const keys = new MemoryHolderKeyVault();
+    keys.stored = { holderSecret: new Uint8Array(5), holderBlind: new Uint8Array(32) };
+    const enrollment = await device(services(), keys).page().beginEnrollment(request());
+    expect(keys.saves).toBe(1);
+    expect(keys.stored?.holderSecret).toHaveLength(32);
+    expect(
+      deriveHolderBinding(
+        keys.stored?.holderSecret as Uint8Array,
+        keys.stored?.holderBlind as Uint8Array,
+      ),
+    ).toEqual(enrollment.holderBinding);
+  });
+
+  describe('when the document already belongs to another device', () => {
+    class RefusingIssuer implements CivicCredentialIssuerPort {
+      readonly adapterName = 'refusing-issuer';
+      asked = 0;
+      async issueCredential(): Promise<never> {
+        this.asked += 1;
+        throw new CivicCredentialError(
+          'DOCUMENT_ALREADY_ENROLLED',
+          'This document already has a pass, held by another device or browser',
+        );
+      }
+    }
+
+    it('ends the attempt and says why, instead of asking again', async () => {
+      const gateway = new FakeRarimoGateway();
+      const issuer = new RefusingIssuer();
+      const { vault, pendingVault, page } = device({ gateway, issuer });
+      const adapter = page();
+      const enrollment = await adapter.beginEnrollment(request());
+      const requestId = [...gateway.requests.keys()][0] as string;
+      gateway.statuses.set(requestId, 'verified');
+
+      await expect(adapter.getEnrollmentStatus(enrollment.enrollmentId)).resolves.toEqual({
+        enrollmentId: enrollment.enrollmentId,
+        status: 'failed',
+        updatedAt: now.toISOString(),
+        errorCode: 'DOCUMENT_ALREADY_ENROLLED',
+      });
+      // The verification is removed at the verifier and forgotten on the device.
+      expect(gateway.deleted).toEqual([requestId]);
+      expect(pendingVault.stored).toBeNull();
+      expect(vault.stored).toBeNull();
+      await expect(adapter.getCredentialSummary()).resolves.toBeNull();
+
+      // Asked again, it gives the same answer and does not trouble the issuer.
+      await expect(adapter.getEnrollmentStatus(enrollment.enrollmentId)).resolves.toMatchObject({
+        status: 'failed',
+        errorCode: 'DOCUMENT_ALREADY_ENROLLED',
+      });
+      expect(issuer.asked).toBe(1);
+    });
+
+    it('still treats every other issuer failure as one to try again', async () => {
+      const gateway = new FakeRarimoGateway();
+      const issuer = new FakeCicoIssuer();
+      issuer.fail = true;
+      const { pendingVault, page } = device({ gateway, issuer });
+      const adapter = page();
+      const enrollment = await adapter.beginEnrollment(request());
+      gateway.statuses.set([...gateway.requests.keys()][0] as string, 'verified');
+
+      await expect(adapter.getEnrollmentStatus(enrollment.enrollmentId)).rejects.toMatchObject({
+        code: 'ISSUANCE_FAILED',
+        retryable: true,
+      });
+      expect(pendingVault.stored?.enrollmentId).toBe(enrollment.enrollmentId);
+      expect(gateway.deleted).toEqual([]);
+    });
+
+    it('leaves the holder key in place: this device may hold another document', async () => {
+      const gateway = new FakeRarimoGateway();
+      const keys = new MemoryHolderKeyVault();
+      const refused = device({ gateway, issuer: new RefusingIssuer() }, keys);
+      const adapter = refused.page();
+      const enrollment = await adapter.beginEnrollment(request());
+      gateway.statuses.set([...gateway.requests.keys()][0] as string, 'verified');
+      await adapter.getEnrollmentStatus(enrollment.enrollmentId);
+
+      const kept = keys.stored;
+      if (!kept) throw new Error('expected a kept holder key');
+      expect(deriveHolderBinding(kept.holderSecret, kept.holderBlind)).toEqual(
+        enrollment.holderBinding,
+      );
+    });
   });
 });

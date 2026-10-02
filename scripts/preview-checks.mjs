@@ -275,6 +275,42 @@ function credentialRows(cico, wanted, appOrigin) {
   return rows;
 }
 
+/**
+ * A document gets one holder: the service ties every pass of one document to
+ * the device that got the first. That works only when the app and the service
+ * ask for verifications under the same event, which both derive from the
+ * registry. `expectedEventId` is what the app derives.
+ */
+function documentRow(cico, expectedEventId) {
+  const check = 'One pass per document';
+  if (unreachable(cico) || cico.status !== 200 || !cico.body || typeof cico.body !== 'object') {
+    return row(check, 'unknown', 'the credential service did not answer');
+  }
+  const rule = cico.body.documents;
+  if (!rule) {
+    return row(
+      check,
+      'unknown',
+      'this image does not say how it treats a document verified twice',
+      'Deploy the credential manifest of this repository (image 0.2.4 or later). Before it, a person verified on two devices holds two passes',
+    );
+  }
+  if (rule.onePassPerDocument === 'off') {
+    return row(check, 'ok', 'off by configuration: nothing ties two passes of one document');
+  }
+  if (expectedEventId && rule.eventId !== expectedEventId) {
+    return row(
+      check,
+      'fail',
+      'the service and the app derive different events: it refuses every verification the app asks for',
+      'CICO_REGISTRY_CONTRACT_ADDRESS and CICO_CREDENTIAL_EPOCH must be those of the registry manifest the app was built from',
+    );
+  }
+  return rule.onePassPerDocument === 'enforce'
+    ? row(check, 'ok', 'a document has one holder; a second device is refused')
+    : row(check, 'ok', 'observed only: a second device is logged, not refused');
+}
+
 function sharedSecretRow(relay, cico) {
   const relayId = relay?.body?.v2?.capabilityKeyId;
   const cicoId = cico?.body?.actionCapabilities?.keyId;
@@ -388,6 +424,7 @@ export function evaluatePreviewServices(observations) {
   return [
     ...relayRows(observations.relay, wanted, observations.appOrigin),
     ...credentialRows(observations.cico, wanted, observations.appOrigin),
+    documentRow(observations.cico, observations.chain?.documentEventId),
     sharedSecretRow(observations.relay, observations.cico),
     ...chainRows(observations.chain),
     ...siteRows(observations.app, observations.assistant),

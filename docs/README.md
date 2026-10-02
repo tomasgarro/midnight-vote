@@ -57,6 +57,10 @@ Prefer a visual introduction? Open [midnight.vote/docs](https://midnight.vote/do
 | [ADR-005: Evidence provider](adr/ADR-005-rarimo-evidence-boundary.md) | Rarimo stays behind a replaceable verification boundary. |
 | [ADR-007: Open enrollment](adr/ADR-007-open-enrollment-and-evidence-roles.md) | Later roots need a separately attested publication path. |
 | [ADR-008: Reflection and actor lanes](adr/ADR-008-civic-pulse-and-actor-lanes.md) | Human reflection and future agent results stay separate. |
+| [ADR-009: Voter-owned count](adr/ADR-009-voter-owned-reveal.md) | Each person counts their own answer; no organizer holds it. |
+| [ADR-010: Disclosed hosted proving](adr/ADR-010-disclosed-hosted-proving.md) | Proving on the operator's server is a choice, never the default. |
+| [ADR-011: On-device proving](adr/ADR-011-on-device-proving.md) | A browser without a wallet builds its own proofs. |
+| [ADR-012: One holder per document](adr/ADR-012-one-holder-per-document.md) | What makes "one answer per person" true, and where it stops. |
 | [ADR-006: Frozen enrollment](adr/ADR-006-credential-epoch-lifecycle.md) | Historical decision, superseded by ADR-007. |
 
 ## Evidence has a date and a source revision

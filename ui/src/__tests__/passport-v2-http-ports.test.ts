@@ -185,6 +185,57 @@ describe('Passport v2 narrow HTTP boundaries', () => {
       }),
     ).rejects.toMatchObject({ code: 'ADAPTER_UNAVAILABLE' });
   });
+
+  describe('when the issuer refuses a pass', () => {
+    const issuance = {
+      enrollmentId: 'enrollment-id',
+      provider: 'rarimo' as const,
+      evidenceAuthorization: 'single-use-evidence-authorization',
+      holderBinding: new Uint8Array(32).fill(1),
+      claims: {
+        issuerId: 'cico-preview-issuer',
+        country: isoNumericCountry('032'),
+        ageClass: '18-plus' as const,
+        assurance: 'document-nfc' as const,
+        credentialEpoch: 1,
+        validFrom: '2026-08-24T12:00:00.000Z',
+        validUntil: '2026-08-25T12:00:00.000Z',
+      },
+    };
+    const issuerAnswering = (body: unknown, status: number) =>
+      new HttpCivicCredentialIssuerPort({
+        baseUrl: 'https://passport-api.example',
+        fetcher: vi.fn().mockResolvedValue(json(body, status)),
+      });
+
+    it('names a document that belongs to another device, and does not call it retryable', async () => {
+      const issuer = issuerAnswering(
+        {
+          message: 'This document already has a pass, held by another device or browser',
+          code: 'DOCUMENT_ALREADY_ENROLLED',
+        },
+        409,
+      );
+      await expect(issuer.issueCredential(issuance)).rejects.toMatchObject({
+        code: 'DOCUMENT_ALREADY_ENROLLED',
+        retryable: false,
+      });
+    });
+
+    it('takes the code only from a conflict: no other answer can end a verification', async () => {
+      // The same code on a server error is a failure to try again.
+      await expect(
+        issuerAnswering(
+          { message: 'unavailable', code: 'DOCUMENT_ALREADY_ENROLLED' },
+          503,
+        ).issueCredential(issuance),
+      ).rejects.toMatchObject({ code: 'ADAPTER_UNAVAILABLE', retryable: true });
+      // A conflict without the code stays what it was.
+      await expect(
+        issuerAnswering({ message: 'conflict' }, 409).issueCredential(issuance),
+      ).rejects.toMatchObject({ code: 'INVALID_CREDENTIAL_CLAIMS' });
+    });
+  });
 });
 
 describe('HttpEnrollmentStatusPort', () => {

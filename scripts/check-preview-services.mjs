@@ -43,10 +43,14 @@ const asJson = args.includes('--json');
 const now = Math.floor(Date.now() / 1000);
 const consultations = [];
 let registryAddress = null;
+let registryEpoch = null;
 for (const slug of Object.keys(file.consultations)) {
   if (slug.startsWith('rehearsal') || !existsSync(manifestPathFor(slug))) continue;
   const manifest = JSON.parse(readFileSync(manifestPathFor(slug), 'utf8'));
-  registryAddress ??= manifest.registry?.contractAddress ?? null;
+  if (!registryAddress && manifest.registry?.contractAddress) {
+    registryAddress = manifest.registry.contractAddress;
+    registryEpoch = manifest.registry.credentialEpoch ?? null;
+  }
   for (const referendum of manifest.referenda ?? []) {
     if (referendum.contractAddress && Number(referendum.revealClosesAtUnix) > now) {
       consultations.push({ slug, contractAddress: referendum.contractAddress });
@@ -118,7 +122,14 @@ async function readChain() {
           : false,
       });
     }
-    return { consultations: rows };
+    return {
+      consultations: rows,
+      // The event the app asks for verifications under. The service must say the same.
+      documentEventId:
+        registryAddress && registryEpoch !== null
+          ? api.deriveRarimoEventId(registryAddress, Number(registryEpoch))
+          : null,
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'could not be read' };
   }

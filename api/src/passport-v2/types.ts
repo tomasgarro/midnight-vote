@@ -193,6 +193,12 @@ export type CivicCredentialErrorCode =
    */
   | 'CREDENTIAL_ADMISSION_CLOSED'
   | 'INVALID_CREDENTIAL_CLAIMS'
+  /**
+   * The document already has a pass, held by another device or browser. One
+   * document gets one holder per registry epoch, so that a person cannot
+   * answer a consultation twice by being verified twice.
+   */
+  | 'DOCUMENT_ALREADY_ENROLLED'
   | 'ISSUANCE_FAILED'
   | 'ADAPTER_UNAVAILABLE'
   | 'CONFLICT'

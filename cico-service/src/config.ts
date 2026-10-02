@@ -48,6 +48,12 @@ export interface CicoServiceConfig {
    * referenda are configured.
    */
   readonly referendumZkConfigPath: string | null;
+  /**
+   * One holder per document: `enforce` refuses a second holder, `observe`
+   * records and logs without refusing, `off` keeps no record and lets every
+   * verification choose its own event.
+   */
+  readonly documentUniqueness: 'enforce' | 'observe' | 'off';
   /** Tuning for CredentialRootPublisher; the publisher itself is wired up only where referenda are configured. */
   readonly rootPublisher: {
     readonly minBatchSize: number;
@@ -171,6 +177,7 @@ export function loadCicoServiceConfig(
       10 * 60 * 1_000,
     ),
     rootPublisherSecretHex,
+    documentUniqueness: documentUniqueness(env),
     referendumZkConfigPath:
       referenda.length > 0 ? resolve(required(env, 'CICO_REFERENDUM_ZK_CONFIG_PATH')) : null,
     referenda,
@@ -232,6 +239,16 @@ export function loadCicoServiceConfig(
       ),
     },
   };
+}
+
+function documentUniqueness(
+  env: Readonly<Record<string, string | undefined>>,
+): 'enforce' | 'observe' | 'off' {
+  const value = optional(env, 'CICO_DOCUMENT_UNIQUENESS', 'enforce');
+  if (value !== 'enforce' && value !== 'observe' && value !== 'off') {
+    throw new Error('CICO_DOCUMENT_UNIQUENESS must be enforce, observe or off');
+  }
+  return value;
 }
 
 function required(env: Readonly<Record<string, string | undefined>>, name: string): string {

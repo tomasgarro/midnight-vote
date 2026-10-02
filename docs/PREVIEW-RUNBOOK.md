@@ -238,6 +238,55 @@ them one after another, not at once; a person can answer each consultation as
 soon as that one has the root. How long one such transaction takes on the
 server is not measured yet.
 
+### One pass per document
+
+A document has one holder: the browser that got its first pass. The rule is
+what makes "one answer per person" true. A pass lasts 24 hours, so a person who
+comes back the next day is verified again; without the rule that second pass
+would be a second voice in a consultation that is still open.
+
+| Part | What it does |
+| --- | --- |
+| The app | Asks for every verification under one event, derived from the registry's address and epoch. Under one event a document always shows the same nullifier. It keeps one holder secret per browser, in the encrypted vault, and uses it for every pass |
+| The credential service | Refuses a verification asked under another event. Before it issues a pass it looks up the document's nullifier: unknown, it records the holder; the same holder, it issues a renewal; another holder, it refuses, and nothing is spent |
+| The contract | Unchanged. An answer's nullifier follows the holder's secret, so two passes of one holder give one answer |
+
+What the service keeps is `document-bindings.json` in its state directory: a
+digest of the nullifier beside a digest of the holder's public binding. No
+document number, name or country is in it, and a line cannot be traced to a
+person. That is also why an operator cannot release one document: the file can
+only be kept or removed as a whole.
+
+| Log line | Meaning |
+| --- | --- |
+| `[cico] one pass per document: enforce` | At start. `observe` records and logs, and refuses nothing. `off` asks nothing of the app |
+| `[cico] document holder: bound` | A document's first pass |
+| `[cico] document holder: renewed` | The same browser, a later pass |
+| `[cico] document holder: refused` | Another browser asked for a pass with a document that has a holder. The app tells the person to use the first one |
+| `[cico] document holder: no-nullifier` | The proof did not show its nullifier. Refused: it would be the way around the rule |
+
+`CICO_DOCUMENT_UNIQUENESS` sets the mode: `enforce`, `observe` or `off`. Left
+empty, as in the credential project's manifest, the mode is `enforce`. To
+change it, add the variable in hPanel and redeploy the project.
+
+The rule has run against a stand-in verifier only. If the first real scan ends
+with `document holder: no-nullifier`, the real proof does not show what the
+circuit's documentation says it shows: set `observe`, finish the phone run, and
+keep the log line. That is a finding, not a fault of the person.
+
+The service also takes only one shape of verification, the one the app asks
+for, and answers any other with 400 and the rule it broke. It is not
+switchable: without it a changed app could get an `18-plus` pass that proves no
+age, or a pass for a passport registered again in RariMe. A device whose date
+is more than two days off is refused the same way, with "must prove the
+passport is valid today".
+
+What it costs a person: the pass cannot move. A person who clears the site's
+data, uses private browsing, or opens the app first inside a messaging app's
+own browser and later in the phone's browser, is refused in the second place
+until the registry's epoch changes. The first phone run should start in the
+browser the person will keep using.
+
 ### If the issuer wallet holds no DUST
 
 The credential service pays for every pass and every root it publishes, from
@@ -292,6 +341,7 @@ What can go wrong, and what it means:
 | "Origin is not allowed" in the browser console | The credential service or the relayer does not know `https://midnight.vote` | The new credential manifest is not deployed |
 | The relayer is unavailable | `relay.midnight.vote/ready` is not 200 | Its wallet is still replaying, or it holds no DUST |
 | RariMe refuses the document | The passport is not supported or was registered before | Record the exact message. Try the second passport |
+| "This document already has a pass on another device or browser" | The document's first pass went to another browser, and a document has one holder | Go back to that browser. If it was a messaging app's own browser, open the link there again. See "One pass per document" |
 | The app is back at its first screen after the scan | The phone dropped the page while RariMe was in front. The scan is not lost: the attempt is kept in the device's encrypted vault for thirty minutes | Tap "Add eligibility" again and sign in to Passport. The app goes back to the same attempt and finishes it. Do not scan again |
 | The proof stops or the tab reloads | The phone ran out of memory | Close other apps and try again. Record the model. This is a result worth reporting |
 
@@ -334,10 +384,26 @@ Run on 2 October 2026 on a laptop: a pass was issued 30 seconds after the
 stand-in scan, admitted to the consultation 48 seconds later, and the answer
 was sealed 27 to 36 seconds after that.
 
+It can also rehearse what a phone does to a page:
+
+| How | What it rehearses |
+| --- | --- |
+| `REHEARSAL_DROP=issuing npm run rehearse:dress -- journey`, then `journey` again | The page is dropped while the pass is being issued. The second run is the page coming back: it takes up the attempt kept on the device, asks for the same pass, and seals. One pass is issued, not two |
+| `npm run rehearse:dress -- forget-confirmation`, then `journey` | The device never saw its answer confirmed. The app finds the answer on chain and refuses to seal a second one |
+| `REHEARSAL_DEVICE=<label>` | A second device, with a document of its own: a second person |
+| `REHEARSAL_DOCUMENT=<label>` | The document that is scanned. The same label on two devices is one person on two devices: the second is refused a pass |
+| `REHEARSAL_RENEW=1` | The device asks for a new pass although it holds one, as on the day after. It gets one, for the same holder, and cannot answer twice |
+| `REHEARSAL_RUN=<label>` | Another run, with a registry and a consultation of its own: a consultation's deadlines are fixed when it is deployed |
+
 ## Known limits
 
 - A pass is valid for 24 hours. A person seals their answer in the same sitting
   as the passport scan. Counting later needs no pass.
+- A document's pass stays in the browser that got it first. Another browser or
+  device is refused for as long as the registry's epoch lasts, and so is the
+  same browser once its site data is cleared. Nothing moves a pass.
+- The rule holds for one registry. A consultation on another registry, such as
+  a dress rehearsal, knows nothing of it.
 - The registry is shared by every consultation and keeps enrolling. The
   credential service publishes each new root to every open consultation, one
   transaction per consultation. A person's proof is built against the newest root the

@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import {
   type CivicCredentialClaims,
+  CivicCredentialError,
   type CivicCredentialIssuanceRequest,
   type CivicCredentialIssuerPort,
   isoNumericCountry,
@@ -13,6 +14,7 @@ import {
   type ActionCapabilityIssuer,
 } from './action-capability-issuer.js';
 import type { CredentialRootPublisherStatus } from './credential-root-publisher.js';
+import { RarimoHttpGatewayError } from './rarimo-http-gateway.js';
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 
@@ -44,6 +46,14 @@ export interface CicoServiceStatus {
     readonly address: string | null;
     readonly dustAvailable: boolean | null;
   };
+  /**
+   * How a document is kept to one holder. `eventId` is the Rarimo event every
+   * verification must be made under; null when the rule is off.
+   */
+  readonly documents?: {
+    readonly onePassPerDocument: 'enforce' | 'observe' | 'off';
+    readonly eventId: string | null;
+  };
 }
 
 export interface CicoHttpServiceOptions {
@@ -55,6 +65,12 @@ export interface CicoHttpServiceOptions {
   /** Absent when no referenda are configured; the route then reports unavailable. */
   readonly enrollmentStatus?: EnrollmentStatusReader;
   readonly serviceStatus?: () => Promise<CicoServiceStatus>;
+  /**
+   * The one Rarimo event a verification may be made under. A request under
+   * any other event is refused: its proof would carry a nullifier this
+   * service has never seen, for a document it may already know.
+   */
+  readonly verificationEventId?: string;
 }
 
 /** Local/hosted HTTP façade. Real Rarimo and Midnight implementations are injected. */
@@ -104,6 +120,18 @@ export function createCicoHttpService(options: CicoHttpServiceOptions): Server {
           : error instanceof ActionCapabilityError
             ? error.status
             : 500;
+      // The one refusal of the issuer a person can act on: it is told apart
+      // by a code, and it names no document and no holder.
+      if (error instanceof CivicCredentialError && error.code === 'DOCUMENT_ALREADY_ENROLLED') {
+        sendJson(response, 409, { message: error.message, code: error.code });
+        return;
+      }
+      // A verification asked for in a shape the app never uses. The reason
+      // names a rule, never a person or a document.
+      if (error instanceof RarimoHttpGatewayError && error.code === 'REQUEST_NOT_ALLOWED') {
+        sendJson(response, 400, { message: error.message });
+        return;
+      }
       const message =
         error instanceof HttpProblem
           ? error.message
@@ -126,6 +154,9 @@ async function routeRequest(
   }
   if (request.method === 'POST' && url.pathname === '/v1/rarimo/verification-requests') {
     const body = parseVerificationRequest(await readJson(request, maxBodyBytes));
+    if (options.verificationEventId && body.eventId !== options.verificationEventId) {
+      throw new HttpProblem(400, 'The verification is not made under the event of this registry');
+    }
     sendSafeJson(response, 201, await options.gateway.createVerificationRequest(body));
     return;
   }

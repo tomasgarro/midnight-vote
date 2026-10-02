@@ -3,8 +3,10 @@ import type { CivicPassportSession, CredentialSummary } from 'midnight-referendu
 import {
   browserBallotOpeningVault,
   browserCivicCredentialVault,
+  browserHolderKeyVault,
   browserRarimoEnrollmentVault,
   createIndexerRegistryHistory,
+  deriveRarimoEventId,
   MidnightCivicActionAdapter,
   RarimoCivicCredentialAdapter,
 } from 'midnight-referendum-api';
@@ -361,6 +363,16 @@ function CivicApp() {
       ),
       // A scan in progress survives the phone dropping this page.
       pendingVault: browserRarimoEnrollmentVault(
+        `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`,
+      ),
+      // One document, one holder: every verification is made under the
+      // registry's own event, and this device keeps one holder secret for all
+      // the passes it is issued there.
+      verificationEventId: deriveRarimoEventId(
+        passportV2Runtime.config.registry.registryContractAddress,
+        passportV2Runtime.config.credentialEpoch,
+      ),
+      holderKeyVault: browserHolderKeyVault(
         `${APP_MODE}:${passportV2Runtime.config.issuerId}:${passportV2Runtime.config.credentialEpoch}`,
       ),
       countryMapper: rarimoIsoCountryMapper,

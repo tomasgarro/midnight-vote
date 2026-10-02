@@ -6,6 +6,19 @@
  *     node scripts/rehearse-with-stand-in-verifier.mjs journey [YES|NO|ABSTAIN] [alpha-3 country]
  *     node scripts/rehearse-with-stand-in-verifier.mjs operate
  *     node scripts/rehearse-with-stand-in-verifier.mjs count
+ *     node scripts/rehearse-with-stand-in-verifier.mjs forget-confirmation
+ *
+ * | Variable | Effect |
+ * | --- | --- |
+ * | `REHEARSAL_RUN=<label>` | Another run, with a registry and a consultation of its own. A consultation's deadlines are fixed, so each run needs one |
+ * | `REHEARSAL_DEVICE=<label>` | Another device, so another person. The same label again is the same device |
+ * | `REHEARSAL_DROP=issuing` | `journey` ends while the pass is being issued, as a phone drops a page. `journey` again is the page coming back |
+ * | `REHEARSAL_DOCUMENT=<label>` | The document that is scanned. Without it each device scans a document of its own. The same label on two devices is one person on two devices |
+ * | `REHEARSAL_RENEW=1` | `journey` asks for a new pass although the device holds one, as when a pass has expired |
+ *
+ * `forget-confirmation` puts the device's answer back to "sealing", as on a
+ * device that never saw its answer confirmed. `journey` must then find the
+ * answer on chain and refuse to seal a second one.
  *
  * What runs for real: the credential service and the relayer of this
  * repository, as processes on this machine, configured as on the server; the
@@ -38,8 +51,16 @@
  * wallet at the same moment.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,11 +71,19 @@ import { catalogEntry, fileBallotVault, readPublicState } from './rehearsal-lib.
 globalThis.WebSocket ??= WebSocket;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SLUG = 'rehearsal-dress';
+// A consultation's deadlines are fixed when it is deployed, so a rehearsal can
+// be run once. REHEARSAL_RUN names another run, with a registry, a
+// consultation and service files of its own.
+const RUN = process.env.REHEARSAL_RUN?.trim() ?? '';
+if (RUN && !/^[a-z0-9-]+$/u.test(RUN)) {
+  console.error('REHEARSAL_RUN is letters, digits and dashes');
+  process.exit(1);
+}
+const SLUG = RUN ? `rehearsal-dress-${RUN}` : 'rehearsal-dress';
 const DEPLOY_ENV = `.env.v2.preview.${SLUG}`;
 const MANIFEST = `deploy/passport-v2/preview.${SLUG}.manifest.json`;
-const CICO_ENV = '.env.cico-dress.local';
-const CICO_STATE = '.state/cico-dress';
+const CICO_ENV = `.env.cico-dress${RUN ? `-${RUN}` : ''}.local`;
+const CICO_STATE = `.state/cico-dress${RUN ? `-${RUN}` : ''}`;
 // One file is one device. A second journey is a second person: give it its own
 // device with REHEARSAL_DEVICE, and name the same device again to count.
 const DEVICE = process.env.REHEARSAL_DEVICE?.trim() ?? '';
@@ -62,7 +91,27 @@ if (DEVICE && !/^[a-z0-9-]+$/u.test(DEVICE)) {
   console.error('REHEARSAL_DEVICE is letters, digits and dashes');
   process.exit(1);
 }
-const VAULT = `.state/rehearsal-vault.${SLUG}${DEVICE ? `.${DEVICE}` : ''}.json`;
+const ON_DEVICE = `${SLUG}${DEVICE ? `.${DEVICE}` : ''}`;
+const VAULT = `.state/rehearsal-vault.${ON_DEVICE}.json`;
+// What the browser keeps in its encrypted vault: the pass, and a verification
+// in progress. As files, so that a second process is the same device with a
+// page that started again.
+const PASS_FILE = `.state/rehearsal-pass.${ON_DEVICE}.json`;
+const ATTEMPT_FILE = `.state/rehearsal-attempt.${ON_DEVICE}.json`;
+// The device's holder secret. It outlives every pass the device is issued.
+const HOLDER_FILE = `.state/rehearsal-holder.${ON_DEVICE}.json`;
+const VERIFIER_FILE = `.state/stand-in-verifier.${SLUG}.json`;
+// The document a scan stands for. The stand-in verifier turns it into the
+// nullifier a real proof would show: the same for one document under one event.
+const DOCUMENT = process.env.REHEARSAL_DOCUMENT?.trim() || `document-of-${DEVICE || 'the-device'}`;
+if (!/^[a-z0-9-]+$/u.test(DOCUMENT)) {
+  console.error('REHEARSAL_DOCUMENT is letters, digits and dashes');
+  process.exit(1);
+}
+const RENEW = process.env.REHEARSAL_RENEW?.trim() === '1';
+// REHEARSAL_DROP=issuing ends the process while the pass is being issued, as a
+// phone drops a page. Running "journey" again is the page coming back.
+const DROP = process.env.REHEARSAL_DROP?.trim() ?? '';
 const APP_ORIGIN = 'https://midnight.vote';
 const VERIFIER_PORT = 28_090;
 const VERIFIER_URL = `http://127.0.0.1:${VERIFIER_PORT}`;
@@ -220,8 +269,21 @@ function prepare() {
  * call stands for a person scanning a document with RariMe.
  */
 function startStandInVerifier() {
-  const requests = new Map();
-  let latest = null;
+  // Kept in a file: the verifier is a service of its own, and it must still
+  // know a scan when the page that asked for it has been dropped.
+  const kept = existsSync(inRoot(VERIFIER_FILE))
+    ? JSON.parse(readFileSync(inRoot(VERIFIER_FILE), 'utf8'))
+    : { requests: [], latest: null };
+  const requests = new Map(kept.requests);
+  let latest = kept.latest;
+  const keep = () => {
+    mkdirSync(dirname(inRoot(VERIFIER_FILE)), { recursive: true });
+    writeFileSync(
+      inRoot(VERIFIER_FILE),
+      JSON.stringify({ requests: [...requests], latest }),
+      'utf8',
+    );
+  };
   const json = (response, status, body) => {
     const text = body === undefined ? '' : JSON.stringify(body);
     response.writeHead(
@@ -242,6 +304,7 @@ function startStandInVerifier() {
         const userHash = randomBytes(16).toString('hex');
         requests.set(data.id, { attributes: data.attributes, userHash, scanned: null });
         latest = data.id;
+        keep();
         json(response, 200, {
           data: {
             id: data.id,
@@ -274,6 +337,15 @@ function startStandInVerifier() {
         const a = held.attributes;
         // The public signals of a query proof, at the positions the service reads.
         const signals = Array.from({ length: 23 }, () => '0');
+        // What a real proof shows of the document: a number that is the same
+        // whenever this document is proven under this event, and says nothing
+        // else about it.
+        signals[0] = BigInt(
+          `0x${createHash('sha256')
+            .update(`stand-in-nullifier:${held.document}:${a.event_id}`)
+            .digest('hex')
+            .slice(0, 62)}`,
+        ).toString(10);
         signals[6] = BigInt(`0x${Buffer.from(held.scanned, 'ascii').toString('hex')}`).toString(10);
         signals[9] = String(a.event_id);
         signals[10] = decimal(a.event_data);
@@ -309,6 +381,7 @@ function startStandInVerifier() {
       const user = url.pathname.match(/\/private\/user\/([^/]+)$/u);
       if (request.method === 'DELETE' && user) {
         requests.delete(decodeURIComponent(user[1]));
+        keep();
         json(response, 204);
         return;
       }
@@ -321,16 +394,36 @@ function startStandInVerifier() {
     server.once('error', refuse);
     server.listen(VERIFIER_PORT, '127.0.0.1', () =>
       ready({
-        /** A person scans a document of this country. */
-        scan(alpha3) {
+        /** A person scans this document, of this country. */
+        scan(alpha3, document) {
           const held = latest ? requests.get(latest) : null;
           if (!held) throw new Error('Nobody asked the verifier for anything');
           held.scanned = alpha3;
+          held.document = document;
+          keep();
         },
         close: () => server.close(),
       }),
     );
   });
+}
+
+/** One record of the device's vault, as a file, encoded as the browser's vault encodes it. */
+function fileVault(api, path) {
+  return {
+    load: async () =>
+      existsSync(path) ? api.deserializePrivateStateFromStorage(readFileSync(path, 'utf8')) : null,
+    save: async (value) => {
+      mkdirSync(dirname(path), { recursive: true });
+      const temporary = `${path}.${process.pid}.tmp`;
+      writeFileSync(temporary, api.serializePrivateStateForStorage(value), {
+        encoding: 'utf8',
+        mode: 0o600,
+      });
+      renameSync(temporary, path);
+    },
+    clear: async () => rmSync(path, { force: true }),
+  };
 }
 
 /** Every request carries the app's origin, as a browser's would. */
@@ -388,7 +481,22 @@ async function journey() {
   const manifest = readManifest();
   if (!manifest?.referenda?.[0]?.contractAddress) fail('Run "prepare" first');
   const verifier = await startStandInVerifier();
-  const { api, runtime, deployed, relayer } = await connect(manifest);
+  const { api, runtime, deployed, relayer, status } = await connect(manifest);
+
+  // How the service keeps a document to one holder, and the event the app
+  // derives for itself from the registry. They must be the same number.
+  const rule = status.documents ?? { onePassPerDocument: 'off', eventId: null };
+  const verificationEventId =
+    rule.onePassPerDocument === 'off'
+      ? undefined
+      : api.deriveRarimoEventId(
+          manifest.registry.contractAddress,
+          Number(manifest.registry.credentialEpoch),
+        );
+  if (verificationEventId && verificationEventId !== rule.eventId) {
+    fail('The app and the credential service derive different events for this registry');
+  }
+  console.log(`one pass per document: ${rule.onePassPerDocument}`);
 
   // The app's own ports to the credential service, and its country catalogue.
   const { HttpRarimoVerificationGateway, HttpCivicCredentialIssuerPort } = await import(
@@ -397,7 +505,7 @@ async function journey() {
   const { rarimoIsoCountryMapper } = await import('../ui/src/integration/rarimo-country-mapper.ts');
   const { sealWhenAdmitted } = await import('../ui/src/integration/seal-admission.ts');
 
-  let stored = null;
+  const attempts = fileVault(api, inRoot(ATTEMPT_FILE));
   const credential = new api.RarimoCivicCredentialAdapter({
     gateway: new HttpRarimoVerificationGateway({ baseUrl: CICO_URL, fetcher: fromApp }),
     issuer: new HttpCivicCredentialIssuerPort({ baseUrl: CICO_URL, fetcher: fromApp }),
@@ -408,16 +516,12 @@ async function journey() {
     uniquenessTimestampUpperBoundUnixSeconds: Number(
       manifest.runtime.uniquenessTimestampUpperBoundUnixSeconds,
     ),
-    // The browser keeps the pass in its vault; a rehearsal keeps it for one run.
-    vault: {
-      load: async () => stored,
-      save: async (value) => {
-        stored = value;
-      },
-      clear: async () => {
-        stored = null;
-      },
-    },
+    vault: fileVault(api, inRoot(PASS_FILE)),
+    pendingVault: attempts,
+    enrollmentTtlMs: 30 * 60 * 1_000,
+    ...(verificationEventId
+      ? { verificationEventId, holderKeyVault: fileVault(api, inRoot(HOLDER_FILE)) }
+      : {}),
   });
   const actions = new api.MidnightCivicActionAdapter({
     providers: runtime.providers,
@@ -435,34 +539,72 @@ async function journey() {
   console.log('before:', JSON.stringify(await state()));
 
   // 1. Add eligibility: the app asks for a verification, the person scans.
+  //    Unless a page was dropped mid-way: then the attempt it left is taken up.
   let step = Date.now();
-  const enrollment = await credential.beginEnrollment({
-    session: {
-      sessionId: 'rehearsal',
-      origin: APP_ORIGIN,
-      network: 'stagenet',
-      status: 'connected',
-      profile: { displayName: 'Rehearsal' },
-      capabilities: ['session', 'profile'],
-    },
-    policy: { minimumAssurance: 'document-nfc', requireAdult: true },
-  });
-  console.log(
-    `verification requested in ${elapsed(step)}; the link opens ${new URL(enrollment.interaction.uri).origin}`,
-  );
-  const pending = await credential.getEnrollmentStatus(enrollment.enrollmentId);
-  console.log(`before the scan the pass is: ${pending.status}`);
-  verifier.scan(alpha3);
-  console.log(`stand-in scan: a document of ${alpha3}. No document was read.`);
+  const left = await attempts.load();
+  const held = left ? null : await credential.getCredentialSummary();
+  let enrollmentId = null;
+  if (held?.status === 'issued' && !RENEW) {
+    // A device that comes back with a pass goes straight to answering.
+    console.log(`this device holds a pass, valid until ${held.validUntil}: no verification`);
+  } else if (left) {
+    enrollmentId = left.enrollmentId;
+    console.log(
+      `an attempt was under way on this device (${left.issuanceClaims ? 'the pass had been asked for' : 'the scan was awaited'}); taking it up again, with no new scan`,
+    );
+  } else {
+    if (held?.status === 'issued') {
+      console.log(
+        `this device holds a pass, valid until ${held.validUntil}, and asks for a new one`,
+      );
+    }
+    const enrollment = await credential.beginEnrollment({
+      session: {
+        sessionId: 'rehearsal',
+        origin: APP_ORIGIN,
+        network: 'stagenet',
+        status: 'connected',
+        profile: { displayName: 'Rehearsal' },
+        capabilities: ['session', 'profile'],
+      },
+      policy: { minimumAssurance: 'document-nfc', requireAdult: true },
+    });
+    enrollmentId = enrollment.enrollmentId;
+    console.log(
+      `verification requested in ${elapsed(step)}; the link opens ${new URL(enrollment.interaction.uri).origin}`,
+    );
+    const pending = await credential.getEnrollmentStatus(enrollmentId);
+    console.log(`before the scan the pass is: ${pending.status}`);
+    verifier.scan(alpha3, DOCUMENT);
+    console.log(`stand-in scan: "${DOCUMENT}", a document of ${alpha3}. No document was read.`);
+  }
+
+  if (DROP === 'issuing' && !left) {
+    // The request to issue the pass leaves, and the page is gone before the
+    // answer comes back. The credential service carries on by itself.
+    credential.getEnrollmentStatus(enrollmentId).catch(() => undefined);
+    await new Promise((wake) => setTimeout(wake, 6_000));
+    console.log('the page is dropped while the pass is being issued. Run "journey" again.');
+    process.exit(3);
+  }
 
   // 2. The pass is issued on chain by the credential service.
   step = Date.now();
-  let issued = null;
+  let issued = enrollmentId ? null : held;
   for (let attempt = 0; attempt < 60 && !issued; attempt += 1) {
     try {
-      const snapshot = await credential.getEnrollmentStatus(enrollment.enrollmentId);
+      const snapshot = await credential.getEnrollmentStatus(enrollmentId);
       if (snapshot.status === 'issued') issued = snapshot;
-      else if (snapshot.status !== 'pending') {
+      else if (snapshot.errorCode === 'DOCUMENT_ALREADY_ENROLLED') {
+        // A refusal the app would show to a person is a result, not a crash.
+        console.log(
+          `no pass after ${elapsed(step)}: DOCUMENT_ALREADY_ENROLLED: "${DOCUMENT}" already has a pass on another device`,
+        );
+        console.log('this device holds:', await credential.getCredentialSummary());
+        console.log('after: ', JSON.stringify(await state()));
+        verifier.close();
+        process.exit(2);
+      } else if (snapshot.status !== 'pending') {
         fail(`The pass was not issued: ${snapshot.status} ${snapshot.errorCode ?? ''}`);
       }
     } catch (error) {
@@ -473,28 +615,41 @@ async function journey() {
   }
   if (!issued) fail('The pass was not issued in time');
   const summary = await credential.getCredentialSummary();
-  console.log(
-    `pass issued in ${elapsed(step)}: country ${summary.country}, ${summary.ageClass}, ${summary.assurance}, valid until ${summary.validUntil}`,
-  );
+  if (enrollmentId) {
+    console.log(
+      `pass issued in ${elapsed(step)}: country ${summary.country}, ${summary.ageClass}, ${summary.assurance}, valid until ${summary.validUntil}`,
+    );
+  }
 
   // 3. Seal an answer. The app waits by itself until the pass is admitted.
   const authorization = await credential.getActionAuthorization();
   if (!authorization) fail('The pass carries no authorization');
   step = Date.now();
   let sealingFrom = step;
-  const receipt = await sealWhenAdmitted({
-    seal: () => {
-      sealingFrom = Date.now();
-      return actions.castVote({ referendumId: deployed.referendumId, choice, authorization });
-    },
-    admission: () => actions.getPassAdmission(deployed.referendumId),
-    onWaiting: (waiting) =>
-      console.log(
-        waiting
-          ? 'the pass is not admitted yet; waiting, as the app does'
-          : `the wait for admission ended after ${elapsed(step)}`,
-      ),
-  });
+  let receipt;
+  try {
+    receipt = await sealWhenAdmitted({
+      seal: () => {
+        sealingFrom = Date.now();
+        return actions.castVote({ referendumId: deployed.referendumId, choice, authorization });
+      },
+      admission: () => actions.getPassAdmission(deployed.referendumId),
+      onWaiting: (waiting) =>
+        console.log(
+          waiting
+            ? 'the pass is not admitted yet; waiting, as the app does'
+            : `the wait for admission ended after ${elapsed(step)}`,
+        ),
+    });
+  } catch (error) {
+    // A refusal the app would show to a person is a result, not a crash.
+    if (!api.isCivicCredentialError(error)) throw error;
+    console.log(`refused after ${elapsed(sealingFrom)}: ${error.code}: ${error.message}`);
+    console.log('this device:', await actions.getSealedAnswerStatus(deployed.referendumId));
+    console.log('after: ', JSON.stringify(await state()));
+    verifier.close();
+    process.exit(2);
+  }
   console.log(`sealed in ${elapsed(sealingFrom)}: transaction ${receipt.transactionId}`);
   console.log(
     `  block ${receipt.blockHeight}, ${receipt.blockTimestamp}, hash ${receipt.transactionHash}`,
@@ -539,9 +694,29 @@ async function count() {
   console.log('after: ', JSON.stringify(await state()));
 }
 
+/**
+ * Makes the device forget that its answer was confirmed: the opening goes back
+ * to "sealing", as it is on a device whose page was dropped while it waited
+ * for the relay. The answer on chain is not touched.
+ */
+function forgetConfirmation() {
+  const path = inRoot(VAULT);
+  if (!existsSync(path)) fail('This device holds no answer');
+  const openings = JSON.parse(readFileSync(path, 'utf8'));
+  writeFileSync(
+    path,
+    JSON.stringify(
+      openings.map(({ sealedAt: _sealedAt, ...opening }) => ({ ...opening, status: 'sealing' })),
+    ),
+    { encoding: 'utf8', mode: 0o600 },
+  );
+  console.log(`${openings.length} answer(s) on this device are back to "sealing"`);
+}
+
 if (command === 'prepare') prepare();
+else if (command === 'forget-confirmation') forgetConfirmation();
 else if (command === 'operate') runDeploy();
 else if (command === 'journey') await journey();
 else if (command === 'count') await count();
-else fail('The command is prepare, journey, operate or count');
+else fail('The command is prepare, journey, operate, count or forget-confirmation');
 process.exit(0);

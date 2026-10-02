@@ -243,6 +243,19 @@ describe('CICO service configuration', () => {
     }
   });
 
+  it('keeps a document to one holder unless told otherwise', () => {
+    expect(loadCicoServiceConfig(valid).documentUniqueness).toBe('enforce');
+    expect(
+      loadCicoServiceConfig({ ...valid, CICO_DOCUMENT_UNIQUENESS: 'observe' }).documentUniqueness,
+    ).toBe('observe');
+    expect(
+      loadCicoServiceConfig({ ...valid, CICO_DOCUMENT_UNIQUENESS: 'off' }).documentUniqueness,
+    ).toBe('off');
+    expect(() => loadCicoServiceConfig({ ...valid, CICO_DOCUMENT_UNIQUENESS: 'maybe' })).toThrow(
+      'CICO_DOCUMENT_UNIQUENESS must be enforce, observe or off',
+    );
+  });
+
   it('rejects malformed CICO_REFERENDA_JSON', () => {
     expect(() => loadCicoServiceConfig({ ...valid, CICO_REFERENDA_JSON: '{not json' })).toThrow(
       'valid JSON',

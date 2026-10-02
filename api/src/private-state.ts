@@ -7,7 +7,9 @@ import type {
   StoredCivicCredential,
 } from './passport-v2/ports.js';
 import type {
+  HolderKeyVaultPort,
   RarimoEnrollmentVaultPort,
+  StoredHolderKey,
   StoredRarimoEnrollment,
 } from './passport-v2/rarimo-credential-adapter.js';
 
@@ -350,6 +352,26 @@ export function browserRarimoEnrollmentVault(scope: string): RarimoEnrollmentVau
     load: async () => provider.get(PENDING_ENROLLMENT_VAULT_ID),
     save: async (enrollment) => provider.set(PENDING_ENROLLMENT_VAULT_ID, enrollment),
     clear: async () => provider.remove(PENDING_ENROLLMENT_VAULT_ID),
+  };
+}
+
+const HOLDER_KEY_VAULT_ID = 'cico-holder-key-v1' as const;
+
+/**
+ * Stores this device's holder secret in the same encrypted boundary and under
+ * the same scope as its pass. It outlives the pass: a pass expires and is
+ * renewed, and the issuer renews it only for the holder the document already
+ * has. There is no way to clear it here. Without it, the document could get no
+ * pass again on this device for as long as the registry's epoch lasts.
+ */
+export function browserHolderKeyVault(scope: string): HolderKeyVaultPort {
+  const normalizedScope = scope.trim();
+  if (!normalizedScope) throw new TypeError('Holder key vault scope must not be empty');
+  const provider = browserPrivateStateProvider<typeof HOLDER_KEY_VAULT_ID, StoredHolderKey>();
+  provider.setContractAddress(normalizedScope as ContractAddress);
+  return {
+    load: async () => provider.get(HOLDER_KEY_VAULT_ID),
+    save: async (key) => provider.set(HOLDER_KEY_VAULT_ID, key),
   };
 }
 

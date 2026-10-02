@@ -160,6 +160,50 @@ describe('Preview Passport journey', () => {
     expect(clearCredential).toHaveBeenCalledOnce();
   });
 
+  it('says in plain words that the document already has a pass on another device', async () => {
+    const user = userEvent.setup();
+    const credential: CivicCredentialPort = {
+      ...credentialPort(),
+      beginEnrollment: vi.fn().mockResolvedValue({
+        enrollmentId: 'second-device-enrollment',
+        status: 'pending',
+        holderBinding: new Uint8Array(32).fill(2),
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+        interaction: {
+          kind: 'cross-device-qr',
+          uri: 'https://app.rarime.com/external?id=second-device-enrollment',
+          expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+        },
+      }),
+      getEnrollmentStatus: vi.fn().mockResolvedValue({
+        enrollmentId: 'second-device-enrollment',
+        status: 'failed',
+        updatedAt: new Date().toISOString(),
+        errorCode: 'DOCUMENT_ALREADY_ENROLLED',
+      }),
+    };
+    render(
+      <PassportJourney
+        mode="preview"
+        onClose={vi.fn()}
+        ports={{ passport: passportPort(), credential }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Conectar Passport/i }));
+    await user.click(screen.getByRole('button', { name: /Iniciar verificación documental/i }));
+    await user.click(await screen.findByRole('button', { name: /Comprobar ahora/i }));
+
+    // What happened and what to do, not the name of a state.
+    expect(
+      await screen.findByText(/Este documento ya tiene un pase en otro dispositivo o navegador/),
+    ).toBeTruthy();
+    expect(screen.getByText(/usá el dispositivo donde lo verificaste primero/)).toBeTruthy();
+    expect(screen.queryByText(/terminó con estado/)).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Tu credencial está lista' })).toBeNull();
+  });
+
   it('resumes the scan that was under way when the page was dropped, instead of starting another', async () => {
     const user = userEvent.setup();
     // What a reload leaves in the tab: the attempt's handle and its expiry.

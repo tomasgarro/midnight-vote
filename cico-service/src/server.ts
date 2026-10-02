@@ -8,6 +8,7 @@ import { asContractAddress } from '@midnight-ntwrk/midnight-js-types';
 import { iso31661 } from 'iso-3166';
 import {
   createReferendumV2Executor,
+  deriveRarimoEventId,
   deriveRegistryContractBinding,
   type FrozenCredentialRegistryReference,
   isoNumericCountry,
@@ -31,7 +32,11 @@ import {
   type CredentialRootPublisherReferendumTarget,
   MidnightCredentialRootPublisherReader,
 } from './credential-root-publisher.js';
-import { FileCredentialIssuanceStore, FileEvidenceAuthorizationStore } from './durable-stores.js';
+import {
+  FileCredentialIssuanceStore,
+  FileDocumentBindingStore,
+  FileEvidenceAuthorizationStore,
+} from './durable-stores.js';
 import { createCicoHttpService } from './http.js';
 import { checkIssuerRole } from './issuer-role-check.js';
 import { startMidnightIssuerRuntime } from './midnight-issuer-runtime.js';
@@ -81,6 +86,13 @@ export async function startCicoService(): Promise<() => Promise<void>> {
     createWallet: createMidnightIssuerWalletAdapter,
   });
   const issuerSecret = hexBytes(config.issuerRuntime.issuerRoleSecretHex);
+  // One event for every verification under this registry and epoch, so that a
+  // document shows the same nullifier each time. The app derives the same one.
+  const verificationEventId =
+    config.documentUniqueness === 'off'
+      ? undefined
+      : deriveRarimoEventId(config.issuerRuntime.registryContractAddress, config.credentialEpoch);
+  process.stdout.write(`[cico] one pass per document: ${config.documentUniqueness}\n`);
   const issuanceStore = new FileCredentialIssuanceStore(
     join(config.stateDirectory, 'credential-issuances.json'),
   );
@@ -102,6 +114,19 @@ export async function startCicoService(): Promise<() => Promise<void>> {
       join(config.stateDirectory, 'evidence-authorizations.json'),
     ),
     issuanceStore,
+    ...(verificationEventId
+      ? {
+          documentHolders: {
+            tagFor: (authorization) => gateway.documentTagFor(authorization),
+            bindings: new FileDocumentBindingStore(
+              join(config.stateDirectory, 'document-bindings.json'),
+            ),
+            mode: config.documentUniqueness === 'observe' ? 'observe' : 'enforce',
+            // Says that it happened, never for which document or which holder.
+            report: (outcome) => process.stdout.write(`[cico] document holder: ${outcome}\n`),
+          },
+        }
+      : {}),
     validateEvidenceAuthorization: (request) =>
       gateway.validateCredentialIssuance(request, {
         issuerId: config.issuerIdText,
@@ -127,6 +152,7 @@ export async function startCicoService(): Promise<() => Promise<void>> {
         }
       : issuer,
     allowedOrigins: config.allowedOrigins,
+    ...(verificationEventId ? { verificationEventId } : {}),
     ...(config.actionCapabilities
       ? {
           actionCapabilityIssuer: new HmacActionCapabilityIssuer({
@@ -154,6 +180,10 @@ export async function startCicoService(): Promise<() => Promise<void>> {
         issuerWallet: {
           address: wallet?.address ?? null,
           dustAvailable: wallet?.dustAvailable ?? null,
+        },
+        documents: {
+          onePassPerDocument: config.documentUniqueness,
+          eventId: verificationEventId ?? null,
         },
       };
     },
