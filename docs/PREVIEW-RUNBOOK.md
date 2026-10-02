@@ -60,6 +60,10 @@ minutes, once when the wallet is synchronized, and at shutdown. A file that is
 damaged, or that belongs to another wallet or network, is ignored and the
 wallet replays the chain as before. To force a replay, delete the file.
 
+Measured on 2 October 2026 with the relayer on a laptop: a first start
+replayed 258,821 indices in about an hour and a half; a restart from the saved
+state was synchronized, with its DUST balance, 85 seconds after it started.
+
 ## Put a consultation on chain
 
 A consultation is written down once, in
