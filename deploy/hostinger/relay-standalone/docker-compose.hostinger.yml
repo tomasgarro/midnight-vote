@@ -35,6 +35,8 @@ services:
   # needs egress once, to fetch Midnight's public parameters at start.
   relayer-proof:
     <<: *proof
+    # Midnight's public parameters are kept here; the root stays read-only.
+    volumes: [relayer-proof-cache:/.cache]
     command: [midnight-proof-server, -v]
     networks: [relay-internal, relay-egress]
 
@@ -63,11 +65,15 @@ services:
       RELAYER_HOST: 0.0.0.0
       RELAYER_PORT: 8790
       RELAYER_V2_JOB_STORE_PATH: /var/lib/relayer/state/v2-actions.json
+      # What the wallet learned from the chain, kept between starts. No key in it.
+      RELAYER_WALLET_STATE_PATH: /var/lib/relayer/state/wallet-state.json
       RELAYER_EXPLORER_BASE_URL: https://explorer.preview.midnight.network/tx
       RELAYER_LEGACY_API_ENABLED: "false"
     volumes: [relay-secrets:/run/relay-secrets:ro, relayer-state:/var/lib/relayer/state]
     read_only: true
     tmpfs: [/tmp]
+    # Room for the wallet to save its state before the container is killed.
+    stop_grace_period: 30s
     healthcheck: {test: [CMD, node, -e, "fetch('http://127.0.0.1:8790/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 60, start_period: 5m}
     depends_on: {relayer-postgres: {condition: service_healthy}, relayer-proof: {condition: service_started}}
     networks: [relay-internal, relay-egress, relay-edge]
@@ -77,6 +83,8 @@ services:
   voter-proof:
     <<: *proof
     profiles: [hosted-proving]
+    # Its parameters live in memory and are fetched again at each start.
+    tmpfs: [/tmp, /.cache]
     command: [midnight-proof-server]
     networks: [prove-edge, prove-egress]
 
@@ -156,5 +164,6 @@ volumes:
   relay-secrets: {name: midnight-civic-relay-secrets}
   relayer-postgres-data: {name: midnight-civic-relay-postgres-data}
   relayer-state: {name: midnight-civic-relay-state}
+  relayer-proof-cache: {name: midnight-civic-relay-proof-cache}
   caddy-data: {name: midnight-civic-relay-caddy-data}
   caddy-config: {name: midnight-civic-relay-caddy-config}

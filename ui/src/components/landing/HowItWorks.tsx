@@ -4,13 +4,13 @@ import {
   Check,
   GlobeHemisphereWest,
   LockKey,
-  Robot,
   ShieldCheck,
   Sparkle,
   UserCircle,
   WifiHigh,
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
+import bust from '@/assets/companion/cleisthenes-bust.webp';
 import './how-it-works.css';
 import './story-refinement.css';
 
@@ -37,8 +37,7 @@ const steps = [
     label: 'Participate',
     heading: 'Join the conversation',
     text: 'Explore a consultation, make your choice, and see how private participation can work.',
-    detail:
-      'Try a non-binding demo vote, then find Civic Pulse in Discover. Discussion and AI summaries are planned.',
+    detail: 'Try a non-binding demo vote. It is simulated, and it says so.',
     action: 'Explore the demo',
   },
 ] as const;
@@ -309,17 +308,17 @@ export function HowItWorks({ onStart }: { onStart: () => void }) {
                     <p>{step.text}</p>
                     <p className="how-detail">{step.detail}</p>
                     {index === 2 && (
-                      <aside className="how-ai-preview" aria-label="Planned AI summary feature">
+                      <aside className="how-ai-preview" aria-label="Cleisthenes, the guide">
                         <div className="how-ai-robot" aria-hidden="true">
-                          <Robot size={30} weight="duotone" />
-                          <span />
-                          <span />
-                          <span />
+                          <img src={bust} alt="" width="46" height="46" />
                         </div>
                         <div>
                           <strong>More context. Your own conclusion.</strong>
-                          <p>AI summaries of proposals, key arguments, and trade-offs.</p>
-                          <small>Planned feature · illustrative preview</small>
+                          <p>
+                            Cleisthenes explains each consultation from its sources: what is asked,
+                            what each side says, and who says it. He never says how to answer.
+                          </p>
+                          <small>In the app today</small>
                         </div>
                       </aside>
                     )}

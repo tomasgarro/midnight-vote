@@ -7,7 +7,7 @@ import type {
 import * as GeneratedRegistry from '../generated/credential-registry-v1/index.js';
 import * as GeneratedReferendumV2 from '../generated/referendum-v2/index.js';
 import { deriveRegistryContractBinding } from './crypto.js';
-import type { VoteChoice } from './types.js';
+import { CivicCredentialError, type VoteChoice } from './types.js';
 import { credentialRegistryV1Witnesses, referendumV2Witnesses } from './witnesses.js';
 
 export { choiceToGenerated } from './witnesses.js';
@@ -143,6 +143,15 @@ export function parseCredentialRegistryV1(data: ChargedState): CredentialRegistr
   };
 }
 
+/**
+ * The public key of the registry's issuer, as the registry holds it on chain.
+ * A service compares it with the key its own secret derives, to learn at start
+ * whether it is the issuer of this registry at all.
+ */
+export function readCredentialRegistryIssuerKey(data: ChargedState): Uint8Array {
+  return new Uint8Array(GeneratedRegistry.ledger(data).issuerKey);
+}
+
 export function findCredentialPath(
   data: ChargedState,
   credentialLeaf: Uint8Array,
@@ -227,6 +236,158 @@ export function createFrozenCredentialRegistryReference(
     credentialEpoch: state.credentialEpoch,
     frozenRoot: { field: state.frozenRoot.field },
   };
+}
+
+/**
+ * The registry reference of a consultation whose registry keeps enrolling.
+ *
+ * Such a registry never freezes, so it has no frozen root to pin. The root
+ * here is the one the consultation recorded when it was deployed. The
+ * registry's own root moves on with every pass that is issued.
+ */
+export function createOpenCredentialRegistryReference(
+  registryContractAddress: string,
+  state: CredentialRegistryV1State,
+  initialCredentialRoot: MerkleTreeDigest,
+): FrozenCredentialRegistryReference {
+  if (state.frozen) {
+    throw new Error('Credential registry is frozen; its frozen root must be pinned instead');
+  }
+  return {
+    registryContractAddress,
+    registryContractBinding: deriveRegistryContractBinding(registryContractAddress),
+    registryId: new Uint8Array(state.registryId),
+    issuerId: new Uint8Array(state.issuerId),
+    credentialEpoch: state.credentialEpoch,
+    frozenRoot: { field: initialCredentialRoot.field },
+  };
+}
+
+/** What a consultation says on chain about its registry and the roots it admits. */
+export type ReferendumV2AdmissionState = ReferendumV2RegistryBinding &
+  Pick<ReferendumV2State, 'acceptedCredentialRoots' | 'revokedCredentialRoots'>;
+
+/**
+ * Checked on the person's device before a proof is built: the consultation on
+ * chain is bound to the registry the catalogue names.
+ *
+ * A frozen registry is pinned by its frozen root. An open one is pinned by its
+ * address, its ID, its issuer and its epoch. Which of an open registry's roots
+ * a pass is proven against is decided by `resolveAdmittedCredentialPath`.
+ */
+export function assertCanonicalReferendumBinding(
+  catalogRegistry: FrozenCredentialRegistryReference,
+  registry: CredentialRegistryV1State,
+  referendum: ReferendumV2RegistryBinding,
+): void {
+  const reference = registry.frozen
+    ? createFrozenCredentialRegistryReference(catalogRegistry.registryContractAddress, registry)
+    : createOpenCredentialRegistryReference(
+        catalogRegistry.registryContractAddress,
+        registry,
+        referendum.initialCredentialRoot,
+      );
+  assertReferendumRegistryBinding(reference, {
+    registryContractBinding: catalogRegistry.registryContractBinding,
+    registryId: catalogRegistry.registryId,
+    issuerId: catalogRegistry.issuerId,
+    credentialEpoch: catalogRegistry.credentialEpoch,
+    initialCredentialRoot: catalogRegistry.frozenRoot,
+  });
+  assertReferendumRegistryBinding(reference, referendum);
+}
+
+/** True when the consultation takes a proof built against this registry root. */
+export function admitsCredentialRoot(
+  referendum: Pick<ReferendumV2State, 'acceptedCredentialRoots' | 'revokedCredentialRoots'>,
+  root: MerkleTreeDigest,
+): boolean {
+  return (
+    referendum.acceptedCredentialRoots.some((accepted) => accepted.field === root.field) &&
+    !referendum.revokedCredentialRoots.some((revoked) => revoked.field === root.field)
+  );
+}
+
+/** The registry's pass tree at one moment: its root, and the path of a pass in it. */
+export interface CredentialTreeView {
+  readonly root: MerkleTreeDigest;
+  findPath(credentialLeaf: Uint8Array): MerkleTreePath<Uint8Array> | undefined;
+}
+
+export function credentialTreeView(data: ChargedState): CredentialTreeView {
+  const { credentials } = GeneratedRegistry.ledger(data);
+  return {
+    root: credentials.root(),
+    findPath: (credentialLeaf) => credentials.findPathForLeaf(credentialLeaf),
+  };
+}
+
+export interface AdmittedCredentialPathInput {
+  readonly credentialLeaf: Uint8Array;
+  /** The registry as it is now. */
+  readonly current: CredentialTreeView;
+  /** True for a frozen registry: its one root is pinned by the binding check. */
+  readonly frozen: boolean;
+  readonly referendum: Pick<
+    ReferendumV2State,
+    'acceptedCredentialRoots' | 'revokedCredentialRoots' | 'enrollmentClosed'
+  >;
+  /**
+   * The registry as it was after each earlier pass, newest first. Read only
+   * when the registry has moved past the last root the consultation admitted.
+   */
+  readonly earlier?: () => AsyncIterable<CredentialTreeView>;
+  /** True once the consultation's own enrolment deadline has passed. */
+  readonly enrollmentDeadlinePassed?: boolean;
+}
+
+/**
+ * The path a pass is proven with, against a root the consultation admits.
+ *
+ * The registry is shared and keeps enrolling, so its current root is often
+ * newer than the last one a consultation admitted: other people got a pass in
+ * the meantime, or the consultation stopped admitting passes while answers are
+ * still open. The contract takes a proof against any root it admitted. So the
+ * path is taken from the newest admitted state of the registry that already
+ * held this pass. Newest, because the root is public and a later root hides
+ * the pass among more of them.
+ *
+ * A pass that no admitted root holds cannot be proven yet. It is refused here,
+ * before a proof is built, and the refusal says whether waiting will help.
+ */
+export async function resolveAdmittedCredentialPath(
+  input: AdmittedCredentialPathInput,
+): Promise<MerkleTreePath<Uint8Array>> {
+  const currentPath = input.current.findPath(input.credentialLeaf);
+  if (!currentPath) throw new Error('Credential is not present in the canonical registry');
+  if (input.frozen || admitsCredentialRoot(input.referendum, input.current.root)) {
+    return currentPath;
+  }
+
+  if (input.earlier) {
+    const seen = new Set<bigint>([input.current.root.field]);
+    for await (const past of input.earlier()) {
+      if (seen.has(past.root.field)) continue;
+      seen.add(past.root.field);
+      if (!admitsCredentialRoot(input.referendum, past.root)) continue;
+      const path = past.findPath(input.credentialLeaf);
+      if (path) return path;
+      // The tree only grows. No older state holds a pass this one lacks.
+      break;
+    }
+  }
+
+  if (input.referendum.enrollmentClosed || input.enrollmentDeadlinePassed) {
+    throw new CivicCredentialError(
+      'CREDENTIAL_ADMISSION_CLOSED',
+      'This pass was added after this consultation stopped admitting passes.',
+    );
+  }
+  throw new CivicCredentialError(
+    'CREDENTIAL_NOT_ADMITTED',
+    'This consultation has not admitted this pass yet. Try again in a few minutes.',
+    true,
+  );
 }
 
 /** Prevents deploying a referendum against an arbitrary or stale registry root. */

@@ -43,6 +43,15 @@ abstract class PassportV2HttpBase {
         isRecord(problem) && typeof problem.message === 'string'
           ? problem.message
           : `Passport v2 backend returned HTTP ${response.status}`;
+      // The one refusal a person can act on: the document belongs to another
+      // device. Asking again would not change it.
+      if (
+        response.status === 409 &&
+        isRecord(problem) &&
+        problem.code === 'DOCUMENT_ALREADY_ENROLLED'
+      ) {
+        throw new CivicCredentialError('DOCUMENT_ALREADY_ENROLLED', message);
+      }
       throw new CivicCredentialError(
         response.status >= 500 ? 'ADAPTER_UNAVAILABLE' : 'INVALID_CREDENTIAL_CLAIMS',
         message,

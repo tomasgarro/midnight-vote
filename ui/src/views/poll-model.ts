@@ -54,6 +54,23 @@ export interface Poll {
   place?: string;
   /** The official date the subject is known by: a federal vote, a proposal. */
   milestone?: { kind: 'vote' | 'proposal'; date: string };
+  /** What the contract enforces for this consultation; absent on demo fixtures. */
+  runtime?: PollRuntimeFacts;
+}
+
+/**
+ * The schedule and the rule a deployed consultation enforces on chain. The
+ * page states these instead of editorial filler: they are the facts a person
+ * can check.
+ */
+export interface PollRuntimeFacts {
+  /** After this instant a new pass is no longer admitted. */
+  readonly passesUntil: string | null;
+  /** After this instant a sealed answer can no longer be counted. */
+  readonly countingUntil: string | null;
+  readonly requireAdult: boolean;
+  /** 0 self-asserted, 1 document, 2 document read by chip, 3 Passport-native. */
+  readonly minimumAssurance: number;
 }
 
 export type VoteReceipt = PassportReceiptRecord;
@@ -587,13 +604,28 @@ export function toRuntimePolls(referenda: ReadonlyArray<PassportV2RuntimeReferen
     const countryCode = countryNumeric
       ? ASSIGNED_COUNTRIES.find((entry) => entry.numeric === countryNumeric)?.alpha2
       : undefined;
+    const config = item.source?.config;
     return {
       id: item.referendumId,
       title: item.title,
       question: item.question,
-      description: item.description ?? 'Consulta ciudadana publicada en el catálogo v2.',
-      opened: item.opened ?? 'Según el catálogo v2',
-      deadline: item.deadline ?? 'Según el estado del contrato',
+      description: item.description ?? '',
+      /* A deployed consultation is about how consultations run unless its
+         catalogue says otherwise; without this it fell through to "Economy". */
+      subject: 'governance',
+      ...(item.translations ? { translations: item.translations } : {}),
+      ...(config
+        ? {
+            runtime: {
+              passesUntil: unixToIso(config.enrollmentClosesAtUnix),
+              countingUntil: unixToIso(config.revealClosesAtUnix),
+              requireAdult: config.requireAdult,
+              minimumAssurance: Number(config.minimumAssurance),
+            },
+          }
+        : {}),
+      opened: item.opened ?? '',
+      deadline: item.deadline ?? '',
       /* The contract publishes its own schedule, and it is enforced on chain --
          `closeVote` and `finalizeVote` are rejected before their deadlines. The
          catalog's ISO fields are an optional display override; when they are
@@ -604,14 +636,18 @@ export function toRuntimePolls(referenda: ReadonlyArray<PassportV2RuntimeReferen
       opensAt: item.opensAt ?? unixToIso(item.source?.config.opensAtUnix) ?? EPOCH_START,
       closesAt: item.closesAt ?? unixToIso(item.source?.config.closesAtUnix) ?? FAR_FUTURE,
       eligible: item.eligible ?? '—',
-      participation: item.participation ?? 'Estado público consultado en Midnight',
-      whyNow: 'Esta consulta se publica desde el manifiesto de despliegue v2.',
-      legalFrame: 'Consulta independiente; revisá las fuentes publicadas por su organizador.',
-      evidence: 'La identidad del contrato y sus reglas provienen del catálogo v2 validado.',
-      evidenceLabel: 'CATÁLOGO V2 · configuración publicada',
-      argumentsFor: ['Evaluá la propuesta con la información publicada por su organizador.'],
-      argumentsAgainst: ['Considerá sus límites, costos e incertidumbres antes de participar.'],
-      uncertainty: 'El catálogo no sustituye el debate público ni constituye una decisión oficial.',
+      participation: item.participation ?? '',
+      /* The editorial fields stay empty. They used to hold placeholder prose
+         ("Evaluate the proposal with the information published by its
+         organiser"), which read as content and said nothing. The page shows
+         the description, the schedule and the rule instead. */
+      whyNow: '',
+      legalFrame: '',
+      evidence: '',
+      evidenceLabel: '',
+      argumentsFor: [],
+      argumentsAgainst: [],
+      uncertainty: '',
       sources: [],
       runtimeScope: item.scope,
       runtimeContractAddress: item.source?.contractAddress,

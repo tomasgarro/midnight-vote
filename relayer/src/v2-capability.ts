@@ -14,6 +14,26 @@ export interface V2CapabilityClaims {
   readonly expiresAt: number;
 }
 
+/**
+ * A short public fingerprint of the capability secret.
+ *
+ * The relay and the credential service are given the same secret by hand, in
+ * two places. If the two differ, a person learns it only after their device
+ * has built a proof: the relay refuses the capability. Each service publishes
+ * this fingerprint, so an operator can compare them from outside beforehand.
+ *
+ * It is a keyed hash of a constant, cut to 64 bits. It signs nothing, and it
+ * tells no more about the secret than any capability the service hands out.
+ * The credential service computes the same value in its own package; the two
+ * are held together by a shared test vector.
+ */
+export function capabilityKeyId(secret: string): string {
+  return createHmac('sha256', secret)
+    .update('midnight-referendum:v2-capability:key-id:1')
+    .digest('hex')
+    .slice(0, 16);
+}
+
 /** Test/operator helper; production issuance belongs to the trusted API. */
 export function signV2Capability(claims: V2CapabilityClaims, secret: string): string {
   const payload = base64Url(JSON.stringify({ v: 1, ...claims }));

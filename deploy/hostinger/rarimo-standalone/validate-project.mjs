@@ -9,6 +9,10 @@ const cutoverCompose = await readFile(
   new URL('./docker-compose.hostinger.cutover.yml', import.meta.url),
   'utf8',
 );
+const previewCompose = await readFile(
+  new URL('./docker-compose.hostinger.preview.yml', import.meta.url),
+  'utf8',
+);
 
 const servicesSection = (value) => value.slice(value.indexOf('services:'));
 
@@ -151,6 +155,80 @@ const checks = [
     cutoverCompose.includes('rarimo-internal: {internal: true}'),
     'cutover private network is not internal',
   ],
+  // The Preview manifest is the cutover plus what a walletless answer needs:
+  // the capability issuer, the root publisher, the relay route, and the
+  // midnight.vote names.
+  [previewCompose.length <= 8192, 'Preview manifest exceeds the Hostinger API content limit'],
+  [!previewCompose.includes('build:'), 'Preview manifest still requires a build'],
+  [
+    !/image: [^\n]*(?<!@sha256:[0-9a-f]{64})\n/u.test(previewCompose),
+    'every Preview image must be pinned by digest',
+  ],
+  [
+    previewCompose.includes('midnight-civic-cico-service:') &&
+      previewCompose.includes('midnight-rarimo-verificator:'),
+    'Preview images are missing',
+  ],
+  [
+    ['cico.midnight.vote', 'rarimo.midnight.vote {', 'relay.midnight.vote {'].every((site) =>
+      previewCompose.includes(site),
+    ),
+    'a midnight.vote site is missing from the Preview edge',
+  ],
+  [
+    !previewCompose.includes('rarimo.cardanoschool.org') &&
+      previewCompose.includes('RARIMO_CALLBACK_ORIGIN: https://rarimo.midnight.vote') &&
+      previewCompose.includes('CICO_RARIMO_PROOF_PARAMS_ORIGINS: https://rarimo.midnight.vote'),
+    'the verifier must be published under one name, used by both services',
+  ],
+  [
+    previewCompose.includes('CICO_ALLOWED_ORIGINS: https://midnight.vote\n'),
+    'the credential service must answer the app origin only',
+  ],
+  // The Cleisthenes project joins this edge network and is reached here.
+  [
+    previewCompose.includes('@swiss path /Switzerland/api /Switzerland/api/*') &&
+      previewCompose.includes('reverse_proxy swiss-pilot:4318'),
+    'the Cleisthenes route is missing from the Preview edge',
+  ],
+  [
+    previewCompose.includes('@relay path /keys /ready /v2/*') &&
+      previewCompose.includes('reverse_proxy relayer:8790'),
+    'the relay route is missing or wider than the citizen routes',
+  ],
+  [
+    previewCompose.includes('@ok path /v1/*') &&
+      previewCompose.includes('/public/proof-params/*') &&
+      previewCompose.includes('/public/callback/*') &&
+      !previewCompose.includes('/private/*'),
+    'Preview route allow-lists are wrong',
+  ],
+  [
+    [
+      'CICO_ISSUER_WALLET_SEED',
+      'CICO_ISSUER_ROLE_SECRET',
+      'CICO_ROOT_PUBLISHER_SECRET_HEX',
+      'CICO_ACTION_CAPABILITY_SECRET',
+      'CICO_ACTION_ALLOWED_CONTRACTS',
+      'CICO_REFERENDA_JSON',
+    ].every((name) => previewCompose.includes(`${name}: \${${name}:?required}`)),
+    'a Preview secret or consultation value is not injected',
+  ],
+  [
+    previewCompose.includes('CICO_ACTION_ALLOWED_CIRCUITS: castVote,revealVote\n') &&
+      previewCompose.includes('CICO_ACTION_ALLOWED_NETWORKS: preview\n'),
+    'capabilities must cover exactly the two citizen circuits on Preview',
+  ],
+  [
+    previewCompose.includes('CICO_RARIMO_BASE_URL: http://127.0.0.1:8000') &&
+      previewCompose.includes('CICO_PROOF_SERVER_URL: http://127.0.0.1:6300') &&
+      (previewCompose.match(/network_mode: "service:rarimo-verificator"/gu) ?? []).length === 2,
+    'CICO must reach the verifier and its proof server over loopback',
+  ],
+  [
+    previewCompose.includes('rarimo-internal: {internal: true}'),
+    'Preview private network is not internal',
+  ],
 ];
 
 for (const [ok, message] of checks) {
@@ -158,7 +236,9 @@ for (const [ok, message] of checks) {
 }
 
 const unresolved =
-  `${compose}\n${registryCompose}\n${cutoverCompose}`.match(/REPLACE_[A-Z0-9_]+/gu) ?? [];
+  `${compose}\n${registryCompose}\n${cutoverCompose}\n${previewCompose}`.match(
+    /REPLACE_[A-Z0-9_]+/gu,
+  ) ?? [];
 if (unresolved.length !== 0) {
   throw new Error(`unexpected unresolved placeholders: ${unresolved.join(', ') || '(none)'}`);
 }

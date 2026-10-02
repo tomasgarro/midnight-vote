@@ -44,6 +44,11 @@ export interface MidnightIssuerRuntimeConfig {
   readonly relayUrl?: string;
   readonly explorerBaseUrl?: string;
   readonly balanceTtlMs?: number;
+  /**
+   * File that keeps the issuer wallet's synchronized state between starts, so
+   * a restart does not replay the chain. It holds no key. Omit to keep nothing.
+   */
+  readonly walletStatePath?: string;
 }
 
 /** Narrow seam around WalletFacade; production code supplies the SDK adapter. */
@@ -64,6 +69,13 @@ export interface MidnightIssuerWalletAdapter {
   start(): Promise<void>;
   waitUntilSynced(): Promise<void>;
   stop(): Promise<void>;
+  /** The wallet's public address and whether it holds DUST now; null if it cannot say. */
+  describe?(): Promise<MidnightIssuerWalletDescription | null>;
+}
+
+export interface MidnightIssuerWalletDescription {
+  readonly address: string;
+  readonly dustAvailable: boolean;
 }
 
 export interface MidnightIssuerTransactionCodec {
@@ -96,6 +108,8 @@ export interface MidnightIssuerRuntime {
   readonly executor: CredentialRegistryV1Executor;
   readonly providers: CredentialRegistryV1Providers;
   readonly stop: () => Promise<void>;
+  /** Public facts about the wallet that pays; null when it cannot be asked. */
+  readonly describeWallet: () => Promise<MidnightIssuerWalletDescription | null>;
 }
 
 export async function startMidnightIssuerRuntime(
@@ -124,6 +138,13 @@ export async function startMidnightIssuerRuntime(
     return {
       executor,
       providers,
+      describeWallet: async () => {
+        try {
+          return (await wallet.describe?.()) ?? null;
+        } catch {
+          return null;
+        }
+      },
       stop: async () => {
         if (stopped) return;
         stopped = true;

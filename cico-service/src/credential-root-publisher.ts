@@ -66,11 +66,23 @@ export interface CredentialRootPublisherOptions {
   readonly intervalMs?: number;
   readonly now?: () => number;
   readonly logger?: CredentialRootPublisherLogger;
+  /**
+   * Runs one transaction at a time across the whole service. The publisher
+   * shares the issuer's wallet and its registry executor, so each of its
+   * transactions goes through the queue that issuance uses. One transaction
+   * per turn: a person getting a pass is not held behind a whole cycle.
+   */
+  readonly walletMutation?: <T>(operation: () => Promise<T>) => Promise<T>;
 }
 
 export interface CredentialRootPublisherReferendumOutcome {
   readonly contractAddress: string;
-  readonly status: 'published' | 'failed';
+  /**
+   * `already-admitted`: the consultation holds this root, so nothing was sent.
+   * `enrollment-closed`: it admits no more passes, or its answers are over.
+   * `gave-up`: publishing this root failed too often; a later root is tried again.
+   */
+  readonly status: 'published' | 'failed' | 'already-admitted' | 'enrollment-closed' | 'gave-up';
   readonly transactionId?: string;
   readonly error?: string;
 }
@@ -79,14 +91,19 @@ export type CredentialRootPublishSkipReason =
   | 'no-referenda-configured'
   | 'unchanged'
   | 'no-new-credentials'
+  /** Every configured consultation already holds this root, or takes no more. */
+  | 'nothing-to-admit'
   | 'below-minimum-batch'
-  | 'attestation-failed';
+  | 'attestation-failed'
+  /** The root was attested and no consultation took it this time; it is tried again. */
+  | 'publish-failed';
 
 export interface CredentialRootPublishSkipped {
   readonly published: false;
   readonly reason: CredentialRootPublishSkipReason;
   readonly batchSize?: number;
   readonly error?: string;
+  readonly referenda?: readonly CredentialRootPublisherReferendumOutcome[];
 }
 
 export interface CredentialRootPublishSucceeded {
@@ -138,6 +155,8 @@ export interface CredentialRootPublisherStatus {
 const DEFAULT_MIN_BATCH_SIZE = 16;
 const DEFAULT_MAX_WAIT_MS = 900_000;
 const DEFAULT_INTERVAL_MS = 60_000;
+/** How often one root is offered to one consultation before the publisher stops trying. */
+const MAX_PUBLISH_ATTEMPTS = 5;
 
 const noopLogger: CredentialRootPublisherLogger = {
   info: () => undefined,
@@ -157,6 +176,13 @@ const noopLogger: CredentialRootPublisherLogger = {
  * itself — see docs/ROOT-ATTESTATION-AUDIT.md). A failed attestation must
  * never be followed by a publish.
  *
+ * Each consultation is read before anything is sent. One that already holds
+ * the root, or that admits no more passes, gets no transaction, and when no
+ * consultation needs the root there is no attestation either: a restart costs
+ * nothing. One whose publish failed is offered the same root again in the
+ * next cycle, a few times, without a second attestation. A person whose pass
+ * is in that root waits on this, so a failure must not be forgotten.
+ *
  * To protect voter anonymity, a root that admits very few new credentials is
  * withheld until either `minBatchSize` is reached, `maxWaitMs` has elapsed
  * since the root started pending, or an enrollment deadline is imminent for
@@ -173,10 +199,10 @@ export class CredentialRootPublisher {
   private readonly intervalMs: number;
   private readonly now: () => number;
   private readonly logger: CredentialRootPublisherLogger;
+  private readonly walletMutation: <T>(operation: () => Promise<T>) => Promise<T>;
 
   private queue: Promise<void> = Promise.resolve();
   private timer: ReturnType<typeof setInterval> | null = null;
-  private registryJoined = false;
   private readonly joinedReferenda = new Set<string>();
 
   /** Root field of the last root this publisher successfully admitted; null before the first publish. */
@@ -189,6 +215,12 @@ export class CredentialRootPublisher {
   /** Batch size seen by the last completed cycle; null before the first one. */
   private lastObservedBatchSize: number | null = null;
   private lastPublishedAtMs: number | null = null;
+  /** The pending root's attestation, kept so a retry does not attest twice. */
+  private attested: { readonly rootField: bigint; readonly transactionId: string } | null = null;
+  /** Consultations that took the pending root in an earlier cycle. */
+  private readonly publishedTo = new Set<string>();
+  /** Failed attempts to give the pending root to a consultation. */
+  private readonly failedAttempts = new Map<string, number>();
 
   private lastResult: CredentialRootPublishResult | undefined;
   private lastError: unknown;
@@ -212,6 +244,7 @@ export class CredentialRootPublisher {
     );
     this.now = options.now ?? (() => Date.now());
     this.logger = options.logger ?? noopLogger;
+    this.walletMutation = options.walletMutation ?? ((operation) => operation());
     for (const target of this.referenda) {
       requireBytes32(target.rootPublisherSecret, 'rootPublisherSecret');
     }
@@ -225,15 +258,22 @@ export class CredentialRootPublisher {
   /** Starts the periodic timer. A no-op if already started; never runs two cycles at once. */
   start(): void {
     if (this.timer) return;
-    this.timer = setInterval(() => {
-      this.publishOnce().catch((error) => {
-        this.lastError = error;
-        this.logger.error('credential-root-publisher: publish cycle failed', {
-          message: error instanceof Error ? error.message : String(error),
-        });
-      });
-    }, this.intervalMs);
+    this.timer = setInterval(() => this.trigger(), this.intervalMs);
     this.timer.unref?.();
+  }
+
+  /**
+   * Runs a cycle now, without waiting for it. Called when a pass was just
+   * issued: its holder is waiting for the root, so the next tick is too late.
+   * A failure is logged and left to the next cycle.
+   */
+  trigger(): void {
+    this.publishOnce().catch((error) => {
+      this.lastError = error;
+      this.logger.error('credential-root-publisher: publish cycle failed', {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
   }
 
   stop(): void {
@@ -298,12 +338,26 @@ export class CredentialRootPublisher {
     if (this.pendingRootField !== currentRootField) {
       this.pendingRootField = currentRootField;
       this.pendingSinceMs = this.now();
+      this.publishedTo.clear();
+      this.failedAttempts.clear();
     }
 
     const batchSize = registryState.credentialCount - this.lastPublishedCredentialCount;
     this.lastObservedBatchSize = Number(batchSize > 0n ? batchSize : 0n);
     if (batchSize <= 0n) {
       return { published: false, reason: 'no-new-credentials' };
+    }
+
+    const settled: CredentialRootPublisherReferendumOutcome[] = [];
+    const due: CredentialRootPublisherReferendumTarget[] = [];
+    for (const target of this.referenda) {
+      const standing = await this.standingOf(target, currentRootField);
+      if (standing === 'due') due.push(target);
+      else settled.push({ contractAddress: target.contractAddress, status: standing });
+    }
+    if (due.length === 0) {
+      this.settle(currentRootField, registryState.credentialCount);
+      return { published: false, reason: 'nothing-to-admit', referenda: settled };
     }
 
     const meetsMinimum = batchSize >= BigInt(this.minBatchSize);
@@ -323,44 +377,64 @@ export class CredentialRootPublisher {
 
     const belowMinimum = !meetsMinimum;
 
-    let attestReceipt: CanonicalReceipt;
-    try {
-      attestReceipt = await this.attest(registryState.currentRoot);
-    } catch (error) {
-      this.logger.warn('credential-root-publisher: attestation failed, refusing to publish', {
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return { published: false, reason: 'attestation-failed' };
+    if (this.attested?.rootField !== currentRootField) {
+      try {
+        const receipt = await this.attest(registryState.currentRoot);
+        this.attested = { rootField: currentRootField, transactionId: receipt.transactionId };
+      } catch (error) {
+        this.logger.warn('credential-root-publisher: attestation failed, refusing to publish', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+        return { published: false, reason: 'attestation-failed' };
+      }
     }
+    const attestationTransactionId = this.attested.transactionId;
 
-    const referendumOutcomes: CredentialRootPublisherReferendumOutcome[] = [];
-    for (const target of this.referenda) {
+    const referendumOutcomes: CredentialRootPublisherReferendumOutcome[] = [...settled];
+    let publishedNow = 0;
+    let stillOwed = 0;
+    for (const target of due) {
       try {
         const receipt = await this.publishToReferendum(target, registryState.currentRoot);
+        this.publishedTo.add(target.contractAddress);
+        publishedNow += 1;
         referendumOutcomes.push({
           contractAddress: target.contractAddress,
           status: 'published',
           transactionId: receipt.transactionId,
         });
       } catch (error) {
-        this.logger.error('credential-root-publisher: publish to referendum failed', {
-          contractAddress: target.contractAddress,
-          message: error instanceof Error ? error.message : String(error),
-        });
+        const attempts = (this.failedAttempts.get(target.contractAddress) ?? 0) + 1;
+        this.failedAttempts.set(target.contractAddress, attempts);
+        const gaveUp = attempts >= MAX_PUBLISH_ATTEMPTS;
+        if (!gaveUp) stillOwed += 1;
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          gaveUp
+            ? 'credential-root-publisher: gave up publishing this root to a referendum'
+            : 'credential-root-publisher: publish to referendum failed, will retry',
+          { contractAddress: target.contractAddress, attempts, message },
+        );
         referendumOutcomes.push({
           contractAddress: target.contractAddress,
-          status: 'failed',
-          error: error instanceof Error ? error.message : String(error),
+          status: gaveUp ? 'gave-up' : 'failed',
+          error: message,
         });
       }
     }
 
-    this.lastPublishedRootField = currentRootField;
-    this.lastPublishedCredentialCount = registryState.credentialCount;
-    this.pendingRootField = null;
-    this.pendingSinceMs = null;
-    this.lastObservedBatchSize = 0;
-    this.lastPublishedAtMs = this.now();
+    // While a consultation is still owed this root, the root stays pending and
+    // the next cycle offers it again to that consultation only.
+    if (stillOwed === 0) this.settle(currentRootField, registryState.credentialCount);
+
+    if (publishedNow === 0) {
+      return {
+        published: false,
+        reason: 'publish-failed',
+        batchSize: Number(batchSize),
+        referenda: referendumOutcomes,
+      };
+    }
 
     if (belowMinimum) {
       this.logger.warn('credential-root-publisher: published an under-sized batch', {
@@ -368,15 +442,73 @@ export class CredentialRootPublisher {
         minBatchSize: this.minBatchSize,
       });
     }
+    this.logger.info('credential-root-publisher: root published', {
+      rootField: currentRootField.toString(),
+      batchSize: Number(batchSize),
+      published: publishedNow,
+      stillOwed,
+    });
 
     return {
       published: true,
       rootField: currentRootField.toString(),
       batchSize: Number(batchSize),
       belowMinimum,
-      attestationTransactionId: attestReceipt.transactionId,
+      attestationTransactionId,
       referenda: referendumOutcomes,
     };
+  }
+
+  /** Nothing more is owed for this root: it is the last published one. */
+  private settle(rootField: bigint, credentialCount: bigint): void {
+    this.lastPublishedRootField = rootField;
+    this.lastPublishedCredentialCount = credentialCount;
+    this.pendingRootField = null;
+    this.pendingSinceMs = null;
+    this.lastObservedBatchSize = 0;
+    this.lastPublishedAtMs = this.now();
+    this.publishedTo.clear();
+    this.failedAttempts.clear();
+  }
+
+  /**
+   * Whether a consultation is still owed this root. Decided from its state on
+   * chain. When that cannot be read, the root is offered: the contract refuses
+   * what it should not take, and a person is not left waiting on a failed read.
+   */
+  private async standingOf(
+    target: CredentialRootPublisherReferendumTarget,
+    rootField: bigint,
+  ): Promise<'due' | 'already-admitted' | 'enrollment-closed' | 'gave-up'> {
+    if (this.publishedTo.has(target.contractAddress)) return 'already-admitted';
+    if ((this.failedAttempts.get(target.contractAddress) ?? 0) >= MAX_PUBLISH_ATTEMPTS) {
+      return 'gave-up';
+    }
+    let state: ReferendumV2State;
+    try {
+      state = await this.reader.readReferendum(target.contractAddress);
+    } catch (error) {
+      this.logger.warn('credential-root-publisher: could not read referendum, offering the root', {
+        contractAddress: target.contractAddress,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return 'due';
+    }
+    if (state.acceptedCredentialRoots.some((root) => root.field === rootField)) {
+      return 'already-admitted';
+    }
+    const nowSeconds = BigInt(Math.floor(this.now() / 1000));
+    if (
+      state.enrollmentClosed ||
+      state.closed ||
+      state.phase !== 'COMMIT' ||
+      nowSeconds >= state.enrollmentClosesAtUnix ||
+      // The contract never takes back a root it revoked.
+      state.revokedCredentialRoots.some((root) => root.field === rootField)
+    ) {
+      return 'enrollment-closed';
+    }
+    return 'due';
   }
 
   private async isEnrollmentDeadlineImminent(): Promise<boolean> {
@@ -398,26 +530,29 @@ export class CredentialRootPublisher {
     return false;
   }
 
-  private async attest(root: CredentialRegistryV1State['currentRoot']): Promise<CanonicalReceipt> {
-    if (!this.registryJoined) {
+  private attest(root: CredentialRegistryV1State['currentRoot']): Promise<CanonicalReceipt> {
+    return this.walletMutation(async () => {
+      // The issuer joins the registry with a person's claims before every
+      // pass, so the publisher sets its own, empty state again each time.
       await this.registryExecutor.join(this.registryContractAddress, attestationPrivateState());
-      this.registryJoined = true;
-    }
-    return this.registryExecutor.attestRegistryRoot(root);
+      return this.registryExecutor.attestRegistryRoot(root);
+    });
   }
 
-  private async publishToReferendum(
+  private publishToReferendum(
     target: CredentialRootPublisherReferendumTarget,
     root: CredentialRegistryV1State['currentRoot'],
   ): Promise<CanonicalReceipt> {
-    if (!this.joinedReferenda.has(target.contractAddress)) {
-      await target.executor.join(
-        target.contractAddress,
-        rootPublisherPrivateState(target.rootPublisherSecret),
-      );
-      this.joinedReferenda.add(target.contractAddress);
-    }
-    return target.executor.publishCredentialRoot(root);
+    return this.walletMutation(async () => {
+      if (!this.joinedReferenda.has(target.contractAddress)) {
+        await target.executor.join(
+          target.contractAddress,
+          rootPublisherPrivateState(target.rootPublisherSecret),
+        );
+        this.joinedReferenda.add(target.contractAddress);
+      }
+      return target.executor.publishCredentialRoot(root);
+    });
   }
 
   private exclusive<T>(operation: () => Promise<T>): Promise<T> {

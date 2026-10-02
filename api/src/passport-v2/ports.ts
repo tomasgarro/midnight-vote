@@ -183,9 +183,27 @@ export interface BallotOpeningVaultPort {
  * Durable boundary for citizen actions. Providers return a canonical receipt
  * only after the Midnight indexer confirms the transaction.
  */
+/**
+ * Where this device's pass stands for one consultation, asked before a proof
+ * is built.
+ *
+ * | Value | Meaning |
+ * | --- | --- |
+ * | `admitted` | The consultation takes a proof of this pass now |
+ * | `pending` | It will, once a root that holds the pass is published to it |
+ * | `closed` | It will not: the pass came after the consultation stopped admitting passes |
+ * | `no-pass` | This device holds no pass |
+ */
+export type PassAdmission = 'admitted' | 'pending' | 'closed' | 'no-pass';
+
 export interface CivicActionPort {
   readonly adapterName: string;
   castVote(request: CastVoteRequest): Promise<CanonicalReceipt>;
+  /**
+   * Optional: an adapter that cannot ask leaves the question to `castVote`,
+   * which refuses for the same reasons.
+   */
+  getPassAdmission?(referendumId: string): Promise<PassAdmission>;
   /**
    * Counts this device's own sealed answer. The organizer holds no openings,
    * so an answer is counted only when the device that sealed it returns.

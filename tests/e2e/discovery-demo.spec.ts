@@ -115,12 +115,14 @@ test('age input validation and under-18 demo does not enable participation', asy
   await page.getByRole('button', { name: 'Create my simulated pass' }).click();
   await expect(page.getByText('< 18', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'See the consultations', exact: true }).click();
-  await expect(
-    page.locator('.poll__actions button').filter({ hasText: '18+' }).first(),
-  ).toBeDisabled();
+  // No button to press: each card says in one line why this pass cannot answer.
+  await expect(page.locator('.poll__reason').first()).toHaveText(
+    'For passes of people 18 and over.',
+  );
+  await expect(page.getByRole('button', { name: /Participate/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'View consultation', exact: true }).first().click();
   await expect(
-    page.getByRole('button', { name: 'Valid country pass required · 18+', exact: true }),
+    page.getByRole('button', { name: 'For passes of people 18 and over.', exact: true }),
   ).toBeDisabled();
 });
 

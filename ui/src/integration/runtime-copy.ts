@@ -19,6 +19,14 @@ export const RUNTIME_COPY = {
     actionUnavailable: 'La acción no está disponible; la respuesta fue bloqueada.',
     authorizationMissing:
       'Tu pase no tiene una autorización vigente para responder. Verificá de nuevo tu pasaporte.',
+    passNotAdmitted:
+      'Tu pase todavía no fue admitido en esta consulta. Probá de nuevo en unos minutos.',
+    passTooLate:
+      'Tu pase se agregó después de que esta consulta dejó de admitir pases. Podés responder otras consultas abiertas.',
+    answerAlreadySealed:
+      'Tu respuesta a esta consulta ya está sellada en este dispositivo. La encontrás en tus respuestas.',
+    holderAlreadyAnswered:
+      'Este pase ya respondió esta consulta. Este navegador no guarda esa respuesta: no puede sellar otra ni contar aquella desde acá.',
     manifestMissing: (network: string) =>
       `${network} requiere un manifiesto v2 completo; el flujo anterior está deshabilitado.`,
     transactionFailed: (network: string) => `Falló la transacción en ${network}`,
@@ -38,6 +46,14 @@ export const RUNTIME_COPY = {
     actionUnavailable: 'The action is not available, so the answer was blocked.',
     authorizationMissing:
       'Your pass holds no current authorization to answer. Verify your passport again.',
+    passNotAdmitted:
+      'Your pass has not been admitted to this consultation yet. Try again in a few minutes.',
+    passTooLate:
+      'Your pass was added after this consultation stopped admitting passes. You can answer the other open consultations.',
+    answerAlreadySealed:
+      'Your answer to this consultation is already sealed on this device. You will find it under your answers.',
+    holderAlreadyAnswered:
+      'This pass has already answered this consultation. This browser holds no record of that answer, so it cannot seal another one or count that one from here.',
     manifestMissing: (network: string) =>
       `${network} needs a complete v2 manifest. The earlier flow is disabled.`,
     transactionFailed: (network: string) => `The transaction failed on ${network}`,
@@ -57,6 +73,14 @@ export const RUNTIME_COPY = {
     actionUnavailable: 'L’action n’est pas disponible ; la réponse a été bloquée.',
     authorizationMissing:
       'Votre laissez-passer n’a pas d’autorisation en cours pour répondre. Vérifiez à nouveau votre passeport.',
+    passNotAdmitted:
+      'Votre laissez-passer n’est pas encore admis dans cette consultation. Réessayez dans quelques minutes.',
+    passTooLate:
+      'Votre laissez-passer a été ajouté après la fin des admissions de cette consultation. Vous pouvez répondre aux autres consultations ouvertes.',
+    answerAlreadySealed:
+      'Votre réponse à cette consultation est déjà scellée sur cet appareil. Vous la trouverez dans vos réponses.',
+    holderAlreadyAnswered:
+      'Ce laissez-passer a déjà répondu à cette consultation. Ce navigateur ne garde pas cette réponse : il ne peut ni en sceller une autre, ni compter celle-là.',
     manifestMissing: (network: string) =>
       `${network} exige un manifeste v2 complet. L’ancien parcours est désactivé.`,
     transactionFailed: (network: string) => `La transaction a échoué sur ${network}`,
@@ -68,3 +92,25 @@ export const RUNTIME_COPY = {
     dismissNotice: 'Fermer la notification',
   },
 } as const satisfies Record<CicoLocale, unknown>;
+
+/**
+ * What a person reads when sealing an answer was refused.
+ *
+ * Three refusals are part of the ordinary journey, so they are said in the
+ * person's language: the pass is not admitted yet, which clears by itself; the
+ * pass came after the consultation closed to new passes, which does not; and
+ * the answer is already sealed, which an attempt can learn only from the
+ * chain. A fourth is rare and said the same way: the contract found that the
+ * holder of this pass has answered, and this browser has no record of it. Any
+ * other message is shown as it arrived.
+ */
+export function sealRefusalMessage(error: unknown, locale: CicoLocale, network: string): string {
+  const code = error instanceof Error ? (error as { code?: unknown }).code : undefined;
+  if (code === 'CREDENTIAL_NOT_ADMITTED') return RUNTIME_COPY[locale].passNotAdmitted;
+  if (code === 'CREDENTIAL_ADMISSION_CLOSED') return RUNTIME_COPY[locale].passTooLate;
+  if (code === 'ANSWER_ALREADY_SEALED') return RUNTIME_COPY[locale].answerAlreadySealed;
+  if (code === 'HOLDER_ALREADY_ANSWERED') return RUNTIME_COPY[locale].holderAlreadyAnswered;
+  return error instanceof Error && error.message
+    ? error.message
+    : RUNTIME_COPY[locale].transactionFailed(network);
+}

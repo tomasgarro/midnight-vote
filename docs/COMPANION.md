@@ -98,6 +98,7 @@ the app, where headings are small.
 | --- | --- | --- |
 | Cleisthenes before an alpine lake, in an arched frame | Landing page, first screen | `ui/public/art/civic/alpine-lake.webp`, `cleisthenes-bust.webp` |
 | The Geneva lakefront, engraved | Landing page, last screen | `ui/public/art/civic/geneva-lakefront.webp` |
+| Cleisthenes in a portico above the lake (variant) | Landing page, only with `?hero=portico`, until it is approved | `ui/public/art/civic/portico.webp` with the two above |
 
 The pictures are the ones Cleisthenes uses at `/Switzerland`. They were painted
 on rag paper, so the landing page and the documentation page stay in the light

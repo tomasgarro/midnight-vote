@@ -124,6 +124,37 @@ export function deriveRegistryContractBinding(registryContractAddress: string): 
   ]);
 }
 
+/**
+ * The Rarimo event every verification for one registry epoch is made under.
+ *
+ * A passport proof carries a nullifier that depends on the document and on
+ * the event. Under one fixed event a document always shows the same
+ * nullifier, so the issuer can tell that a document already has a pass
+ * without learning which document it is. Under a fresh event per attempt,
+ * which is what the app used to ask for, one document could be verified again
+ * and again and collect a pass each time.
+ *
+ * The event follows from the registry's address and its epoch, both public,
+ * so the app and the issuer derive it without telling each other. A new
+ * registry or a new epoch is a new event, and every document starts afresh.
+ */
+export function deriveRarimoEventId(
+  registryContractAddress: string,
+  credentialEpoch: bigint | number,
+): string {
+  const epoch = BigInt(credentialEpoch);
+  if (epoch < 0n) throw new TypeError('credentialEpoch must not be negative');
+  const digest = persistentHash(vector3, [
+    padBytes32('cico:rarimo:event:v1'),
+    deriveRegistryContractBinding(registryContractAddress),
+    convertFieldToBytes(32, epoch, 'credential epoch'),
+  ]);
+  // Rarimo encodes event_id as a BN254 scalar: 31 bytes are always in range.
+  let value = 0n;
+  for (const byte of digest.slice(1)) value = (value << 8n) | BigInt(byte);
+  return (value === 0n ? 1n : value).toString(10);
+}
+
 /** Binds a Rarimo proof request to the exact enrollment and public holder commitment. */
 export function deriveRarimoIssuanceEventData(
   enrollmentId: string,

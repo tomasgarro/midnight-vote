@@ -11,6 +11,7 @@ export * from './midnight-v2-relayer-providers.js';
 export * from './ports.js';
 export * from './public-state.js';
 export * from './rarimo-credential-adapter.js';
+export * from './rarimo-query.js';
 export type {
   RarimoCountryMapper,
   RarimoDerivedClaims,
@@ -20,5 +21,6 @@ export type {
   RarimoVerificationStatus,
   RarimoVerifiedEvidence,
 } from './rarimo-types.js';
+export * from './registry-history.js';
 export * from './types.js';
 export { credentialRegistryV1Witnesses, referendumV2Witnesses } from './witnesses.js';

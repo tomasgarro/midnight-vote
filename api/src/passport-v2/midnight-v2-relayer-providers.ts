@@ -336,8 +336,13 @@ export async function createReferendumV2WalletlessProviders(
         );
   const pendingStore = options.pendingStore ?? new InMemoryWalletlessPendingActionStore();
   const pollIntervalMs = boundedDelay(options.pollIntervalMs ?? 500, 'pollIntervalMs');
+  // How long the device waits for the relay's transaction to reach the chain.
+  // The relay holds an action for a random moment, builds its own fee proof on
+  // a small shared server, and one action waits behind another. Two minutes was
+  // enough on a laptop and tight on the server. Giving up early is costly: the
+  // person's device builds a second proof only to find the first one landed.
   const submissionTimeoutMs = boundedDelay(
-    options.submissionTimeoutMs ?? 120_000,
+    options.submissionTimeoutMs ?? 300_000,
     'submissionTimeoutMs',
   );
   let activeScope: WalletlessActionScope | null = null;

@@ -1,5 +1,5 @@
-import { resolve } from 'node:path';
-import { padBytes32 } from 'midnight-referendum-api';
+import { join, resolve } from 'node:path';
+import { deriveRoleKey, padBytes32 } from 'midnight-referendum-api';
 
 /**
  * One referendum this service's root publisher is authorized to admit
@@ -48,6 +48,12 @@ export interface CicoServiceConfig {
    * referenda are configured.
    */
   readonly referendumZkConfigPath: string | null;
+  /**
+   * One holder per document: `enforce` refuses a second holder, `observe`
+   * records and logs without refusing, `off` keeps no record and lets every
+   * verification choose its own event.
+   */
+  readonly documentUniqueness: 'enforce' | 'observe' | 'off';
   /** Tuning for CredentialRootPublisher; the publisher itself is wired up only where referenda are configured. */
   readonly rootPublisher: {
     readonly minBatchSize: number;
@@ -76,6 +82,7 @@ export interface CicoServiceConfig {
     readonly credentialEpoch: bigint;
     readonly relayUrl: string;
     readonly explorerBaseUrl?: string;
+    readonly walletStatePath: string;
   };
 }
 
@@ -107,6 +114,21 @@ export function loadCicoServiceConfig(
     );
   }
   const referenda = parseReferenda(env);
+  // A consultation takes a root only from the holder of its root-publisher
+  // secret. With another secret every publish would be refused, and nobody
+  // with a new pass could answer. Say so at start, not at the first person.
+  const rootPublisherKey = deriveRoleKey(
+    'cico:ref-v2:root-publisher:',
+    bytes32(rootPublisherSecretHex, 'CICO_ROOT_PUBLISHER_SECRET_HEX'),
+  );
+  for (const referendum of referenda) {
+    if (!equalBytes(referendum.rootPublisherKey, rootPublisherKey)) {
+      throw new Error(
+        `CICO_ROOT_PUBLISHER_SECRET_HEX is not the root publisher of the consultation ${referendum.contractAddress}: ` +
+          'the key it derives is not the rootPublisherKeyHex in CICO_REFERENDA_JSON',
+      );
+    }
+  }
   const rarimoBaseUrl = required(env, 'CICO_RARIMO_BASE_URL');
   const verifierOrigin = absoluteHttpUrl(rarimoBaseUrl, 'CICO_RARIMO_BASE_URL').origin;
   const explorerBaseUrl = env.CICO_EXPLORER_BASE_URL?.trim();
@@ -122,11 +144,12 @@ export function loadCicoServiceConfig(
       'Action capability, issuer wallet, and issuer role secrets must be independent',
     );
   }
+  const stateDirectory = resolve(optional(env, 'CICO_STATE_DIRECTORY', '.cico-state'));
   return {
     host: optional(env, 'CICO_HOST', '127.0.0.1'),
     port: integer(env, 'CICO_PORT', 1, 65_535, 8791),
     allowedOrigins: list(required(env, 'CICO_ALLOWED_ORIGINS')),
-    stateDirectory: resolve(optional(env, 'CICO_STATE_DIRECTORY', '.cico-state')),
+    stateDirectory,
     rarimoBaseUrl,
     rarimoPrivateHeaders: stringRecord(env.CICO_RARIMO_PRIVATE_HEADERS_JSON),
     rarimoProofParamsAllowedOrigins: list(
@@ -154,6 +177,7 @@ export function loadCicoServiceConfig(
       10 * 60 * 1_000,
     ),
     rootPublisherSecretHex,
+    documentUniqueness: documentUniqueness(env),
     referendumZkConfigPath:
       referenda.length > 0 ? resolve(required(env, 'CICO_REFERENDUM_ZK_CONFIG_PATH')) : null,
     referenda,
@@ -208,8 +232,23 @@ export function loadCicoServiceConfig(
       credentialEpoch: BigInt(credentialEpoch),
       relayUrl: optional(env, 'CICO_NODE_URL', 'wss://rpc.preview.midnight.network'),
       ...(explorerBaseUrl ? { explorerBaseUrl } : {}),
+      // Beside the service's other durable state, so it needs no setting of
+      // its own where that directory is already a volume.
+      walletStatePath: resolve(
+        optional(env, 'CICO_WALLET_STATE_PATH', join(stateDirectory, 'issuer-wallet-state.json')),
+      ),
     },
   };
+}
+
+function documentUniqueness(
+  env: Readonly<Record<string, string | undefined>>,
+): 'enforce' | 'observe' | 'off' {
+  const value = optional(env, 'CICO_DOCUMENT_UNIQUENESS', 'enforce');
+  if (value !== 'enforce' && value !== 'observe' && value !== 'off') {
+    throw new Error('CICO_DOCUMENT_UNIQUENESS must be enforce, observe or off');
+  }
+  return value;
 }
 
 function required(env: Readonly<Record<string, string | undefined>>, name: string): string {

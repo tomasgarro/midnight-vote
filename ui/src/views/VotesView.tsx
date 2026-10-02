@@ -5,7 +5,7 @@ import {
   MapPin,
   ShieldCheck,
 } from '@phosphor-icons/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, CountryPicker, Display, EmptyState, Sheet } from '@/components/system';
 import { CountryFlag } from '@/components/system/CountryFlag';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
@@ -18,14 +18,21 @@ import {
   isCountryPoll,
   isCountryPollForCountry,
   localizePoll,
-  meetsCountryPolicy,
   type Poll,
   pollPlaceCode,
 } from '@/views/poll-model';
 import { ResultsPanel } from '@/views/ResultsPanel';
 import { ConsultationRail } from './ConsultationRail';
 import './votes-view.css';
-import { ConsultationMedia, canUseDemoPass, pollSubject, SUBJECTS } from './discovery-presentation';
+import { ConsultationMedia, pollSubject, SUBJECTS } from './discovery-presentation';
+import {
+  answerableByPlace,
+  defaultScopeForPass,
+  orderForPass,
+  PASS_FIT_COPY,
+  passBlock,
+  passBlockLine,
+} from './pass-fit';
 import './discovery-cards.css';
 
 const COPY = {
@@ -142,14 +149,33 @@ export function VotesView({
   locale,
 }: VotesViewProps) {
   const copy = COPY[locale];
-  const [scope, setScope] = useState<DiscoveryScope>(() =>
-    credential?.country ? { kind: 'country', code: credential.country } : { kind: 'world' },
-  );
+  const fit = PASS_FIT_COPY[locale];
+  // A pass opens the list where it can answer something, so no pass lands on
+  // an empty or unrelated list. Choosing a place afterwards is the reader's.
+  const [scope, setScope] = useState<DiscoveryScope>(() => defaultScopeForPass(polls, credential));
   const [subject, setSubject] = useState<keyof typeof SUBJECTS.en>('all');
+  const passKey = credential
+    ? `${credential.country}|${credential.ageClass}|${credential.validUntil}`
+    : '';
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-placed only when the pass itself changes.
   useEffect(() => {
-    if (credential?.country) setScope({ kind: 'country', code: credential.country });
-  }, [credential?.country]);
+    if (passKey) setScope(defaultScopeForPass(polls, credential));
+  }, [passKey]);
   const [scopeSheetOpen, setScopeSheetOpen] = useState(false);
+  // The chosen place can sit past the edge of the chip row, for instance when
+  // a pass opens the list on it. Bring it into view, sideways only.
+  const scopesRef = useRef<HTMLFieldSetElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the chosen place changes.
+  useEffect(() => {
+    const row = scopesRef.current;
+    const pressed = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!row || !pressed) return;
+    const rowBox = row.getBoundingClientRect();
+    const box = pressed.getBoundingClientRect();
+    if (box.left < rowBox.left || box.right > rowBox.right) {
+      row.scrollLeft += box.left - rowBox.left - (rowBox.width - box.width) / 2;
+    }
+  }, [scope]);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -178,6 +204,11 @@ export function VotesView({
     scope.kind === 'country' && !availableCountryCodes.includes(scope.code)
       ? [...availableCountryCodes, scope.code]
       : availableCountryCodes;
+  const scopeKey = scope.kind === 'country' ? scope.code : 'global';
+  // Places other than this one where the pass can answer now, most first.
+  const elsewhere = [...answerableByPlace(polls, credential, now).entries()]
+    .filter(([key]) => key !== scopeKey)
+    .sort((left, right) => right[1] - left[1]);
   const passMatchesCountry = Boolean(
     credential &&
       scope.kind === 'country' &&
@@ -204,7 +235,7 @@ export function VotesView({
 
       {/* The places that have consultations are one tap away. Every other
           place is in the sheet, behind the last chip. */}
-      <fieldset className="votes__scopes" aria-label={copy.scopeLabel}>
+      <fieldset ref={scopesRef} className="votes__scopes" aria-label={copy.scopeLabel}>
         <button type="button" aria-pressed={scope.kind === 'world'} onClick={chooseGlobal}>
           <GlobeHemisphereWest size={17} aria-hidden="true" />
           {copy.world}
@@ -276,8 +307,10 @@ export function VotesView({
           ? { key: scope.code, label: countryLabel, items: scopedPolls }
           : { key: 'global', label: copy.world, items: scopedPolls },
       ].map(({ key: sectionKey, label: countryLabel, items: sectionPolls }) => {
-        const visiblePolls = sectionPolls.filter(
-          (poll) => subject === 'all' || pollSubject(poll) === subject,
+        const visiblePolls = orderForPass(
+          sectionPolls.filter((poll) => subject === 'all' || pollSubject(poll) === subject),
+          credential,
+          now,
         );
         return (
           <section
@@ -300,6 +333,20 @@ export function VotesView({
                 </span>
               ) : null}
             </div>
+            {elsewhere.length ? (
+              <p className="votes__elsewhere">
+                <span>{fit.elsewhere}</span>
+                {elsewhere.map(([key, count]) => (
+                  <button
+                    type="button"
+                    key={key}
+                    onClick={() => (key === 'global' ? chooseGlobal() : chooseCountry(key))}
+                  >
+                    {key === 'global' ? fit.global : countryName(key, locale)} ({count})
+                  </button>
+                ))}
+              </p>
+            ) : null}
             {visiblePolls.length ? (
               <ConsultationRail
                 key={countryLabel + subject}
@@ -309,10 +356,10 @@ export function VotesView({
               >
                 {visiblePolls.map((poll) => {
                   const displayPoll = localizePoll(poll, locale);
-                  const eligibleForScope = Boolean(
-                    credential && meetsCountryPolicy(poll, credential.country),
-                  );
                   const isOpen = getPollAvailability(poll, now).isOpen;
+                  // With a pass, a consultation it cannot answer says why in
+                  // one line, in place of the button.
+                  const block = credential ? passBlock(poll, credential, now) : null;
                   return (
                     <li key={poll.id}>
                       <Card className="poll">
@@ -328,8 +375,11 @@ export function VotesView({
                             `deadline` string: that one is authored per fixture
                             (French on the French one, whatever the reader
                             chose) and it disagreed with the date Activity
-                            computed for the same consultation. */}
-                            {copy.closes} {formatDate(poll.closesAt, locale) ?? poll.deadline}
+                            computed for the same consultation. A closed one
+                            shows the date alone: the chip beside it already
+                            says it is closed, and "Closes" was no longer true. */}
+                            {isOpen ? `${copy.closes} ` : ''}
+                            {formatDate(poll.closesAt, locale) ?? poll.deadline}
                           </span>
                         </div>
                         <h3 className="poll__title">{displayPoll.title}</h3>
@@ -337,26 +387,17 @@ export function VotesView({
                         <p className="poll__note">
                           {poll.runtimeContractAddress ? copy.fromContract : copy.simulated}
                         </p>
+                        {block ? (
+                          <p className="poll__reason">{passBlockLine(block, locale)}</p>
+                        ) : null}
                         <div className="poll__actions">
-                          {isOpen ? (
-                            <Button
-                              size="sm"
-                              disabled={
-                                credential?.kind === 'synthetic-demo-credential' &&
-                                !canUseDemoPass(poll, credential, now) &&
-                                eligibleForScope
-                              }
-                              onClick={() =>
-                                eligibleForScope ? onStartVote(poll.id) : onOpenPassportJourney()
-                              }
-                            >
-                              {credential?.kind === 'synthetic-demo-credential' &&
-                              credential.ageClass !== '18+'
-                                ? '18+'
-                                : eligibleForScope
-                                  ? copy.vote
-                                  : copy.addEligibility}{' '}
-                              <ArrowRight size={16} />
+                          {credential && !block ? (
+                            <Button size="sm" onClick={() => onStartVote(poll.id)}>
+                              {copy.vote} <ArrowRight size={16} />
+                            </Button>
+                          ) : !credential && isOpen ? (
+                            <Button size="sm" onClick={onOpenPassportJourney}>
+                              {copy.addEligibility} <ArrowRight size={16} />
                             </Button>
                           ) : null}
                           <Button variant="link" size="sm" onClick={() => onOpenPolicy(poll.id)}>

@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Poll } from '@/views/poll-model';
 import { VotesView } from '@/views/VotesView';
 
@@ -37,8 +37,15 @@ const credential = {
   ageClass: '18+',
   assurance: 'fixture',
   epoch: 'preview',
-  validUntil: '2026-09-30',
+  validUntil: '2026-11-30T00:00:00Z',
 };
+
+// The list depends on the clock (open, closed, expired), so the clock is fixed.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-02T12:00:00Z'));
+});
+afterEach(() => vi.useRealTimers());
 
 function renderVotes(polls: readonly Poll[], onStartVote = vi.fn()) {
   render(
@@ -68,20 +75,15 @@ describe('VotesView scope discovery', () => {
       }),
     ]);
 
-    // The pass is French and France has no consultation, so France gets a chip
-    // of its own after the places that have one.
+    // The pass is French and France has no consultation, so the list opens on
+    // Global, where the pass can answer, rather than on an empty France.
     const places = screen.getByRole('group', { name: 'Consultation scope' });
     expect(
       within(places)
         .getAllByRole('button')
         .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
-    ).toEqual([
-      'Global',
-      expect.stringMatching(/Italy$/),
-      expect.stringMatching(/France$/),
-      'More places',
-    ]);
-    expect(within(places).getByRole('button', { name: /France/, pressed: true })).toBeTruthy();
+    ).toEqual(['Global', expect.stringMatching(/Italy$/), 'More places']);
+    expect(within(places).getByRole('button', { name: 'Global', pressed: true })).toBeTruthy();
 
     await user.click(within(places).getByRole('button', { name: 'More places' }));
     expect(screen.getByText('Consultations available')).toBeTruthy();
@@ -112,7 +114,10 @@ describe('VotesView scope discovery', () => {
     expect(screen.queryByText('Open rules')).toBeNull();
     expect(screen.getByText('Italy consultation')).toBeTruthy();
     expect(screen.getByText(/This does not prove eligibility/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Add eligibility/i })).toBeTruthy();
+    // A French pass cannot answer an Italian consultation, and the card says so
+    // in one line instead of offering a button.
+    expect(screen.getByText('For passports from Italy only.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Participate|Add eligibility/i })).toBeNull();
     expect(onStartVote).not.toHaveBeenCalled();
   });
 

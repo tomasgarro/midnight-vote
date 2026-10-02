@@ -23,7 +23,13 @@ test('one place at a time, source-backed chat and reduced motion', async ({ page
   await expect(page.getByRole('status')).toContainText('Finding catalogue context');
   await expect(page.locator('.catalogue-chat__answer')).toContainText('loud fireworks');
   await page.screenshot({ path: 'outputs/cleisthenes-fireworks-390.png' });
-  await page.getByRole('button', { name: 'Sources', exact: true }).click();
+  // The answer is in one shape: in short, each side, the sources, the limits.
+  await expect(page.locator('.chat-answer-section h3')).toHaveText([
+    'In short',
+    'What each side says',
+    'Sources',
+    'What I can’t tell you',
+  ]);
   await expect(page.getByRole('link', { name: /UVEK/ })).toHaveAttribute('href', /uvek\.admin\.ch/);
   await page.getByRole('button', { name: 'Clear chat' }).click();
   await page.emulateMedia({ reducedMotion: 'reduce' });

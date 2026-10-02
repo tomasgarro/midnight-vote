@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { asksHowToAnswer } from './advice.js';
 import { createCleisthenesAssistant } from './cleisthenes-adapter.js';
 import { DeliberationError, MAX_QUESTION_LENGTH } from './ports.js';
 
@@ -584,6 +585,45 @@ describe('asking a question', () => {
     await expect(
       port.ask({ consultationId: 'world-2026', language: 'en', question: 'Why?' }),
     ).rejects.toMatchObject({ code: 'UNKNOWN_CONSULTATION' });
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('never saying how to answer', () => {
+  const advice = [
+    'Should I vote yes?',
+    'How should I vote on this?',
+    'What should I answer?',
+    'Can you recommend an answer?',
+    '¿Qué voto?',
+    '¿Debería votar que sí?',
+    '¿Me recomendás algo?',
+    'Dois-je voter oui ?',
+    'Que voter ?',
+    'Vous me conseillez quoi ?',
+    'Soll ich Ja stimmen?',
+    'Cosa dovrei votare?',
+  ];
+  const questions = [
+    'Who opposed the VAT rise?',
+    '¿Cómo votó el Consejo Nacional?',
+    'Comment le Conseil a-t-il voté ?',
+    'What should I know about the financing?',
+    'Qui soutient l’initiative ?',
+  ];
+
+  it('recognises a request for advice in each language the app speaks', () => {
+    for (const question of advice) expect(asksHowToAnswer(question), question).toBe(true);
+    for (const question of questions) expect(asksHowToAnswer(question), question).toBe(false);
+  });
+
+  it('declines before reading the record or sending anything', async () => {
+    const { port, calls } = serving(voteObject());
+    for (const question of advice) {
+      await expect(
+        port.ask({ consultationId: CONSULTATION, language: 'en', question }),
+      ).rejects.toMatchObject({ code: 'ADVICE_DECLINED', retryable: false });
+    }
     expect(calls).toHaveLength(0);
   });
 });

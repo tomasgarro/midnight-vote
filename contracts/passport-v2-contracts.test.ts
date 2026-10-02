@@ -21,6 +21,18 @@ import {
   deriveRegistryContractBinding,
   deriveVoteNullifier,
 } from '../api/src/passport-v2/crypto.js';
+import { MidnightCivicActionAdapter } from '../api/src/passport-v2/midnight-civic-action-adapter.js';
+import {
+  credentialTreeView,
+  parseReferendumV2,
+  type ReferendumV2PrivateState,
+  resolveAdmittedCredentialPath,
+} from '../api/src/passport-v2/midnight-v2.js';
+import type {
+  ReferendumV2Executor,
+  ReferendumV2Providers,
+} from '../api/src/passport-v2/midnight-v2-executors.js';
+import { isoNumericCountry } from '../api/src/passport-v2/types.js';
 import {
   Contract as RegistryContract,
   ledger as registryLedger,
@@ -752,6 +764,212 @@ describe('ReferendumV2 credential policy', () => {
       expect(state.acceptedCredentialRoots.member(enrolled.root)).toBe(true);
     });
 
+    it('takes the proof the app builds against the last admitted root once the registry has moved on', async () => {
+      // The consultation admitted the root that holds the first pass. Two
+      // more people then got a pass, and neither of those roots is admitted.
+      const item = setupReferendum();
+      const afterFirstPass = item.registry.context.currentQueryContext.state;
+      enroll(item.registry, makeClaims(110).claims);
+      const afterSecondPass = item.registry.context.currentQueryContext.state;
+      enroll(item.registry, makeClaims(120).claims);
+      const now = item.registry.context.currentQueryContext.state;
+
+      // A path taken from the registry as it is now leads to a root the
+      // consultation never admitted, and the contract refuses it.
+      const pathNow = registryLedger(now).credentials.findPathForLeaf(item.leaf);
+      if (!pathNow) throw new Error('the first pass left the registry');
+      const withPathNow: CircuitContext<ReferendumPrivateState> = {
+        ...item.context,
+        currentPrivateState: { ...item.privateState, voterPath: pathNow },
+      };
+      expect(() => item.contract.impureCircuits.castVote(withPathNow)).toThrow(
+        'Credential policy not satisfied',
+      );
+
+      // The app's lookup walks the registry's earlier states, newest first.
+      const fetched: string[] = [];
+      const path = await resolveAdmittedCredentialPath({
+        credentialLeaf: item.leaf,
+        current: credentialTreeView(now),
+        frozen: false,
+        referendum: parseReferendumV2(item.context.currentQueryContext.state),
+        earlier: async function* () {
+          for (const [label, state] of [
+            ['second pass', afterSecondPass],
+            ['first pass', afterFirstPass],
+          ] as const) {
+            fetched.push(label);
+            yield credentialTreeView(state);
+          }
+        },
+      });
+      expect(fetched).toEqual(['second pass', 'first pass']);
+
+      const withAdmittedPath: CircuitContext<ReferendumPrivateState> = {
+        ...item.context,
+        currentPrivateState: { ...item.privateState, voterPath: path },
+      };
+      const vote = item.contract.impureCircuits.castVote(withAdmittedPath);
+      expect(referendumLedger(vote.context.currentQueryContext.state).issuedVotes).toBe(1n);
+    });
+
+    it('runs that lookup inside the app adapter, from the indexer blocks to the sealed answer', async () => {
+      const item = setupReferendum();
+      const registryAddress = dummyContractAddress();
+      const referendumAddress = 'cd'.repeat(32);
+      // The registry's state after each pass, keyed by the block it landed in.
+      const registryAt = new Map<number, unknown>([
+        [100, item.registry.context.currentQueryContext.state],
+      ]);
+      enroll(item.registry, makeClaims(140).claims);
+      registryAt.set(200, item.registry.context.currentQueryContext.state);
+      enroll(item.registry, makeClaims(150).claims);
+      registryAt.set(300, item.registry.context.currentQueryContext.state);
+
+      const asked: (number | 'latest')[] = [];
+      const providers = {
+        privateStateProvider: {},
+        publicDataProvider: {
+          async queryContractState(address: string, config?: { blockHeight: number }) {
+            if (address === referendumAddress) {
+              return { data: item.context.currentQueryContext.state };
+            }
+            asked.push(config?.blockHeight ?? 'latest');
+            const data = registryAt.get(config?.blockHeight ?? 300);
+            return data ? { data } : null;
+          },
+        },
+      } as unknown as ReferendumV2Providers;
+
+      let voterPath: MerkleTreePath<Uint8Array> | undefined;
+      const executor = {
+        async join(_address: string, privateState: ReferendumV2PrivateState) {
+          voterPath = privateState.voterPath;
+        },
+        async castVote() {
+          if (!voterPath) throw new Error('no path was prepared');
+          // The contract itself decides whether the prepared path is good.
+          const vote = item.contract.impureCircuits.castVote({
+            ...item.context,
+            currentPrivateState: { ...item.privateState, voterPath },
+          });
+          expect(referendumLedger(vote.context.currentQueryContext.state).issuedVotes).toBe(1n);
+          return {
+            status: 'confirmed' as const,
+            action: 'vote' as const,
+            network: 'preview' as const,
+            transactionId: 'sealed',
+            transactionHash: 'sealed-hash',
+            contractAddress: referendumAddress,
+            circuit: 'castVote',
+            blockHeight: 301,
+            blockHash: 'block',
+            blockTimestamp: '2026-10-02T00:00:00.000Z',
+          };
+        },
+      } as unknown as ReferendumV2Executor;
+
+      const adapter = new MidnightCivicActionAdapter({
+        providers,
+        referenda: [
+          {
+            referendumId: 'simulated',
+            contractAddress: referendumAddress,
+            config: {
+              registry: {
+                registryContractAddress: registryAddress,
+                registryContractBinding: deriveRegistryContractBinding(registryAddress),
+                registryId: bytes(6),
+                issuerId: item.registry.claims.issuerId,
+                credentialEpoch: item.registry.claims.epoch,
+                frozenRoot: item.root,
+              },
+              eventId: item.eventId,
+              organizerKey: roleKey('cico:referendum-v2:organizer:', ORGANIZER_SECRET),
+              rootPublisherKey: roleKey('cico:ref-v2:root-publisher:', ROOT_PUBLISHER_SECRET),
+              countryPolicy: item.registry.claims.country,
+              countryPolicyEnabled: true,
+              minimumAssurance: 2n,
+              requireAdult: true,
+              validityReference: 1_900_000_000n,
+              ...item.schedule,
+              network: 'preview',
+            },
+          },
+        ],
+        credential: {
+          adapterName: 'simulated-pass',
+          async beginEnrollment(): Promise<never> {
+            throw new Error('not used');
+          },
+          async getEnrollmentStatus(): Promise<never> {
+            throw new Error('not used');
+          },
+          async getCredentialSummary() {
+            return null;
+          },
+          async getActionAuthorization() {
+            return { kind: 'civic-credential' as const, handle: 'pass' };
+          },
+          async getPrivateCredentialMaterial() {
+            return {
+              voterSecret: item.registry.voterSecret,
+              holderBlind: item.registry.holderBlind,
+              holderBinding: item.registry.claims.holderBinding,
+              credentialBlind: item.registry.claims.blind,
+              credentialLeaf: item.leaf,
+              claims: {
+                issuerId: 'simulated',
+                country: isoNumericCountry('032'),
+                ageClass: '18-plus' as const,
+                assurance: 'document-nfc' as const,
+                credentialEpoch: 7,
+                validFrom: '2026-10-01T00:00:00.000Z',
+                validUntil: '2026-10-03T00:00:00.000Z',
+              },
+            };
+          },
+          async clearCredential() {},
+        },
+        registryHistory: {
+          async credentialBlockHeights(address, limit) {
+            expect(address).toBe(registryAddress);
+            expect(limit).toBeGreaterThan(0);
+            return [300, 200, 100];
+          },
+        },
+        randomBytes: () => bytes(22),
+        executorFactory: () => executor,
+      });
+
+      const receipt = await adapter.castVote({
+        referendumId: 'simulated',
+        choice: 'YES',
+        authorization: { kind: 'civic-credential', handle: 'pass' },
+      });
+      expect(receipt.transactionId).toBe('sealed');
+      // The binding check and the lookup each read the latest state; the lookup
+      // then goes back block by block and stops at the admitted one.
+      expect(asked).toEqual(['latest', 'latest', 300, 200, 100]);
+    });
+
+    it('lets the app refuse a pass added after the last admitted root, before any proof', async () => {
+      const item = setupReferendum();
+      const afterFirstPass = item.registry.context.currentQueryContext.state;
+      const late = makeClaims(130);
+      const enrolled = enroll(item.registry, late.claims);
+      const attempt = resolveAdmittedCredentialPath({
+        credentialLeaf: enrolled.leaf,
+        current: credentialTreeView(item.registry.context.currentQueryContext.state),
+        frozen: false,
+        referendum: parseReferendumV2(item.context.currentQueryContext.state),
+        earlier: async function* () {
+          yield credentialTreeView(afterFirstPass);
+        },
+      });
+      await expect(attempt).rejects.toMatchObject({ code: 'CREDENTIAL_NOT_ADMITTED' });
+    });
+
     it('separates the root-publisher and organizer roles for publish/revoke', () => {
       const item = setupReferendum();
       const late = makeClaims(100);
@@ -911,6 +1129,64 @@ describe('ReferendumV2 credential policy', () => {
       expect(() => item.contract.impureCircuits.castVote(published.context)).toThrow(
         'This voter has already voted in this referendum',
       );
+    });
+
+    // The issuer gives a document one holder and renews its pass only for that
+    // holder. These two cases are why that is enough: a renewed pass is a new
+    // leaf, but the nullifier follows the holder's secret, not the leaf.
+    function renew(item: ReturnType<typeof setupReferendum>, after: typeof item.context) {
+      const claims: Claims = {
+        ...item.registry.claims,
+        validUntil: 2_100_000_000n,
+        blind: bytes(150),
+      };
+      const renewed = enroll(item.registry, claims);
+      expect(renewed.leaf).not.toEqual(item.leaf);
+      const published = item.contract.impureCircuits.publishCredentialRoot(after, renewed.root);
+      const context: CircuitContext<ReferendumPrivateState> = {
+        ...published.context,
+        currentPrivateState: privateStateFromVoter(
+          ORGANIZER_SECRET,
+          ROOT_PUBLISHER_SECRET,
+          item.registry.voterSecret,
+          item.registry.holderBlind,
+          claims,
+          renewed.path,
+          bytes(151),
+        ),
+      };
+      return { context, contract: new ReferendumContract(referendumWitnesses()) };
+    }
+
+    it('refuses a second answer from a renewed pass of the same holder', () => {
+      const item = setupReferendum();
+      const firstVote = item.contract.impureCircuits.castVote(item.context);
+      const renewed = renew(item, firstVote.context);
+
+      expect(() => renewed.contract.impureCircuits.castVote(renewed.context)).toThrow(
+        'This voter has already voted in this referendum',
+      );
+    });
+
+    it('takes one answer from the renewed pass when the first pass gave none, and then none from the first', () => {
+      const item = setupReferendum();
+      const renewed = renew(item, item.context);
+      const vote = renewed.contract.impureCircuits.castVote(renewed.context);
+      const state = referendumLedger(vote.context.currentQueryContext.state);
+      expect(state.issuedVotes).toBe(1n);
+      expect(
+        state.spentVoteNullifiers.member(
+          deriveVoteNullifier(item.registry.voterSecret, item.eventId),
+        ),
+      ).toBe(true);
+
+      // The first pass is still in an admitted root, and still the same holder.
+      expect(() =>
+        item.contract.impureCircuits.castVote({
+          ...vote.context,
+          currentPrivateState: item.privateState,
+        }),
+      ).toThrow('This voter has already voted in this referendum');
     });
   });
 });

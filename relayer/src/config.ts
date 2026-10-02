@@ -37,6 +37,11 @@ export interface RelayerConfig {
   /** Production uses PostgreSQL; file path is for local/test adapter only. */
   v2DatabaseUrl: string;
   v2JobStorePath: string;
+  /**
+   * File that keeps the wallet's synchronized state between starts, so a
+   * restart does not replay the chain. Empty keeps nothing. It holds no key.
+   */
+  walletStatePath: string;
   v2ExplorerBaseUrl: string;
   /** Compatibility-only v1 transaction routes. Disabled unless explicitly opted in. */
   legacyApiEnabled: boolean;
@@ -128,6 +133,7 @@ export function loadConfig(): RelayerConfig {
     v2SubmitDelayMaxMs,
     v2DatabaseUrl: optional('RELAYER_V2_DATABASE_URL', ''),
     v2JobStorePath: optional('RELAYER_V2_JOB_STORE_PATH', '.state/v2-actions.json'),
+    walletStatePath: optional('RELAYER_WALLET_STATE_PATH', ''),
     v2ExplorerBaseUrl: optional('RELAYER_EXPLORER_BASE_URL', ''),
     legacyApiEnabled: boolean('RELAYER_LEGACY_API_ENABLED'),
   };

@@ -1,0 +1,183 @@
+name: midnight-rarimo-nfc
+x-hard: &hard
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+x-rarimo-env: &rarimo-env
+  DB_PASSWORD_FILE: /run/rarimo-secrets/db-password
+  RARIMO_CALLBACK_ORIGIN: https://rarimo.midnight.vote
+  RARIMO_ALLOWED_IDENTITY_TIMESTAMP: ${RARIMO_ALLOWED_IDENTITY_TIMESTAMP:?required}
+  RARIMO_EVENT_ID: ${RARIMO_EVENT_ID:?required}
+x-rarimo: &rarimo
+  image: ghcr.io/tomasgarro/midnight-rarimo-verificator:v0.3.12-cico-delete-204-22c3c68@sha256:c617e38b457d488dce937741ee3ce395b1d4d9749fcc254cadbb8eefe408aa40
+  security_opt: [no-new-privileges:true]
+  entrypoint: [/bin/sh, -ec]
+  command:
+  - |
+    umask 077
+    p=
+    IFS= read -r p <"$$DB_PASSWORD_FILE" || test -n "$$p"
+    case "$$p" in (*[!0-9a-f]*|'') exit 1;; esac
+    printf '%s\n' \
+      'log: {level: info, disable_sentry: true}' \
+      "db: {url: \"postgres://rarimo:$${p}@rarimo-postgres:5432/rarimo_verificator?sslmode=disable\"}" \
+      'listener: {addr: ":8000"}' \
+      'cop: {disabled: true, endpoint: "http://unused.invalid", upstream: "http://unused.invalid", service_name: verificator-svc, service_port: 8000}' \
+      "callback: {url: \"$${RARIMO_CALLBACK_ORIGIN}\"}" \
+      "verifier: {verification_key_path: \"/proof_keys/passport.json\", allowed_identity_timestamp: $${RARIMO_ALLOWED_IDENTITY_TIMESTAMP}, event_id: \"$${RARIMO_EVENT_ID}\", multiproof: false, preserve_user_id_case: false, erc_1155: \"0x0000000000000000000000000000000000000000\"}" \
+      'signature_verification: {pub_key: "04e29323ad356ab524fa5dbe3e490244e741b4d445ac7d2ee5f321556b3fda616bb9d2f2216fc27e099ab3019103cca872679e130629b2b90ea16cedb2b2136371"}' \
+      'poseidonsmt_root_verifier: {rpc: "https://l2.rarimo.com", contract: "0x479F84502Db545FA8d2275372E0582425204A879", request_timeout: 10s}' \
+      'auth: {enabled: false, addr: "http://unused.invalid"}' >/tmp/config.yaml
+    export KV_VIPER_FILE=/tmp/config.yaml
+    exec verificator-svc $$RARIMO_ARGS
+  environment: *rarimo-env
+  volumes: [rarimo-secrets:/run/rarimo-secrets:ro]
+  tmpfs: [/tmp]
+  networks: [rarimo-internal]
+services:
+  secret-init:
+    image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+    security_opt: [no-new-privileges:true]
+    command: [/bin/sh, -ec, "umask 077; f=/s/db-password; test -s $$f || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \\n' >$$f; test $$(wc -c <$$f) -eq 64"]
+    volumes: [rarimo-secrets:/s]
+    networks: [rarimo-internal]
+  rarimo-postgres:
+    <<: *hard
+    image: postgres:16.10-alpine@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    init: true
+    environment: {POSTGRES_DB: rarimo_verificator, POSTGRES_USER: rarimo, POSTGRES_PASSWORD_FILE: /run/rarimo-secrets/db-password}
+    volumes: [rarimo-secrets:/run/rarimo-secrets:ro, rarimo-postgres-data:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U rarimo -d rarimo_verificator"], interval: 5s, timeout: 5s, retries: 30}
+    depends_on: {secret-init: {condition: service_completed_successfully}}
+    networks: [rarimo-internal]
+  rarimo-migrate:
+    <<: *rarimo
+    environment: {<<: *rarimo-env, RARIMO_ARGS: "migrate up"}
+    depends_on: {rarimo-postgres: {condition: service_healthy}}
+  rarimo-verificator:
+    <<: *rarimo
+    restart: unless-stopped
+    environment: {<<: *rarimo-env, RARIMO_ARGS: "run service"}
+    depends_on: {rarimo-migrate: {condition: service_completed_successfully}}
+    ports: ["127.0.0.1:18080:8000"]
+    networks: [rarimo-internal, rarimo-egress]
+  cico-proof:
+    <<: *hard
+    image: midnightntwrk/proof-server:8.1.0@sha256:801bbc0340e9e96f16735f77b523f23c7459e3359842f7c79c2c53f4e994d531
+    init: true
+    command: [midnight-proof-server, -v]
+    tmpfs: [/tmp]
+    network_mode: "service:rarimo-verificator"
+  cico:
+    <<: *hard
+    image: ghcr.io/tomasgarro/midnight-civic-cico-service:0.2.3-14164ea@sha256:05d0d1d8298bd64539af304f15b29d94191150995576afc0d74c3874abe293d7
+    command: [node, cico-service/dist/server.js]
+    init: true
+    user: "1000:1000"
+    environment:
+      CICO_HOST: 0.0.0.0
+      CICO_ALLOWED_ORIGINS: https://midnight.vote
+      CICO_STATE_DIRECTORY: /var/lib/cico-passport
+      CICO_RARIMO_BASE_URL: http://127.0.0.1:8000
+      CICO_RARIMO_PROOF_PARAMS_ORIGINS: https://rarimo.midnight.vote
+      CICO_ISSUER_ID: cico-rarimo-preview
+      CICO_ISSUER_ID_HEX: 6369636f2d726172696d6f2d7072657669657700000000000000000000000000
+      CICO_CREDENTIAL_EPOCH: 1
+      CICO_REGISTRY_CONTRACT_ADDRESS: 9f8fe7c54d9907543cbcde82943c2be35ccb20f404e477ca2c29b8fc84a52132
+      CICO_REGISTRY_ID_HEX: 40c779661f66a6f55354fd638efcbc47b2eb9c08b420d76aae427c23706bcc35
+      CICO_ISSUER_WALLET_SEED: ${CICO_ISSUER_WALLET_SEED:?required}
+      CICO_ISSUER_ROLE_SECRET: ${CICO_ISSUER_ROLE_SECRET:?required}
+      CICO_ROOT_PUBLISHER_SECRET_HEX: ${CICO_ROOT_PUBLISHER_SECRET_HEX:?required}
+      CICO_ZK_CONFIG_PATH: /app/contracts/credential-registry-v1/managed/credential-registry-v1
+      CICO_REFERENDUM_ZK_CONFIG_PATH: /app/contracts/referendum-v2/managed/referendum-v2
+      CICO_PROOF_SERVER_URL: http://127.0.0.1:6300
+      CICO_REFERENDA_JSON: ${CICO_REFERENDA_JSON:?required}
+      CICO_ROOT_PUBLISH_MIN_BATCH: 1
+      CICO_ACTION_CAPABILITY_SECRET: ${CICO_ACTION_CAPABILITY_SECRET:?required}
+      CICO_ACTION_ALLOWED_NETWORKS: preview
+      CICO_ACTION_ALLOWED_CONTRACTS: ${CICO_ACTION_ALLOWED_CONTRACTS:?required}
+      CICO_ACTION_ALLOWED_CIRCUITS: castVote,revealVote
+      CICO_DOCUMENT_UNIQUENESS: ${CICO_DOCUMENT_UNIQUENESS:-}
+    volumes: [cico-state:/var/lib/cico-passport]
+    read_only: true
+    tmpfs: [/tmp]
+    healthcheck: {test: [CMD, node, -e, "fetch('http://127.0.0.1:8791/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 18, start_period: 60s}
+    depends_on: [cico-proof, rarimo-verificator]
+    network_mode: "service:rarimo-verificator"
+  edge:
+    <<: *hard
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    entrypoint: [/bin/sh, -ec]
+    command:
+    - |
+      cat >/tmp/Caddyfile <<'EOF'
+      (secure) {
+        header {
+          Strict-Transport-Security "max-age=31536000; includeSubDomains"
+          X-Content-Type-Options nosniff
+          Referrer-Policy no-referrer
+          X-Frame-Options DENY
+          X-Robots-Tag "noindex, nofollow"
+        }
+      }
+      cico.midnight.vote, cico.cardanoschool.org {
+        import secure
+        request_body {
+          max_size 64KB
+        }
+        @swiss path /Switzerland/api /Switzerland/api/*
+        handle @swiss {
+          reverse_proxy swiss-pilot:4318
+        }
+        @ok path /v1/*
+        handle @ok {
+          reverse_proxy rarimo-verificator:8791
+        }
+        respond 404
+      }
+      rarimo.midnight.vote {
+        import secure
+        request_body {
+          max_size 2MB
+        }
+        @proof {
+          method GET
+          path /integrations/verificator-svc/public/proof-params/*
+        }
+        handle @proof {
+          reverse_proxy rarimo-verificator:8000
+        }
+        @callback {
+          method POST
+          path /integrations/verificator-svc/public/callback/*
+        }
+        handle @callback {
+          reverse_proxy rarimo-verificator:8000
+        }
+        respond 404
+      }
+      relay.midnight.vote {
+        import secure
+        @relay path /keys /ready /v2/*
+        handle @relay {
+          reverse_proxy relayer:8790
+        }
+        respond 404
+      }
+      EOF
+      exec caddy run --config /tmp/Caddyfile
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes: [caddy-data:/data, caddy-config:/config]
+    read_only: true
+    tmpfs: [/tmp]
+    depends_on: [cico, rarimo-verificator]
+    networks: [rarimo-internal, rarimo-edge]
+networks:
+  rarimo-internal: {internal: true}
+  rarimo-egress: {}
+  rarimo-edge: {}
+volumes:
+  rarimo-secrets: {name: midnight-rarimo-nfc-secrets}
+  rarimo-postgres-data: {name: midnight-rarimo-nfc-postgres-data}
+  cico-state: {name: midnight-rarimo-nfc-cico-state}
+  caddy-data: {name: midnight-rarimo-nfc-caddy-data}
+  caddy-config: {name: midnight-rarimo-nfc-caddy-config}

@@ -1,11 +1,13 @@
 import type { AddressInfo } from 'node:net';
 import {
+  CivicCredentialError,
   deriveCredentialLeaf,
   type RarimoVerificationGateway,
   type RarimoVerificationRequest,
 } from 'midnight-referendum-api';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCicoHttpService } from './http.js';
+import { RarimoHttpGatewayError } from './rarimo-http-gateway.js';
 
 const servers: ReturnType<typeof createCicoHttpService>[] = [];
 
@@ -99,15 +101,20 @@ async function start(options?: {
   gateway?: RarimoVerificationGateway;
   actionCapabilityIssuer?: import('./action-capability-issuer.js').ActionCapabilityIssuer;
   enrollmentStatus?: import('./http.js').EnrollmentStatusReader;
+  serviceStatus?: () => Promise<import('./http.js').CicoServiceStatus>;
+  issuer?: import('midnight-referendum-api').CivicCredentialIssuerPort;
+  verificationEventId?: string;
 }) {
   const service = createCicoHttpService({
     gateway: options?.gateway ?? gateway(),
-    issuer: issuer(),
+    issuer: options?.issuer ?? issuer(),
+    ...(options?.verificationEventId ? { verificationEventId: options.verificationEventId } : {}),
     allowedOrigins: ['http://localhost:4173'],
     ...(options?.actionCapabilityIssuer
       ? { actionCapabilityIssuer: options.actionCapabilityIssuer }
       : {}),
     ...(options?.enrollmentStatus ? { enrollmentStatus: options.enrollmentStatus } : {}),
+    ...(options?.serviceStatus ? { serviceStatus: options.serviceStatus } : {}),
   });
   servers.push(service);
   await new Promise<void>((resolve) => service.listen(0, '127.0.0.1', resolve));
@@ -349,6 +356,184 @@ describe('CICO HTTP boundary service', () => {
           })
         ).status,
       ).toBe(403);
+    });
+  });
+
+  describe('one holder per document', () => {
+    const issuance = {
+      enrollmentId: 'enrollment-id',
+      provider: 'rarimo',
+      evidenceAuthorization: 'single-use-authorization',
+      holderBindingHex: '01'.repeat(32),
+      claims: {
+        issuerId: 'cico-rarimo-preview',
+        country: '032',
+        ageClass: '18-plus',
+        assurance: 'document-nfc',
+        credentialEpoch: 7,
+        validFrom: '2026-08-24T12:00:00.000Z',
+        validUntil: '2026-08-25T12:00:00.000Z',
+      },
+    };
+
+    it('tells the app, with a code, that the document belongs to another device', async () => {
+      const base = await start({
+        issuer: {
+          adapterName: 'refusing-issuer',
+          async issueCredential() {
+            throw new CivicCredentialError(
+              'DOCUMENT_ALREADY_ENROLLED',
+              'This document already has a pass, held by another device or browser',
+            );
+          },
+        },
+      });
+      const response = await fetch(`${base}/v1/credentials/issuances`, {
+        method: 'POST',
+        headers: browserHeaders,
+        body: JSON.stringify(issuance),
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        message: 'This document already has a pass, held by another device or browser',
+        code: 'DOCUMENT_ALREADY_ENROLLED',
+      });
+    });
+
+    it('keeps every other issuer failure opaque', async () => {
+      const base = await start({
+        issuer: {
+          adapterName: 'failing-issuer',
+          async issueCredential() {
+            throw new CivicCredentialError('CONFLICT', 'internal detail about an enrolment');
+          },
+        },
+      });
+      const response = await fetch(`${base}/v1/credentials/issuances`, {
+        method: 'POST',
+        headers: browserHeaders,
+        body: JSON.stringify(issuance),
+      });
+      expect(response.status).toBe(500);
+      expect(await response.text()).not.toContain('internal detail');
+    });
+
+    it('takes a verification only under the event of its registry', async () => {
+      const verifier = gateway();
+      const base = await start({ gateway: verifier, verificationEventId: '424242' });
+      const underAnotherEvent = await fetch(`${base}/v1/rarimo/verification-requests`, {
+        method: 'POST',
+        headers: browserHeaders,
+        body: JSON.stringify(verificationRequest),
+      });
+      expect(underAnotherEvent.status).toBe(400);
+      expect(verifier.createVerificationRequest).not.toHaveBeenCalled();
+
+      const underTheEvent = await fetch(`${base}/v1/rarimo/verification-requests`, {
+        method: 'POST',
+        headers: browserHeaders,
+        body: JSON.stringify({ ...verificationRequest, eventId: '424242' }),
+      });
+      expect(underTheEvent.status).toBe(201);
+      expect(verifier.createVerificationRequest).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('answers a verification of a shape the app never asks for with 400 and the rule', async () => {
+    const refusing = gateway();
+    vi.mocked(refusing.createVerificationRequest).mockRejectedValue(
+      new RarimoHttpGatewayError(
+        'REQUEST_NOT_ALLOWED',
+        'The verification must prove the age of majority as of today',
+        400,
+      ),
+    );
+    const base = await start({ gateway: refusing });
+    const response = await fetch(`${base}/v1/rarimo/verification-requests`, {
+      method: 'POST',
+      headers: browserHeaders,
+      body: JSON.stringify(verificationRequest),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: 'The verification must prove the age of majority as of today',
+    });
+
+    // Any other failure of the gateway stays opaque.
+    const failing = gateway();
+    vi.mocked(failing.createVerificationRequest).mockRejectedValue(
+      new RarimoHttpGatewayError('UPSTREAM_HTTP_ERROR', 'verificator said 502 at an inner address'),
+    );
+    const other = await start({ gateway: failing });
+    const opaque = await fetch(`${other}/v1/rarimo/verification-requests`, {
+      method: 'POST',
+      headers: browserHeaders,
+      body: JSON.stringify(verificationRequest),
+    });
+    expect(opaque.status).toBe(500);
+    expect(await opaque.text()).not.toContain('inner address');
+  });
+
+  describe('GET /v1/service/status', () => {
+    const status = {
+      registryContractAddress: 'ab'.repeat(32),
+      consultations: ['cd'.repeat(32)],
+      actionCapabilities: {
+        keyId: '4caad0fe941626a4',
+        networks: ['preview'],
+        contracts: ['cd'.repeat(32)],
+        circuits: ['castVote', 'revealVote'],
+      },
+      issuerWallet: { address: 'mn_addr_preview1example', dustAvailable: true },
+    };
+
+    it('says what the service is configured for, in public terms', async () => {
+      const base = await start({ serviceStatus: async () => status });
+      const response = await fetch(`${base}/v1/service/status`, {
+        headers: { origin: browserHeaders.origin },
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(status);
+    });
+
+    it('passes what it does not know through as null', async () => {
+      const base = await start({
+        serviceStatus: async () => ({
+          ...status,
+          actionCapabilities: null,
+          issuerWallet: { address: null, dustAvailable: null },
+        }),
+      });
+      const body = (await (
+        await fetch(`${base}/v1/service/status`, { headers: { origin: browserHeaders.origin } })
+      ).json()) as typeof status;
+      expect(body.actionCapabilities).toBeNull();
+      expect(body.issuerWallet).toEqual({ address: null, dustAvailable: null });
+    });
+
+    it('refuses to send a status that carries a secret by name', async () => {
+      const base = await start({
+        serviceStatus: async () =>
+          ({ ...status, issuerWallet: { ...status.issuerWallet, seed: 'never' } }) as typeof status,
+      });
+      const response = await fetch(`${base}/v1/service/status`, {
+        headers: { origin: browserHeaders.origin },
+      });
+      expect(response.status).toBe(500);
+      expect(await response.text()).not.toContain('never');
+    });
+
+    it('reports unavailable when the service offers none, and requires a trusted origin', async () => {
+      const without = await start();
+      expect(
+        (
+          await fetch(`${without}/v1/service/status`, {
+            headers: { origin: browserHeaders.origin },
+          })
+        ).status,
+      ).toBe(503);
+      const base = await start({ serviceStatus: async () => status });
+      expect((await fetch(`${base}/v1/service/status`)).status).toBe(403);
     });
   });
 });
