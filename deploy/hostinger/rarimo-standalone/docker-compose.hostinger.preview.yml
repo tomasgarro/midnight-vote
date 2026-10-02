@@ -69,7 +69,7 @@ services:
     network_mode: "service:rarimo-verificator"
   cico:
     <<: *hard
-    image: ghcr.io/tomasgarro/midnight-civic-cico-service:0.2.3-14164ea@sha256:05d0d1d8298bd64539af304f15b29d94191150995576afc0d74c3874abe293d7
+    image: ghcr.io/tomasgarro/midnight-civic-cico-service:0.2.4-31442e4@sha256:968b2e03a649c460af57e384a129728a9bd16d0c118bcedfcf4bcf3d3d4dc15f
     command: [node, cico-service/dist/server.js]
     init: true
     user: "1000:1000"
