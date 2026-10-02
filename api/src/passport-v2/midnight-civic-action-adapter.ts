@@ -8,12 +8,14 @@ import {
 } from './crypto.js';
 import {
   assertCanonicalReferendumBinding,
+  type CredentialTreeView,
+  credentialTreeView,
   findBallotPath,
-  findCredentialPath,
   isBallotRevealed,
   parseCredentialRegistryV1,
   parseReferendumV2,
   type ReferendumV2PrivateState,
+  resolveAdmittedCredentialPath,
 } from './midnight-v2.js';
 import {
   createReferendumV2Executor,
@@ -30,6 +32,7 @@ import type {
   CivicCredentialPrivateMaterial,
   CivicCredentialPrivateStatePort,
 } from './ports.js';
+import type { CredentialRegistryHistoryPort } from './registry-history.js';
 import type {
   CanonicalReceipt,
   CastVoteRequest,
@@ -98,7 +101,19 @@ export interface MidnightCivicActionAdapterOptions {
    * as unavailable.
    */
   readonly ballotOpenings?: BallotOpeningVaultPort;
+  /**
+   * Where the registry gained each pass. With it, a pass is proven against the
+   * newest root the consultation admitted that already held it, so a person is
+   * not held up by passes issued after theirs. Without it, a pass can be
+   * proven only while the registry's current root is admitted.
+   */
+  readonly registryHistory?: CredentialRegistryHistoryPort;
+  /** Seconds since the epoch; only chooses the wording of a refusal. */
+  readonly nowUnix?: () => number;
 }
+
+/** How many earlier passes a lookup goes back before it gives up. */
+const EARLIER_PASSES = 48;
 
 /**
  * Browser-owned v2 vote adapter. It prepares the Compact witness locally and
@@ -152,7 +167,11 @@ export class MidnightCivicActionAdapter implements CivicActionPort {
       throw new TypeError('Referendum catalog IDs must be unique');
     }
     this.randomBytes = options.randomBytes ?? secureRandomBytes;
-    const canonical = createCanonicalStateResolver(options.providers);
+    const canonical = createCanonicalStateResolver(
+      options.providers,
+      options.registryHistory,
+      options.nowUnix ?? (() => Math.floor(Date.now() / 1000)),
+    );
     this.stateResolver = options.stateResolver ?? canonical;
     this.resolveRevealContext =
       options.stateResolver?.resolveRevealContext?.bind(options.stateResolver) ??
@@ -454,7 +473,25 @@ export function buildReferendumV2VoterPrivateState(
 
 function createCanonicalStateResolver(
   providers: ReferendumV2Providers,
+  registryHistory: CredentialRegistryHistoryPort | undefined,
+  nowUnix: () => number,
 ): Required<MidnightCivicActionStateResolver> {
+  // The registry as it was after each earlier pass, newest first. One request
+  // lists the blocks; a state is fetched only when the one before it did not do.
+  async function* earlierRegistryViews(
+    history: CredentialRegistryHistoryPort,
+    registryContractAddress: string,
+  ): AsyncGenerator<CredentialTreeView> {
+    const heights = await history.credentialBlockHeights(registryContractAddress, EARLIER_PASSES);
+    for (const blockHeight of heights) {
+      const past = await providers.publicDataProvider.queryContractState(registryContractAddress, {
+        type: 'blockHeight',
+        blockHeight,
+      });
+      if (past) yield credentialTreeView(past.data);
+    }
+  }
+
   return {
     async assertCanonicalBinding(entry) {
       const registryState = await providers.publicDataProvider.queryContractState(
@@ -479,11 +516,25 @@ function createCanonicalStateResolver(
       }
     },
     async resolveCredentialPath(entry, credentialLeaf) {
-      const registryState = await providers.publicDataProvider.queryContractState(
-        entry.config.registry.registryContractAddress,
-      );
+      const registryContractAddress = entry.config.registry.registryContractAddress;
+      const registryState =
+        await providers.publicDataProvider.queryContractState(registryContractAddress);
       if (!registryState) throw new Error('Credential registry has no canonical state');
-      return findCredentialPath(registryState.data, credentialLeaf);
+      const referendumState = await providers.publicDataProvider.queryContractState(
+        entry.contractAddress,
+      );
+      if (!referendumState) throw new Error('Referendum has no canonical state');
+      const referendum = parseReferendumV2(referendumState.data);
+      return resolveAdmittedCredentialPath({
+        credentialLeaf,
+        current: credentialTreeView(registryState.data),
+        frozen: parseCredentialRegistryV1(registryState.data).frozen,
+        referendum,
+        enrollmentDeadlinePassed: BigInt(nowUnix()) >= referendum.enrollmentClosesAtUnix,
+        ...(registryHistory
+          ? { earlier: () => earlierRegistryViews(registryHistory, registryContractAddress) }
+          : {}),
+      });
     },
     async resolveRevealContext(entry, ballotCommitments) {
       const referendumState = await providers.publicDataProvider.queryContractState(

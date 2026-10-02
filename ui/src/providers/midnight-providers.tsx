@@ -73,6 +73,8 @@ const IS_UNDEPLOYED = APP_MODE === 'undeployed';
 const INDEXER_URL =
   import.meta.env.VITE_MIDNIGHT_INDEXER_URL?.trim() ||
   (APP_MODE === 'preview' ? 'https://indexer.preview.midnight.network/api/v4/graphql' : '');
+/** The public indexer this build reads from. Empty when the build has none. */
+export const PUBLIC_INDEXER_URL = INDEXER_URL;
 const INDEXER_WS_URL =
   import.meta.env.VITE_MIDNIGHT_INDEXER_WS_URL?.trim() ||
   (APP_MODE === 'preview' ? 'wss://indexer.preview.midnight.network/api/v4/graphql/ws' : '');

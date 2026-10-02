@@ -203,7 +203,8 @@ What can go wrong, and what it means:
 
 | The app says | Meaning | Do |
 | --- | --- | --- |
-| "This consultation has not admitted the latest passes yet" | The pass is in the registry, and its root is not yet published to the consultation | Wait a minute and try again. If it persists, the root publisher is not running: check `CICO_REFERENDA_JSON` and the issuer wallet's DUST |
+| "Your pass has not been admitted to this consultation yet" | The pass is in the registry, and no root that holds it is published to the consultation yet | Wait a minute and try again. If it persists, the root publisher is not running: check `CICO_REFERENDA_JSON` and the issuer wallet's DUST |
+| "Your pass was added after this consultation stopped admitting passes" | The consultation's enrolment deadline passed before this pass existed | Nothing to fix. The person can answer the other open consultations |
 | "Origin is not allowed" in the browser console | The credential service or the relayer does not know `https://midnight.vote` | The new credential manifest is not deployed |
 | The relayer is unavailable | `relay.midnight.vote/ready` is not 200 | Its wallet is still replaying, or it holds no DUST |
 | RariMe refuses the document | The passport is not supported or was registered before | Record the exact message. Try the second passport |
@@ -228,12 +229,15 @@ Before a deadline the command prints the date and ends normally.
 
 - A pass is valid for 24 hours. A person seals their answer in the same sitting
   as the passport scan. Counting later needs no pass.
-- The registry is shared by every consultation and keeps enrolling. A person's
-  proof is built against the registry's current state, so a consultation has
-  to have admitted the latest root. The credential service admits each new
-  root within about a minute. Once a consultation's own enrolment has closed,
-  later passes move the registry on, and people who have not yet sealed their
-  answer in that consultation can no longer do so. Close enrolment late.
+- The registry is shared by every consultation and keeps enrolling. The
+  credential service admits each new root to every open consultation within
+  about a minute. A person's proof is built against the newest root the
+  consultation admitted that already holds their pass, so passes issued after
+  theirs do not hold them up, and a consultation that has stopped admitting
+  passes still takes answers from everyone who enrolled in time. The app finds
+  that root by reading the registry's earlier states from the public indexer;
+  it goes back 48 passes at most. A pass added after a consultation's
+  enrolment closed cannot answer that consultation, and the app says so.
 - The app builds the proof on the person's device. On a laptop the seal took
   about two minutes. A phone is not measured yet.
 - English is stored with the deployment. The other languages of a

@@ -3,7 +3,7 @@ import type { CivicPassportSession, CredentialSummary } from 'midnight-referendu
 import {
   browserBallotOpeningVault,
   browserCivicCredentialVault,
-  isCivicCredentialError,
+  createIndexerRegistryHistory,
   MidnightCivicActionAdapter,
   RarimoCivicCredentialAdapter,
 } from 'midnight-referendum-api';
@@ -36,7 +36,7 @@ import {
   loadPassportReceipts,
   savePassportReceipt,
 } from '@/integration/receipt-store';
-import { RUNTIME_COPY } from '@/integration/runtime-copy';
+import { RUNTIME_COPY, sealRefusalMessage } from '@/integration/runtime-copy';
 import {
   browserAnswerMarkerStore,
   type CountOutcome,
@@ -53,7 +53,11 @@ import {
   watchSystemTheme,
 } from '@/integration/theme';
 import { needsHostedConsent } from '@/integration/walletless-proving';
-import { MidnightProvidersProvider, useMidnightProviders } from '@/providers/midnight-providers';
+import {
+  MidnightProvidersProvider,
+  PUBLIC_INDEXER_URL,
+  useMidnightProviders,
+} from '@/providers/midnight-providers';
 import { WalletProvider } from '@/providers/wallet-context';
 import { ActivityView } from '@/views/ActivityView';
 import {
@@ -89,6 +93,14 @@ import { VoteFlow } from '@/views/VoteFlow';
 import { VotesView } from '@/views/VotesView';
 import { BackToYou, YouView } from '@/views/YouView';
 import '@/views/dashboard.css';
+
+/**
+ * Lets a pass be proven against the newest registry root a consultation
+ * admitted that already held it. The lookup names the registry only.
+ */
+const REGISTRY_HISTORY = PUBLIC_INDEXER_URL
+  ? createIndexerRegistryHistory({ indexerUri: PUBLIC_INDEXER_URL })
+  : null;
 
 /** Re-exported so the runtime-catalog conversion keeps its existing test entry point. */
 export { toRuntimePolls };
@@ -355,6 +367,7 @@ function CivicApp() {
             ? { actionExecutionContext: referendumV2ActionContext }
             : {}),
           ...(ballotVault ? { ballotOpenings: ballotVault } : {}),
+          ...(REGISTRY_HISTORY ? { registryHistory: REGISTRY_HISTORY } : {}),
         })
       : undefined;
     return {
@@ -656,15 +669,7 @@ function CivicApp() {
 
         throw new Error(RUNTIME_COPY[locale].manifestMissing(APP_NETWORK_LABEL));
       } catch (error) {
-        setPreviewError(
-          // The one refusal a person meets right after getting a pass, so it
-          // is said in their language. It clears by itself within a minute.
-          isCivicCredentialError(error) && error.code === 'CREDENTIAL_NOT_ADMITTED'
-            ? RUNTIME_COPY[locale].passNotAdmitted
-            : error instanceof Error
-              ? error.message
-              : RUNTIME_COPY[locale].transactionFailed(APP_NETWORK_LABEL),
-        );
+        setPreviewError(sealRefusalMessage(error, locale, APP_NETWORK_LABEL));
         setFlowStage('review');
       }
       return;

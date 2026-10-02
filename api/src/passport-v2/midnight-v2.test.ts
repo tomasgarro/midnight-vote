@@ -1,4 +1,5 @@
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
+import type { MerkleTreePath } from '@midnight-ntwrk/compact-runtime';
 import { describe, expect, it } from 'vitest';
 import { Choice } from '../generated/referendum-v2/index.js';
 import { deriveRegistryContractBinding } from './crypto.js';
@@ -6,12 +7,14 @@ import {
   assertCanonicalReferendumBinding,
   assertReferendumRegistryBinding,
   type CredentialRegistryV1State,
+  type CredentialTreeView,
   choiceToGenerated,
   createCompiledCredentialRegistryV1,
   createCompiledReferendumV2,
   createFrozenCredentialRegistryReference,
   createOpenCredentialRegistryReference,
   type ReferendumV2AdmissionState,
+  resolveAdmittedCredentialPath,
 } from './midnight-v2.js';
 
 describe('Passport v2 compiled bindings', () => {
@@ -132,30 +135,10 @@ describe('Passport v2 compiled bindings', () => {
       ).not.toThrow();
     });
 
-    it('stops before a proof is built when the latest passes are not admitted yet', () => {
+    it('leaves the choice of root to the path lookup: a newer registry root is no refusal', () => {
       expect(() =>
         assertCanonicalReferendumBinding(catalogRegistry, openRegistry(120n), referendum([99n])),
-      ).toThrow('has not admitted the latest passes yet');
-    });
-
-    it('says so with a code the app can translate, and marks it as worth retrying', () => {
-      let refusal: unknown;
-      try {
-        assertCanonicalReferendumBinding(catalogRegistry, openRegistry(120n), referendum([99n]));
-      } catch (error) {
-        refusal = error;
-      }
-      expect(refusal).toMatchObject({ code: 'CREDENTIAL_NOT_ADMITTED', retryable: true });
-    });
-
-    it('treats a revoked root as not admitted', () => {
-      expect(() =>
-        assertCanonicalReferendumBinding(
-          catalogRegistry,
-          openRegistry(120n),
-          referendum([99n, 120n], [120n]),
-        ),
-      ).toThrow('has not admitted the latest passes yet');
+      ).not.toThrow();
     });
 
     it('refuses a consultation deployed against another root than the catalogue names', () => {
@@ -213,6 +196,160 @@ describe('Passport v2 compiled bindings', () => {
           { field: 99n },
         ),
       ).toThrow('frozen root must be pinned');
+    });
+  });
+
+  describe('the root a pass is proven against', () => {
+    const leaf = new Uint8Array(32).fill(7);
+    const pathAt = (root: bigint) =>
+      ({ provenAgainst: root }) as unknown as MerkleTreePath<Uint8Array>;
+    // A registry state that holds the pass, or one from before it was added.
+    const tree = (root: bigint, holdsPass = true): CredentialTreeView => ({
+      root: { field: root },
+      findPath: (candidate) => (holdsPass && candidate === leaf ? pathAt(root) : undefined),
+    });
+    const consultation = (
+      accepted: readonly bigint[],
+      options: { revoked?: readonly bigint[]; enrollmentClosed?: boolean } = {},
+    ) => ({
+      acceptedCredentialRoots: accepted.map((field) => ({ field })),
+      revokedCredentialRoots: (options.revoked ?? []).map((field) => ({ field })),
+      enrollmentClosed: options.enrollmentClosed ?? false,
+    });
+    const earlier = (...views: CredentialTreeView[]) => {
+      const read: bigint[] = [];
+      return {
+        read,
+        states: async function* () {
+          for (const view of views) {
+            read.push(view.root.field);
+            yield view;
+          }
+        },
+      };
+    };
+
+    it('uses the current root when the consultation admits it, and reads no history', async () => {
+      const history = earlier(tree(110n));
+      await expect(
+        resolveAdmittedCredentialPath({
+          credentialLeaf: leaf,
+          current: tree(120n),
+          frozen: false,
+          referendum: consultation([99n, 120n]),
+          earlier: history.states,
+        }),
+      ).resolves.toEqual(pathAt(120n));
+      expect(history.read).toEqual([]);
+    });
+
+    it('uses the newest admitted earlier root that already held the pass', async () => {
+      // Two people got a pass afterwards: 130 and 140 are not admitted yet.
+      const history = earlier(tree(140n), tree(130n), tree(120n), tree(110n));
+      await expect(
+        resolveAdmittedCredentialPath({
+          credentialLeaf: leaf,
+          current: tree(140n),
+          frozen: false,
+          referendum: consultation([99n, 110n, 120n]),
+          earlier: history.states,
+        }),
+      ).resolves.toEqual(pathAt(120n));
+      // It stops at the first root that does; 110 is never fetched.
+      expect(history.read).toEqual([140n, 130n, 120n]);
+    });
+
+    it('refuses, as worth retrying, a pass no admitted root holds yet', async () => {
+      // 110 is admitted, and the pass was only added at 120.
+      const history = earlier(tree(120n), tree(110n, false), tree(99n, false));
+      const attempt = resolveAdmittedCredentialPath({
+        credentialLeaf: leaf,
+        current: tree(120n),
+        frozen: false,
+        referendum: consultation([99n, 110n]),
+        earlier: history.states,
+      });
+      await expect(attempt).rejects.toMatchObject({
+        code: 'CREDENTIAL_NOT_ADMITTED',
+        retryable: true,
+      });
+      // The tree only grows: once an admitted root lacks the pass, older ones are not read.
+      expect(history.read).toEqual([120n, 110n]);
+    });
+
+    it('says waiting will not help once the consultation admits no more passes', async () => {
+      for (const closed of [
+        { referendum: consultation([99n], { enrollmentClosed: true }) },
+        { referendum: consultation([99n]), enrollmentDeadlinePassed: true },
+      ]) {
+        await expect(
+          resolveAdmittedCredentialPath({
+            credentialLeaf: leaf,
+            current: tree(120n),
+            frozen: false,
+            earlier: earlier(tree(99n, false)).states,
+            ...closed,
+          }),
+        ).rejects.toMatchObject({ code: 'CREDENTIAL_ADMISSION_CLOSED', retryable: false });
+      }
+    });
+
+    it('still answers a person who enrolled in time after enrolment closed', async () => {
+      await expect(
+        resolveAdmittedCredentialPath({
+          credentialLeaf: leaf,
+          current: tree(140n),
+          frozen: false,
+          referendum: consultation([99n, 120n], { enrollmentClosed: true }),
+          enrollmentDeadlinePassed: true,
+          earlier: earlier(tree(130n), tree(120n)).states,
+        }),
+      ).resolves.toEqual(pathAt(120n));
+    });
+
+    it('treats a revoked root as not admitted', async () => {
+      await expect(
+        resolveAdmittedCredentialPath({
+          credentialLeaf: leaf,
+          current: tree(120n),
+          frozen: false,
+          referendum: consultation([99n, 120n], { revoked: [120n] }),
+          earlier: earlier(tree(99n, false)).states,
+        }),
+      ).rejects.toMatchObject({ code: 'CREDENTIAL_NOT_ADMITTED' });
+    });
+
+    it('without a history, proves only against the current root', async () => {
+      await expect(
+        resolveAdmittedCredentialPath({
+          credentialLeaf: leaf,
+          current: tree(120n),
+          frozen: false,
+          referendum: consultation([99n]),
+        }),
+      ).rejects.toMatchObject({ code: 'CREDENTIAL_NOT_ADMITTED', retryable: true });
+    });
+
+    it('refuses a pass the registry does not hold, before anything else', async () => {
+      await expect(
+        resolveAdmittedCredentialPath({
+          credentialLeaf: leaf,
+          current: tree(120n, false),
+          frozen: false,
+          referendum: consultation([120n]),
+        }),
+      ).rejects.toThrow('not present in the canonical registry');
+    });
+
+    it('takes a frozen registry at its one root', async () => {
+      await expect(
+        resolveAdmittedCredentialPath({
+          credentialLeaf: leaf,
+          current: tree(99n),
+          frozen: true,
+          referendum: consultation([99n]),
+        }),
+      ).resolves.toEqual(pathAt(99n));
     });
   });
 

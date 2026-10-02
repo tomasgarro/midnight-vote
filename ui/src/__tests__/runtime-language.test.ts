@@ -6,7 +6,7 @@ import {
   type PreviewReadinessInput,
   resolvePassportV2ActionRoute,
 } from '../integration/preview';
-import { RUNTIME_COPY } from '../integration/runtime-copy';
+import { RUNTIME_COPY, sealRefusalMessage } from '../integration/runtime-copy';
 
 const LOCALES: readonly CicoLocale[] = ['es', 'en', 'fr'];
 
@@ -136,5 +136,41 @@ describe("the runtime's own words", () => {
         for (const line of said) expect(line, name).toContain('Preview');
       }
     }
+  });
+});
+
+describe('what the app says when sealing an answer is refused', () => {
+  const refusal = (code: string, message: string) => Object.assign(new Error(message), { code });
+
+  it.each([
+    ['CREDENTIAL_NOT_ADMITTED', 'passNotAdmitted'],
+    ['CREDENTIAL_ADMISSION_CLOSED', 'passTooLate'],
+  ] as const)('says %s in each of the three languages', (code, key) => {
+    const said = LOCALES.map((locale) =>
+      sealRefusalMessage(refusal(code, 'English from the adapter'), locale, 'Preview'),
+    );
+    expect(said).toEqual(LOCALES.map((locale) => RUNTIME_COPY[locale][key]));
+    expect(new Set(said).size).toBe(LOCALES.length);
+    for (const message of said) expect(message).not.toContain('English from the adapter');
+  });
+
+  it('tells a pass that will be admitted from one that came too late', () => {
+    for (const locale of LOCALES) {
+      // Only the first invites the person to try again.
+      expect(RUNTIME_COPY[locale].passNotAdmitted).toMatch(/again|de nuevo|Réessayez/u);
+      expect(RUNTIME_COPY[locale].passTooLate).not.toMatch(/again|de nuevo|Réessayez/u);
+    }
+  });
+
+  it('shows any other refusal as it arrived, and names the network when there is none', () => {
+    expect(sealRefusalMessage(new Error('The relay is unavailable'), 'fr', 'Preview')).toBe(
+      'The relay is unavailable',
+    );
+    expect(sealRefusalMessage(refusal('CONFLICT', 'Already sealed'), 'es', 'Preview')).toBe(
+      'Already sealed',
+    );
+    expect(sealRefusalMessage('not an error', 'en', 'Preview')).toBe(
+      RUNTIME_COPY.en.transactionFailed('Preview'),
+    );
   });
 });

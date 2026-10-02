@@ -183,10 +183,15 @@ export type CivicCredentialErrorCode =
   | 'CREDENTIAL_NOT_FOUND'
   | 'POLICY_NOT_SATISFIED'
   /**
-   * The pass is in the registry, and the consultation has not admitted the
-   * registry's current root yet. It passes by itself; retry shortly.
+   * The pass is in the registry, and the consultation has not admitted a root
+   * that holds it yet. It passes by itself; retry shortly.
    */
   | 'CREDENTIAL_NOT_ADMITTED'
+  /**
+   * The pass was added after the consultation stopped admitting passes. No
+   * later root will be admitted, so waiting does not help.
+   */
+  | 'CREDENTIAL_ADMISSION_CLOSED'
   | 'INVALID_CREDENTIAL_CLAIMS'
   | 'ISSUANCE_FAILED'
   | 'ADAPTER_UNAVAILABLE'

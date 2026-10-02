@@ -20,5 +20,6 @@ export type {
   RarimoVerificationStatus,
   RarimoVerifiedEvidence,
 } from './rarimo-types.js';
+export * from './registry-history.js';
 export * from './types.js';
 export { credentialRegistryV1Witnesses, referendumV2Witnesses } from './witnesses.js';

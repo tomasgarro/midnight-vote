@@ -238,6 +238,7 @@ const adapter = new api.MidnightCivicActionAdapter({
   randomBytes: (length) => Uint8Array.from(randomBytes(length)),
   actionExecutionContext: runtime.actionContext,
   ballotOpenings,
+  registryHistory: api.createIndexerRegistryHistory({ indexerUri: relayer.indexerHttpUrl }),
 });
 
 async function publicState() {
