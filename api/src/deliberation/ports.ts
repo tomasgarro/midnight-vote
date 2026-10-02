@@ -111,6 +111,8 @@ export interface PreparedQuestion {
 export type DeliberationErrorCode =
   | 'UNKNOWN_CONSULTATION'
   | 'INVALID_QUESTION'
+  /** The question asked how to answer. The assistant does not say. */
+  | 'ADVICE_DECLINED'
   | 'SIGN_IN_REQUIRED'
   | 'ALLOWANCE_SPENT'
   | 'ASSISTANT_UNAVAILABLE'

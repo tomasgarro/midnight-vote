@@ -249,16 +249,24 @@
   font-weight: 600;
 }
 
+/* What the assistant cannot say is part of the answer, so it is set at
+   reading size, not as a footnote. */
 .brief__limits {
   border-top: 1px solid var(--line);
   padding-top: var(--space-2);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
   color: var(--ink-muted);
 }
 .brief__limits-label {
   margin: 0 0 var(--space-1);
+  color: var(--ink);
   font-weight: 600;
+}
+
+.brief__short {
+  display: grid;
+  gap: var(--space-1);
 }
 .brief__limits ul {
   margin: 0;

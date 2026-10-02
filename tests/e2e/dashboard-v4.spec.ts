@@ -96,7 +96,9 @@ test('catalogue answers, follow-ups and consultation return preserve the convers
   const input = page.getByRole('textbox', { name: 'Ask about a consultation' });
   await input.fill('What are the arguments?');
   await input.press('Enter');
-  await expect(page.locator('.catalogue-chat__answer').last()).toContainText('uncertaint');
+  await expect(page.locator('.catalogue-chat__answer').last()).toContainText(
+    'What I can’t tell you',
+  );
   await page.screenshot({ path: 'outputs/dashboard-chat-mobile.png' });
   await page.getByRole('button', { name: 'Read consultation', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: 'Open verification rules' })).toBeVisible();
