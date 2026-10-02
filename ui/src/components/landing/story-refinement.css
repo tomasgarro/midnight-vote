@@ -221,21 +221,21 @@
   margin: 14px 0 18px;
   border: 1px solid #ded5c7;
   border-radius: 14px;
-  background: linear-gradient(120deg, var(--ground), var(--surface));
+  background: var(--surface);
 }
 .how-ai-preview strong {
-  font-size: 14px;
-  font-weight: 500;
-  color: #47453a;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
 }
 .how-ai-preview p {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
   margin: 5px 0;
   color: var(--ink-muted);
 }
 .how-ai-preview small {
-  font-size: 10px;
+  font-size: 13px;
   color: var(--ink-muted);
 }
 .how-ai-robot {
@@ -248,23 +248,13 @@
   gap: 4px;
   color: #6f6b5b;
 }
-.how-ai-robot svg {
-  flex-basis: 100%;
-}
-.how-ai-robot > span {
-  width: 4px;
-  height: 4px;
+/* The guide's face, the same bust as in the app. */
+.how-ai-robot img {
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: #ada99b;
-}
-.how-panel[data-active="true"] .how-ai-robot svg {
-  animation: robot-read 2s ease-in-out 2;
-}
-.how-panel[data-active="true"] .how-ai-robot > span {
-  animation: proof-calculate 1s steps(3) 4;
-}
-.how-panel[data-active="true"] .how-ai-robot > span:nth-child(3) {
-  animation-delay: 0.2s;
+  object-fit: cover;
+  background: var(--surface-sunken);
 }
 @keyframes passport-scan {
   0%,
@@ -283,11 +273,6 @@
 @keyframes proof-calculate {
   50% {
     opacity: 0.25;
-  }
-}
-@keyframes robot-read {
-  50% {
-    transform: translateY(-3px) rotate(-6deg);
   }
 }
 @media (max-width: 959px) {
@@ -343,9 +328,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .how-panel[data-active="true"] .how-passport-scan,
-  .how-panel[data-active="true"] .how-proof-compute code,
-  .how-panel[data-active="true"] .how-ai-robot svg,
-  .how-panel[data-active="true"] .how-ai-robot > span {
+  .how-panel[data-active="true"] .how-proof-compute code {
     animation: none;
   }
 }
@@ -368,5 +351,39 @@
   }
   .how-art--passport .how-art__badge {
     bottom: 3%;
+  }
+}
+
+@media (max-width: 959px) {
+  .how-art--proof .how-proof-seal {
+    width: 42%;
+    top: 24%;
+    gap: 2px;
+  }
+  .how-art--proof .how-proof-seal svg {
+    width: 38px;
+    height: 38px;
+  }
+  .how-art--proof .how-proof-seal > span {
+    margin-top: 4px;
+    font-size: 15px;
+  }
+  .how-art--proof .how-proof-seal > strong {
+    max-width: 80%;
+    font-size: 11px;
+    text-align: center;
+  }
+  .how-art--proof .how-proof-result {
+    top: 69%;
+  }
+  .how-art--proof .how-proof-result small {
+    font-size: 11px;
+  }
+}
+
+/* On a phone the vote card fills the picture, and this pill would cover its button. */
+@media (max-width: 959px) {
+  .how-art--vote .how-art__badge {
+    display: none;
   }
 }

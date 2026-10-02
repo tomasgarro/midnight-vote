@@ -69,6 +69,15 @@ export const BRIEF_COPY = {
     privacy:
       'Your question is sent without your pass and without your name. Do not write personal details in it.',
     noAdvice: 'Cleisthenes explains what was said. It does not tell you how to answer.',
+    inShort: 'In short',
+    shortVote: (date: string) => `Swiss voters decide on this object on ${date}.`,
+    shortCouncil: (yes: number, no: number, abstained: number) =>
+      `In its final vote the National Council counted ${yes} yes, ${no} no and ${abstained} ${plural(abstained, 'abstention', 'abstentions')}.`,
+    cannot: 'What Cleisthenes cannot tell you',
+    cannotAdvice: 'How to answer. That choice stays yours.',
+    cannotOutside: 'What was said outside the parliamentary record it reads.',
+    declined:
+      'Cleisthenes does not say how to answer; that choice is yours. The arguments above show what each side says, and who says it.',
     signIn:
       'Own questions are not open to everyone yet. The prepared questions above need no account.',
     spent: 'No questions are left for now. Try again later.',
@@ -144,6 +153,15 @@ export const BRIEF_COPY = {
     privacy:
       'Tu pregunta se envía sin tu pase y sin tu nombre. No escribas datos personales en ella.',
     noAdvice: 'Cleisthenes explica lo que se dijo. No te dice cómo responder.',
+    inShort: 'En pocas palabras',
+    shortVote: (date: string) => `Suiza vota este objeto el ${date}.`,
+    shortCouncil: (yes: number, no: number, abstained: number) =>
+      `En su votación final, el Consejo Nacional contó ${yes} sí, ${no} no y ${abstained} ${plural(abstained, 'abstención', 'abstenciones')}.`,
+    cannot: 'Lo que Cleisthenes no puede decirte',
+    cannotAdvice: 'Cómo responder. Esa decisión sigue siendo tuya.',
+    cannotOutside: 'Lo que se dijo fuera del registro parlamentario que lee.',
+    declined:
+      'Cleisthenes no dice cómo responder; esa decisión es tuya. Los argumentos de arriba muestran qué dice cada parte, y quién lo dice.',
     signIn:
       'Las preguntas propias todavía no están abiertas a todos. Las preguntas preparadas de arriba no necesitan cuenta.',
     spent: 'No quedan preguntas por ahora. Probá más tarde.',
@@ -220,6 +238,15 @@ export const BRIEF_COPY = {
     privacy:
       "Votre question est envoyée sans votre pass et sans votre nom. N'y écrivez pas de données personnelles.",
     noAdvice: 'Cleisthenes explique ce qui a été dit. Il ne vous dit pas comment répondre.',
+    inShort: 'En bref',
+    shortVote: (date: string) => `La Suisse vote sur cet objet le ${date}.`,
+    shortCouncil: (yes: number, no: number, abstained: number) =>
+      `Au vote final, le Conseil national a compté ${yes} oui, ${no} non et ${abstained} ${plural(abstained, 'abstention', 'abstentions')}.`,
+    cannot: 'Ce que Cleisthenes ne peut pas vous dire',
+    cannotAdvice: 'Comment répondre. Ce choix reste le vôtre.',
+    cannotOutside: 'Ce qui a été dit hors du registre parlementaire qu’il lit.',
+    declined:
+      'Cleisthenes ne dit pas comment répondre ; ce choix vous appartient. Les arguments ci-dessus montrent ce que dit chaque camp, et qui le dit.',
     signIn:
       'Les questions libres ne sont pas encore ouvertes à tous. Les questions préparées ci-dessus ne demandent aucun compte.',
     spent: "Il ne reste plus de questions pour l'instant. Réessayez plus tard.",
