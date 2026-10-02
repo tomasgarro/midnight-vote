@@ -82,10 +82,11 @@
 }
 
 /* One measure for every paragraph on the screen. */
+/* Reading text at 17px, as the reference board asks for a brief. */
 .policy__prose {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 1.55;
   color: var(--ink);
 }
 
