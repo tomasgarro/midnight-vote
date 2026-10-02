@@ -135,7 +135,7 @@ describe('the page of a deployed consultation', () => {
     expect(screen.queryByText('A pass can be added until')).toBeNull();
     // Counting is still possible until its own deadline.
     expect(screen.getByText('Your answer can be counted until')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /vote|prepare/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /vote|eligibility/i })).toBeNull();
   });
 
   it('keeps the demo page as it was for a consultation that is not deployed', () => {

@@ -99,7 +99,7 @@ All changes go in together, because each restart costs a wallet replay.
 
 | Step | Where | What |
 | --- | --- | --- |
-| 1 | hPanel → VPS → Docker Manager → `midnight-civic-relay` → Manage → environment | `RELAYER_SEED` and `RELAYER_V2_CAPABILITY_SECRET` from `relayer/.env`; `RELAYER_V2_ALLOWED_CONTRACTS` as printed. Save and restart |
+| 1 | hPanel → VPS → Docker Manager → `midnight-civic-relay` → Manage → environment | Replace the two placeholders: `RELAYER_SEED` and `RELAYER_V2_CAPABILITY_SECRET`, from `relayer/.env`. `RELAYER_V2_ALLOWED_CONTRACTS` already holds the test consultation's address; change it only when a consultation is added. Save and restart |
 | 2 | same place → `midnight-rarimo-nfc` → environment | Add `CICO_ACTION_CAPABILITY_SECRET` (the same value as the relay's capability secret), `CICO_ACTION_ALLOWED_CONTRACTS` and `CICO_REFERENDA_JSON` as printed |
 | 3 | `midnight-rarimo-nfc` → compose editor | Replace the content with `deploy/hostinger/rarimo-standalone/docker-compose.hostinger.preview.yml`. Save and deploy |
 | 4 | Wait | Both wallets replay, this first time. Expect two to three hours on the two-core server. Later restarts take minutes |

@@ -84,7 +84,7 @@ const COPY = {
     abstainBody: 'Todavía no tomaste una posición.',
     sources: 'Fuentes primarias',
     vote: 'Votá ahora',
-    prepare: 'Preparar mi credencial',
+    prepare: 'Añadir elegibilidad',
     disclosureTitle: 'Qué es y qué no es esto',
     runtimeDisclosure:
       'La identidad del contrato y sus resultados públicos se leen desde Midnight. La credencial se comprueba en privado contra la política publicada. No es un referéndum oficial ni tiene efecto legal.',
@@ -129,7 +129,7 @@ const COPY = {
     abstainBody: 'You have not taken a position yet.',
     sources: 'Primary sources',
     vote: 'Vote now',
-    prepare: 'Prepare my credential',
+    prepare: 'Add eligibility',
     disclosureTitle: 'What this is and is not',
     runtimeDisclosure:
       'Contract identity and public results are read from Midnight. The credential is checked privately against the published policy. This is not an official referendum and has no legal effect.',
@@ -174,7 +174,7 @@ const COPY = {
     abstainBody: "Vous n'avez pas encore pris position.",
     sources: 'Sources primaires',
     vote: 'Voter maintenant',
-    prepare: 'Préparer mon justificatif',
+    prepare: 'Ajouter une éligibilité',
     disclosureTitle: "Ce que ceci est, et ce que ce n'est pas",
     runtimeDisclosure:
       "L'identité du contrat et ses résultats publics sont lus depuis Midnight. Le justificatif est vérifié en privé au regard de la politique publiée. Ceci n'est pas un référendum officiel et n'a aucun effet juridique.",
