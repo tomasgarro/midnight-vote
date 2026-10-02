@@ -23,6 +23,7 @@ import {
 import { CredentialIssuerService } from './credential-issuer-service.js';
 import {
   CredentialRootPublisher,
+  type CredentialRootPublisherLogger,
   type CredentialRootPublisherReferendumTarget,
   MidnightCredentialRootPublisherReader,
 } from './credential-root-publisher.js';
@@ -87,10 +88,21 @@ export async function startCicoService(): Promise<() => Promise<void>> {
         countryMapper,
       }),
   });
-  const rootPublisher = createRootPublisher(config, runtime);
+  const rootPublisher = createRootPublisher(config, runtime, epochCoordinator);
   const server = createCicoHttpService({
     gateway,
-    issuer,
+    issuer: rootPublisher
+      ? {
+          adapterName: issuer.adapterName,
+          async issueCredential(request) {
+            const result = await issuer.issueCredential(request);
+            // The person now waits for a root that holds their pass. Start
+            // publishing it at once instead of at the next tick.
+            rootPublisher.trigger();
+            return result;
+          },
+        }
+      : issuer,
     allowedOrigins: config.allowedOrigins,
     ...(config.actionCapabilities
       ? {
@@ -144,6 +156,7 @@ function hexBytes(value: string): Uint8Array {
 function createRootPublisher(
   config: ReturnType<typeof loadCicoServiceConfig>,
   runtime: Awaited<ReturnType<typeof startMidnightIssuerRuntime>>,
+  epochCoordinator: CredentialEpochCoordinator,
 ): CredentialRootPublisher | undefined {
   if (config.referenda.length === 0) return undefined;
   if (!config.referendumZkConfigPath) {
@@ -182,6 +195,10 @@ function createRootPublisher(
       referendumProofProvider,
     ),
   );
+  const everySeconds = Math.round(config.rootPublisher.intervalMs / 1000);
+  process.stdout.write(
+    `[cico] root publisher: ${referenda.length} consultation(s), every ${everySeconds} s\n`,
+  );
   return new CredentialRootPublisher({
     registryExecutor: runtime.executor,
     registryContractAddress: config.issuerRuntime.registryContractAddress,
@@ -190,7 +207,26 @@ function createRootPublisher(
     minBatchSize: config.rootPublisher.minBatchSize,
     maxWaitMs: config.rootPublisher.maxWaitMs,
     intervalMs: config.rootPublisher.intervalMs,
+    logger: rootPublisherLogger,
+    // One wallet pays for passes and for roots: one transaction at a time.
+    walletMutation: (operation) => epochCoordinator.runWalletMutation(operation),
   });
+}
+
+/**
+ * The publisher's own words on the service log. A person waiting to answer
+ * waits on this, so a failure has to be readable there. What it names is
+ * public: contract addresses, registry roots, counts, and the network's error.
+ */
+const rootPublisherLogger: CredentialRootPublisherLogger = {
+  info: (message, details) => process.stdout.write(logLine(message, details)),
+  warn: (message, details) => process.stderr.write(logLine(message, details)),
+  error: (message, details) => process.stderr.write(logLine(message, details)),
+};
+
+function logLine(message: string, details?: Record<string, unknown>): string {
+  const text = details ? ` ${JSON.stringify(details)}` : '';
+  return `[cico] ${message}${text.length > 600 ? `${text.slice(0, 600)}…` : text}\n`;
 }
 
 function buildReferendumTarget(

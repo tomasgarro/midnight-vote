@@ -152,7 +152,29 @@ in front of servers that are not ready shows a consultation nobody can answer.
 | `curl -H "Origin: https://midnight.vote" https://cico.midnight.vote/v1/enrollment/status` | 200 with the root publisher's counters. 503 means no consultation is configured |
 | `curl https://midnight.vote/Switzerland/api/health` | 200. If not, restart `swiss-civic-pilot`: it lost the edge network |
 | The relayer's log | "wallet state restored" or a replay, then "listening". Before that: "Set RELAYER_SEED…" means a secret is missing |
-| The credential service's log | At start: `issuer wallet address, to fund with NIGHT: mn_addr_preview1…`. After the replay: `issuer wallet synchronized. DUST: <number above zero>` |
+| The credential service's log | At start: `issuer wallet address, to fund with NIGHT: mn_addr_preview1…`. After the replay: `issuer wallet synchronized. DUST: <number above zero>`, then `root publisher: <n> consultation(s), every 60 s` |
+
+### What the root publisher does, and what its log says
+
+A pass is added to the registry, which gives the registry a new root. The
+credential service then publishes that root to every consultation that still
+admits passes, and only then can the pass answer there. It starts as soon as
+the pass is issued, and looks again every minute.
+
+| Log line | Meaning |
+| --- | --- |
+| `credential-root-publisher: root published {… "published": 2, "stillOwed": 0}` | Two consultations took the root. Nothing is left to do |
+| `… publish to referendum failed, will retry {"contractAddress": …, "attempts": 1, "message": …}` | One consultation did not take the root. It is offered again in the next cycle, up to five times, without a second attestation |
+| `… gave up publishing this root to a referendum` | Five failures. The next pass brings a new root, which is offered again. Read the message: a wrong publisher secret never heals |
+| `… attestation failed, refusing to publish` | Nothing was published. Usually the wallet has no DUST. It is tried again in a minute |
+| No line at all after a restart | Every consultation already holds the current root. A restart sends no transaction |
+
+Each pass costs the wallet one transaction for the pass, one attestation, and
+one more per open consultation. They run one at a time, in one queue with the
+passes themselves. With several consultations open, a new pass is admitted to
+them one after another, not at once; a person can answer each consultation as
+soon as that one has the root. How long one such transaction takes on the
+server is not measured yet.
 
 ### If the issuer wallet holds no DUST
 
