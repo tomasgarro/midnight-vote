@@ -1,7 +1,9 @@
 import {
   ArrowRight,
+  Check,
   DotsThree,
   GlobeHemisphereWest,
+  LockSimple,
   MapPin,
   ShieldCheck,
 } from '@phosphor-icons/react';
@@ -21,7 +23,6 @@ import {
   type Poll,
   pollCountryCode,
 } from '@/views/poll-model';
-import { ResultsPanel } from '@/views/ResultsPanel';
 import { ConsultationRail } from './ConsultationRail';
 import './votes-view.css';
 import { ConsultationMedia, canUseDemoPass, pollSubject, SUBJECTS } from './discovery-presentation';
@@ -52,8 +53,10 @@ const COPY = {
     read: 'Ver consulta',
     vote: 'Participar',
     addEligibility: 'Añadir elegibilidad',
-    simulated: 'Experiencia pública simulada',
-    fromContract: 'Estado público leído desde Midnight',
+    simulated: 'Simulada',
+    fromContract: 'Leída desde Midnight',
+    answered: 'Ya respondiste en este dispositivo.',
+    seeReceipt: 'Ver tu comprobante',
     empty: 'No hay consultas publicadas en este alcance todavía.',
     passOnFile: 'Pase registrado para',
   },
@@ -81,8 +84,10 @@ const COPY = {
     read: 'View consultation',
     vote: 'Participate',
     addEligibility: 'Add eligibility',
-    simulated: 'Simulated public experience',
-    fromContract: 'Public state read from Midnight',
+    simulated: 'Simulated',
+    fromContract: 'Read from Midnight',
+    answered: 'You answered on this device.',
+    seeReceipt: 'See your receipt',
     empty: 'No consultations are published in this scope yet.',
     passOnFile: 'Pass on file for',
   },
@@ -111,8 +116,10 @@ const COPY = {
     read: 'Voir la consultation',
     vote: 'Participer',
     addEligibility: 'Ajouter une éligibilité',
-    simulated: 'Expérience publique simulée',
-    fromContract: 'État public lu depuis Midnight',
+    simulated: 'Simulée',
+    fromContract: 'Lue depuis Midnight',
+    answered: 'Vous avez répondu sur cet appareil.',
+    seeReceipt: 'Voir votre reçu',
     empty: "Aucune consultation n'est encore publiée dans ce périmètre.",
     passOnFile: 'Laissez-passer enregistré pour',
   },
@@ -124,7 +131,10 @@ const SUBJECT_FILTER_FROM = 4;
 export interface VotesViewProps {
   readonly polls: readonly Poll[];
   readonly credential: DemoCredentialSummary | null;
-  readonly publicContractAddress: string | null;
+  /** Consultations this device holds an answer or a receipt for. */
+  readonly answeredIds?: readonly string[];
+  /** Opens the person's answers, where the receipt is. */
+  readonly onOpenAnswers?: () => void;
   readonly onStartVote: (pollId: string) => void;
   readonly onOpenPolicy: (pollId: string) => void;
   readonly onOpenPassportJourney: () => void;
@@ -134,7 +144,8 @@ export interface VotesViewProps {
 export function VotesView({
   polls,
   credential,
-  publicContractAddress,
+  answeredIds = [],
+  onOpenAnswers,
   onStartVote,
   onOpenPolicy,
   onOpenPassportJourney,
@@ -313,32 +324,50 @@ export function VotesView({
                       (!isCountryPoll(poll) || isCountryPollForCountry(poll, credential.country)),
                   );
                   const isOpen = getPollAvailability(poll, now).isOpen;
+                  // Local to this device, so it is a reminder, not a record.
+                  const answered = answeredIds.includes(poll.id);
+                  // Formatted from `closesAt`, not the pre-rendered `deadline`
+                  // string, which is authored per fixture and disagreed with
+                  // the date Activity computed for the same consultation.
+                  const date = formatDate(poll.closesAt, locale) ?? poll.deadline;
                   return (
                     <li key={poll.id}>
                       <Card className="poll">
-                        <ConsultationMedia poll={displayPoll} locale={locale} />
-                        <div className="poll__meta">
-                          <span
-                            className={`poll__status ${isOpen ? 'poll__status--open' : ''}`.trim()}
-                          >
-                            {isOpen ? copy.open : copy.closed}
-                          </span>
-                          <span>
-                            {/* Formatted from `closesAt`, not the pre-rendered
-                            `deadline` string: that one is authored per fixture
-                            (French on the French one, whatever the reader
-                            chose) and it disagreed with the date Activity
-                            computed for the same consultation. */}
-                            {copy.closes} {formatDate(poll.closesAt, locale) ?? poll.deadline}
-                          </span>
+                        {/* One meta line: status as a word, the date, and
+                            where the state comes from. No filled pill: the
+                            accent belongs to the one action on the card. */}
+                        <div className="poll__head">
+                          <p className="poll__meta">
+                            <span className="poll__status">
+                              {isOpen ? null : <LockSimple size={14} aria-hidden="true" />}
+                              {isOpen ? copy.open : copy.closed}
+                            </span>
+                            <span aria-hidden="true">·</span>
+                            <span className="poll__closes">
+                              {isOpen ? `${copy.closes} ${date}` : date}
+                            </span>
+                            <span aria-hidden="true">·</span>
+                            <span>
+                              {poll.runtimeContractAddress ? copy.fromContract : copy.simulated}
+                            </span>
+                          </p>
+                          <ConsultationMedia poll={displayPoll} />
                         </div>
                         <h3 className="poll__title">{displayPoll.title}</h3>
                         <p className="poll__body">{displayPoll.description}</p>
-                        <p className="poll__note">
-                          {poll.runtimeContractAddress ? copy.fromContract : copy.simulated}
-                        </p>
+                        {answered ? (
+                          <p className="poll__answered">
+                            <Check size={16} weight="bold" aria-hidden="true" />
+                            <span>{copy.answered}</span>
+                            {onOpenAnswers ? (
+                              <button type="button" onClick={onOpenAnswers}>
+                                {copy.seeReceipt}
+                              </button>
+                            ) : null}
+                          </p>
+                        ) : null}
                         <div className="poll__actions">
-                          {isOpen ? (
+                          {isOpen && !answered ? (
                             <Button
                               size="sm"
                               disabled={
@@ -374,10 +403,6 @@ export function VotesView({
           </section>
         );
       })}
-
-      {scope.kind === 'world' ? (
-        <ResultsPanel contractAddress={publicContractAddress} locale={locale} />
-      ) : null}
 
       <Sheet
         open={scopeSheetOpen}

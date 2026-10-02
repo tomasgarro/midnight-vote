@@ -9,7 +9,6 @@ import {
   Wrench,
 } from '@phosphor-icons/react';
 import type { DemoCredentialSummary } from '@/integration/cico-passport-journey';
-import type { CicoLocale } from '@/integration/locale';
 import { type Poll, pollCountryCode } from './poll-model';
 
 export const SUBJECTS = {
@@ -62,7 +61,12 @@ export function canUseDemoPass(
       (!pollCountryCode(poll) || pollCountryCode(poll) === credential.country),
   );
 }
-export function ConsultationMedia({ poll, locale }: { poll: Poll; locale: CicoLocale }) {
+/**
+ * The subject as a small tile beside the meta line. It was a 180px tinted
+ * block in its own palette: civic topics rarely have an honest picture, and
+ * the block pushed the question and the action below the fold.
+ */
+export function ConsultationMedia({ poll }: { poll: Poll }) {
   const subject = pollSubject(poll);
   const Icon =
     poll.id === 'switzerland-bitcoin'
@@ -79,30 +83,12 @@ export function ConsultationMedia({ poll, locale }: { poll: Poll; locale: CicoLo
               economy: Scales,
             }[subject];
   return (
-    <div className={`poll-media poll-media--${subject}`}>
-      {poll.media?.video ? (
-        <video
-          controls
-          playsInline
-          preload="none"
-          poster={poll.media.image}
-          aria-label={poll.title}
-        >
-          <source src={poll.media.video} />
-          <track
-            kind="captions"
-            src={poll.media.captions}
-            srcLang={locale}
-            label={locale}
-            default
-          />
-        </video>
-      ) : poll.media?.image ? (
+    <div className={`poll-media poll-media--${subject}`} aria-hidden="true">
+      {poll.media?.image ? (
         <img src={poll.media.image} alt="" loading="lazy" />
       ) : (
-        <Icon size={78} weight="duotone" aria-hidden="true" />
+        <Icon size={26} weight="duotone" />
       )}
-      <span>{SUBJECTS[locale][subject]}</span>
     </div>
   );
 }

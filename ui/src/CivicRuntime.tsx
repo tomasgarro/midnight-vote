@@ -722,6 +722,11 @@ function CivicApp() {
     setTab('you');
     setYouSection('answers');
   };
+  // What this device answered: a receipt in demo, a sealed answer on chain.
+  const answeredIds = [
+    ...receipts.flatMap((item) => (item.pollId ? [item.pollId] : [])),
+    ...sealedAnswers.map((answer) => answer.referendumId),
+  ];
   const backToYou = <BackToYou onBack={() => setYouSection('hub')} locale={locale} />;
   const currentTabContent =
     tab === 'cleisthenes' ? (
@@ -797,7 +802,8 @@ function CivicApp() {
       <VotesView
         polls={polls}
         credential={credential}
-        publicContractAddress={runtimeContractAddress}
+        answeredIds={answeredIds}
+        onOpenAnswers={openAnswers}
         onStartVote={startVote}
         onOpenPolicy={setPolicyDetailId}
         onOpenPassportJourney={openVerification}
