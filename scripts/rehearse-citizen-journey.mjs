@@ -26,11 +26,12 @@
  * both citizen circuits, and a proof server on port 6300.
  */
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import { loadConsultations, manifestPathFor } from './consultations.mjs';
+import { catalogEntry, fileBallotVault, readPublicState } from './rehearsal-lib.mjs';
 
 globalThis.WebSocket ??= WebSocket;
 
@@ -46,7 +47,6 @@ const required = (name) => {
   if (!value) fail(`${name} is required`);
   return value;
 };
-const hex = (bytes) => Buffer.from(bytes).toString('hex');
 const bytes32 = (value, label) => {
   if (!/^[0-9a-f]{64}$/iu.test(value)) fail(`${label} must be 32 bytes of hexadecimal`);
   return Uint8Array.from(Buffer.from(value, 'hex'));
@@ -87,38 +87,7 @@ if (relayer.v2CapabilitySecret.length < 32) fail('RELAYER_V2_CAPABILITY_SECRET i
 const relayUrl = `http://${relayer.host}:${relayer.port}`;
 
 // The same entry the app builds from its configuration.
-const registryContractAddress = manifest.registry.contractAddress;
-const entry = {
-  referendumId: deployed.referendumId,
-  contractAddress: deployed.contractAddress,
-  config: {
-    registry: {
-      registryContractAddress,
-      registryContractBinding: api.deriveRegistryContractBinding(registryContractAddress),
-      registryId: bytes32(manifest.registry.registryIdHex, 'registry id'),
-      issuerId: bytes32(manifest.registry.issuerIdHex, 'issuer id'),
-      credentialEpoch: BigInt(manifest.registry.credentialEpoch),
-      // An open registry: the consultation is pinned to the root it started from.
-      frozenRoot: { field: BigInt(deployed.initialRootField) },
-    },
-    eventId: bytes32(deployed.eventIdHex, 'event id'),
-    organizerKey: bytes32(deployed.organizerKeyHex, 'organizer key'),
-    rootPublisherKey: bytes32(deployed.rootPublisherKeyHex, 'root publisher key'),
-    opensAtUnix: BigInt(deployed.opensAtUnix),
-    enrollmentClosesAtUnix: BigInt(deployed.enrollmentClosesAtUnix),
-    closesAtUnix: BigInt(deployed.closesAtUnix),
-    revealClosesAtUnix: BigInt(deployed.revealClosesAtUnix),
-    countryPolicy: deployed.countryPolicy
-      ? api.padBytes32(deployed.countryPolicy)
-      : new Uint8Array(32),
-    countryPolicyEnabled: deployed.countryPolicy !== null,
-    minimumAssurance: BigInt(deployed.minimumAssurance),
-    requireAdult: deployed.requireAdult,
-    validityReference: BigInt(deployed.validityReference),
-    network: 'preview',
-    explorerBaseUrl: 'https://explorer.preview.midnight.network/tx',
-  },
-};
+const entry = catalogEntry(api, manifest);
 
 // The operator's fixture pass. Its private material is read from the
 // environment and is never written anywhere by this script.
@@ -155,43 +124,7 @@ const credential = {
 const device = process.env.REHEARSAL_DEVICE?.trim() ?? '';
 if (device && !/^[a-z0-9-]+$/u.test(device)) fail('REHEARSAL_DEVICE is letters, digits and dashes');
 const vaultPath = resolve(ROOT, `.state/rehearsal-vault.${slug}${device ? `.${device}` : ''}.json`);
-const readVault = () =>
-  existsSync(vaultPath)
-    ? JSON.parse(readFileSync(vaultPath, 'utf8')).map((opening) => ({
-        ...opening,
-        voteSalt: Uint8Array.from(Buffer.from(opening.voteSalt, 'hex')),
-        ballotCommitment: Uint8Array.from(Buffer.from(opening.ballotCommitment, 'hex')),
-      }))
-    : [];
-const writeVault = (openings) => {
-  mkdirSync(dirname(vaultPath), { recursive: true });
-  const temporary = `${vaultPath}.${process.pid}.tmp`;
-  writeFileSync(
-    temporary,
-    JSON.stringify(
-      openings.map((opening) => ({
-        ...opening,
-        voteSalt: hex(opening.voteSalt),
-        ballotCommitment: hex(opening.ballotCommitment),
-      })),
-    ),
-    { encoding: 'utf8', mode: 0o600 },
-  );
-  renameSync(temporary, vaultPath);
-};
-const ballotOpenings = {
-  list: async (referendumId) =>
-    readVault().filter((opening) => opening.referendumId === referendumId),
-  save: async (opening) => {
-    const commitment = hex(opening.ballotCommitment);
-    writeVault([
-      ...readVault().filter((held) => hex(held.ballotCommitment) !== commitment),
-      opening,
-    ]);
-  },
-  clear: async (referendumId) =>
-    writeVault(readVault().filter((opening) => opening.referendumId !== referendumId)),
-};
+const ballotOpenings = fileBallotVault(vaultPath);
 
 // Signs what the credential service signs in production, with the operator's
 // secret, for this consultation's contract and the two citizen circuits only.
@@ -244,20 +177,8 @@ const adapter = new api.MidnightCivicActionAdapter({
   registryHistory: api.createIndexerRegistryHistory({ indexerUri: relayer.indexerHttpUrl }),
 });
 
-async function publicState() {
-  const canonical = await runtime.providers.publicDataProvider.queryContractState(
-    deployed.contractAddress,
-  );
-  if (!canonical) fail('The consultation has no state on the indexer');
-  const state = api.parseReferendumV2(canonical.data);
-  return {
-    phase: state.phase,
-    closed: state.closed,
-    sealedAnswers: state.issuedVotes.toString(),
-    tally: Object.fromEntries([...state.tally].map(([key, value]) => [key, value.toString()])),
-    acceptedRoots: state.acceptedCredentialRoots.length,
-  };
-}
+const publicState = () =>
+  readPublicState(api, runtime.providers.publicDataProvider, deployed.contractAddress);
 
 const started = Date.now();
 const seconds = () => `${Math.round((Date.now() - started) / 1000)} s`;

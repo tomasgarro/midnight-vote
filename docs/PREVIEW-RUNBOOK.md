@@ -309,13 +309,37 @@ The schedule is enforced on chain. The contract changes phase only when asked.
 
 Before a deadline the command prints the date and ends normally.
 
+## Rehearse without a passport
+
+Three tools find what breaks before a person stands there with a passport.
+None of them makes a claim about a person: what each leaves on chain is named
+as a rehearsal in `docs/evidence/`.
+
+| Tool | What runs for real | What stands in | Where it runs |
+| --- | --- | --- | --- |
+| `npm run check:preview` | Nothing is run: it reads the services, the chain and the app | Nothing | Against the live services |
+| `node --env-file-if-exists=relayer/.env --env-file-if-exists=.env.v2.preview scripts/rehearse-citizen-journey.mjs <slug> seal\|count` | The app's action adapter, the proofs, a relayer on this machine, the transactions | A fixture pass, and a relay permission signed by the operator's secret | On a consultation whose slug starts with `rehearsal`, on the shared registry |
+| `npm run rehearse:dress -- prepare\|journey\|operate\|count` | The credential service and the relayer of this repository, configured as on the server; the app's HTTP ports, credential adapter and action adapter; the proofs; the transactions | A verifier on loopback that answers "verified" in place of the passport scan | On a registry of its own, which `prepare` deploys |
+
+The dress rehearsal is the one to run after a change to the credential
+service or the relay. It goes through what a person goes through: a
+verification is requested, the pass is issued on chain by the credential
+service, its root is published, the app waits for the admission, and the
+answer is sealed with a permission the credential service signed. Only the
+scan is missing. `prepare` writes the service's configuration and prints the
+two commands that start the services.
+
+Run on 2 October 2026 on a laptop: a pass was issued 30 seconds after the
+stand-in scan, admitted to the consultation 48 seconds later, and the answer
+was sealed 27 to 36 seconds after that.
+
 ## Known limits
 
 - A pass is valid for 24 hours. A person seals their answer in the same sitting
   as the passport scan. Counting later needs no pass.
 - The registry is shared by every consultation and keeps enrolling. The
-  credential service admits each new root to every open consultation within
-  about a minute. A person's proof is built against the newest root the
+  credential service publishes each new root to every open consultation, one
+  transaction per consultation. A person's proof is built against the newest root the
   consultation admitted that already holds their pass, so passes issued after
   theirs do not hold them up, and a consultation that has stopped admitting
   passes still takes answers from everyone who enrolled in time. The app finds

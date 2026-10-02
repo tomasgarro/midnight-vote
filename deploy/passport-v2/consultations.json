@@ -39,6 +39,34 @@
           "description": "A rehearsal by the operator, with the fixture pass. No person answered. It is not shown in the app."
         }
       }
+    },
+    "rehearsal-2": {
+      "referendumId": "rehearsal-2026-10-02-earlier-root",
+      "country": null,
+      "passesUntil": "2026-10-02T04:30:00Z",
+      "answersClose": "2026-10-02T04:42:00Z",
+      "countingUntil": "2026-10-02T04:58:00Z",
+      "text": {
+        "en": {
+          "title": "Rehearsal: an earlier pass after the registry moved on",
+          "question": "Can a pass still answer after later passes changed the registry's root?",
+          "description": "A rehearsal by the operator, with fixture passes. No person answered. It is not shown in the app."
+        }
+      }
+    },
+    "rehearsal-3": {
+      "referendumId": "rehearsal-2026-10-02-second-pass",
+      "country": null,
+      "passesUntil": "2026-10-02T04:30:00Z",
+      "answersClose": "2026-10-02T04:42:00Z",
+      "countingUntil": "2026-10-02T04:58:00Z",
+      "text": {
+        "en": {
+          "title": "Rehearsal: a second fixture pass",
+          "question": "Does a consultation deployed after a second pass admit both?",
+          "description": "A rehearsal by the operator. Deploying it added a second fixture pass to the registry. No person answered. It is not shown in the app."
+        }
+      }
     }
   }
 }

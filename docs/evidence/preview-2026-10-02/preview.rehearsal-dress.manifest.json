@@ -1,0 +1,364 @@
+{
+  "kind": "midnight-passport-v2-runtime",
+  "version": 3,
+  "status": "in-progress",
+  "network": "preview",
+  "networkId": "preview",
+  "generatedAt": "2026-10-02T05:01:08.988Z",
+  "source": {
+    "commit": "981721156fffb7a3d83d64cb4f836632f7630b73",
+    "tree": "98f1bbd6026fb39704ecaec849b25bbfa0d8215b"
+  },
+  "services": {
+    "api": {
+      "version": "0.1.0",
+      "hash": "9fe688e2009bae788b92f8ae82075858e58e9dc81ae4f48e436fabf42841397d"
+    },
+    "relayer": {
+      "version": "0.1.0",
+      "hash": "d8297a0257114836bed9968bf4f7fe489046398f5b6176fe1dbc436eca17461e"
+    },
+    "node": {
+      "version": "midnightntwrk/midnight-node:1.0.0",
+      "hash": "530d6b0a9dc18fb0f5734d1c977a2dade24a4c29c531bb90e558e9a3704c09f9"
+    },
+    "indexer": {
+      "version": "midnightntwrk/indexer-standalone:4.3.3",
+      "hash": "e22afd54ca3afb622e3a0f3440b495f8e768476c15a81f77325f80429f20ff09"
+    },
+    "proofServer": {
+      "version": "midnightntwrk/proof-server:8.1.0",
+      "hash": "6e1ffb4a816a751443762ff5e8400852a4a1e38ba764b0a0ec4cc520cddbcdce"
+    },
+    "lockfile": {
+      "version": "npm-lock",
+      "hash": "8c1f4c158aadefee119c00b2951379d1671c74aeed986c224ff92c6b7120fcad"
+    }
+  },
+  "artifacts": {
+    "compactLanguageVersion": "0.23",
+    "compactCompilerVersion": "0.31.1",
+    "compactRuntimeVersion": "0.16.0",
+    "midnightJsVersion": "4.1.1",
+    "ledgerVersion": "8.1.0",
+    "onchainRuntimeVersion": "3.0.0",
+    "registryArtifact": "credential-registry-v1",
+    "referendumArtifact": "referendum-v2",
+    "hashes": {
+      "credential-registry-v1": "5a449cf29938c1358df5c8d4740e8b2d58f6db0bff720633adf02e417278b391",
+      "referendum-v2": "b6a8110500c093aeffbf964aa6077914f25c2c41c0388da85ff4250cdde4a44d"
+    }
+  },
+  "endpoints": {
+    "nodeRpc": "wss://rpc.preview.midnight.network",
+    "indexerHttp": "https://indexer.preview.midnight.network/api/v4/graphql",
+    "indexerWs": "wss://indexer.preview.midnight.network/api/v4/graphql/ws",
+    "proofServer": "http://localhost:6300",
+    "relay": "http://127.0.0.1:8790",
+    "explorer": "https://explorer.preview.midnight.network/tx"
+  },
+  "dust": {
+    "before": null,
+    "after": null,
+    "spent": null,
+    "beforeObservedAt": null,
+    "afterObservedAt": null,
+    "valuationAt": null,
+    "accounted": false
+  },
+  "runtime": {
+    "apiUrl": "https://cico.cardanoschool.org",
+    "credentialTtlMs": 86400000,
+    "uniquenessTimestampUpperBoundUnixSeconds": "4102444800"
+  },
+  "registry": {
+    "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+    "registryContractBindingHex": "f42ce203794ec6910b8a09572b09492673a16dfdf157c416bb1cfc69749fdc87",
+    "registryIdHex": "4f0f9ae65730df2584a3d7f2ac0c8af64976b5cd1c45100dc2347cf02e89e369",
+    "issuerId": "cico-rarimo-preview",
+    "issuerIdHex": "6369636f2d726172696d6f2d7072657669657700000000000000000000000000",
+    "credentialEpoch": "1",
+    "currentRootField": "46677307036690864556770155148696307778878028411620622839526773576279366504445",
+    "frozenRootField": null,
+    "credentialCount": "3",
+    "frozen": false,
+    "enrollmentModel": "open"
+  },
+  "referenda": [
+    {
+      "referendumId": "rehearsal-dress-2026-10-02",
+      "contractAddress": "8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17",
+      "registryContractBindingHex": "f42ce203794ec6910b8a09572b09492673a16dfdf157c416bb1cfc69749fdc87",
+      "registryContractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+      "eventIdHex": "b7758964a4417133bc53f936e910ae1850829fed0d3dff8818233cf53b8547b8",
+      "organizerKeyHex": "8ddb574e4c26b36ab5878699532ea471e89286b93640146622bd03fbe380ed9f",
+      "rootPublisherKeyHex": "d732d0ce1299aa072fb6c78a894423da171ea19946cc18eea344a8500650567b",
+      "initialRootField": "23169737874574173108891543995072399521151813774706398955220029733522525023206",
+      "acceptedRoots": [
+        "23169737874574173108891543995072399521151813774706398955220029733522525023206",
+        "46677307036690864556770155148696307778878028411620622839526773576279366504445",
+        "37733279346538496236720366295478811479075168488717902622874704844451343722373"
+      ],
+      "opensAtUnix": "1790917259",
+      "enrollmentClosesAtUnix": "1790918759",
+      "closesAtUnix": "1790919359",
+      "revealClosesAtUnix": "1790920559",
+      "countryPolicy": null,
+      "minimumAssurance": "2",
+      "requireAdult": true,
+      "validityReference": "1788184431",
+      "title": "Dress rehearsal with a stand-in verifier",
+      "question": "Does the whole journey run, from a pass to a counted answer?",
+      "description": "A rehearsal by the operator on a registry of its own. No document was read and no person answered. It is not shown in the app."
+    }
+  ],
+  "transcript": {
+    "steps": [
+      {
+        "id": "registry.attest",
+        "status": "confirmed",
+        "completedAt": "2026-10-02T05:02:27.803Z",
+        "receipt": {
+          "status": "confirmed",
+          "action": "credential",
+          "network": "preview",
+          "transactionId": "001738a72651bf6c42de335bfda29dc04c4e060f38a0c87eb3a45839609e2aadba",
+          "transactionHash": "d9dcaa0107396ee2212cd47798c0c142001e27d2f75de950c9a0306d41af4935",
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "circuit": "attestCurrentRoot",
+          "blockHeight": 1116406,
+          "blockHash": "ce263ab7f0dd0d353720f3b42c327ebf5e553d0a60654fb09808c1da6133e71b",
+          "blockTimestamp": "2026-10-02T05:02:12.000Z",
+          "explorerUrl": "https://explorer.preview.midnight.network/tx/001738a72651bf6c42de335bfda29dc04c4e060f38a0c87eb3a45839609e2aadba"
+        },
+        "details": {
+          "rootField": "23169737874574173108891543995072399521151813774706398955220029733522525023206"
+        }
+      },
+      {
+        "id": "lifecycle.close",
+        "status": "confirmed",
+        "completedAt": "2026-10-02T05:38:14.775Z",
+        "receipt": {
+          "status": "confirmed",
+          "action": "vote",
+          "network": "preview",
+          "transactionId": "0022c23e6393b6b12b4442244082ddad44d78ac22a9bd6b507209e0d68604d913c",
+          "transactionHash": "a85bcf051c732711384bd154af8e0cf6dd74353802ced3aafddff2306250b2b2",
+          "contractAddress": "8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17",
+          "circuit": "closeVote",
+          "blockHeight": 1116764,
+          "blockHash": "a5c4158ef536532ae400ae3a1a417cdea40dbfb13adbbae2b754ec581b248c5e",
+          "blockTimestamp": "2026-10-02T05:38:00.000Z",
+          "explorerUrl": "https://explorer.preview.midnight.network/tx/0022c23e6393b6b12b4442244082ddad44d78ac22a9bd6b507209e0d68604d913c"
+        }
+      },
+      {
+        "id": "registry.deploy",
+        "status": "confirmed",
+        "completedAt": "2026-10-02T05:59:45.487Z",
+        "receipt": {
+          "status": "confirmed",
+          "action": "credential",
+          "network": "preview",
+          "transactionId": "005f8eab03f5923c6c0a80eac9daac73d550e9f960f06d561f47487dc68d2c7e2c",
+          "transactionHash": "978197894310f934981c95e0c0b76d477e059df968ac319f0f9d7ca0affaf68c",
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "circuit": "deploy",
+          "blockHeight": 1116397,
+          "blockHash": "5caba83125fd908ee838806f14895d73845a0875f126e5e3cbdc03a1c1f84b33",
+          "blockTimestamp": "2026-10-02T05:01:18.000Z",
+          "explorerUrl": "https://explorer.preview.midnight.network/tx/005f8eab03f5923c6c0a80eac9daac73d550e9f960f06d561f47487dc68d2c7e2c"
+        }
+      },
+      {
+        "id": "registry.issue",
+        "status": "confirmed",
+        "completedAt": "2026-10-02T05:59:45.801Z",
+        "receipt": {
+          "status": "confirmed",
+          "action": "credential",
+          "network": "preview",
+          "transactionId": "00e6050738575d69e78cd99737d01fdf6ae0ac70852ebf42e56da472a53726f66f",
+          "transactionHash": "fdaf8fc7f972ae01178743d2e7ccf29eeda36af3ac003ed8e66689d5475835c7",
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "circuit": "addCredential",
+          "blockHeight": 1116402,
+          "blockHash": "6e2efe5872f818d5ed78131d17e7b89977ee55d20a02b2bddb5867bbe60701ab",
+          "blockTimestamp": "2026-10-02T05:01:48.000Z",
+          "explorerUrl": "https://explorer.preview.midnight.network/tx/00e6050738575d69e78cd99737d01fdf6ae0ac70852ebf42e56da472a53726f66f"
+        },
+        "details": {
+          "credentialCount": "3"
+        }
+      },
+      {
+        "id": "referendum.deploy",
+        "status": "confirmed",
+        "completedAt": "2026-10-02T05:59:46.224Z",
+        "receipt": {
+          "status": "confirmed",
+          "action": "vote",
+          "network": "preview",
+          "transactionId": "001894d90b273124ee91b88ea224a89b17a7bf9af2ce4f965b049c3a6a95e37aeb",
+          "transactionHash": "d82323b2a1fc4ec909d0324264aaa0ace911f457a0fb7bb7b7c851e15393167f",
+          "contractAddress": "8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17",
+          "circuit": "deploy",
+          "blockHeight": 1116410,
+          "blockHash": "69c0381bbeb44d059bea933b20a8a29e32c78bf89b709e941c36dbe4e7e87ba8",
+          "blockTimestamp": "2026-10-02T05:02:36.000Z",
+          "explorerUrl": "https://explorer.preview.midnight.network/tx/001894d90b273124ee91b88ea224a89b17a7bf9af2ce4f965b049c3a6a95e37aeb"
+        }
+      },
+      {
+        "id": "lifecycle.finalize",
+        "status": "confirmed",
+        "completedAt": "2026-10-02T06:00:20.778Z",
+        "receipt": {
+          "status": "confirmed",
+          "action": "vote",
+          "network": "preview",
+          "transactionId": "0099ace4228e117c4baa4979cdc2392b2ddb6f855c4d52449c30fd5769da1881c0",
+          "transactionHash": "81f204be8cc2a935fe59eabdc643ba7ec13369968c36ded7241f091721a77529",
+          "contractAddress": "8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17",
+          "circuit": "finalizeVote",
+          "blockHeight": 1116985,
+          "blockHash": "eaf15fe6b1bab50b64d4c7dd92f234e0c2a18ba5258e4e05026a17b50ff725df",
+          "blockTimestamp": "2026-10-02T06:00:06.000Z",
+          "explorerUrl": "https://explorer.preview.midnight.network/tx/0099ace4228e117c4baa4979cdc2392b2ddb6f855c4d52449c30fd5769da1881c0"
+        }
+      }
+    ],
+    "observations": [
+      {
+        "stage": "registry.attest",
+        "observedAt": "2026-10-02T05:02:27.873Z",
+        "transactionId": "001738a72651bf6c42de335bfda29dc04c4e060f38a0c87eb3a45839609e2aadba",
+        "indexer": {
+          "available": true,
+          "source": "https://indexer.preview.midnight.network/api/v4/graphql"
+        },
+        "registry": {
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "currentRootField": "23169737874574173108891543995072399521151813774706398955220029733522525023206",
+          "frozenRootField": "0",
+          "credentialCount": "1",
+          "frozen": false
+        }
+      },
+      {
+        "stage": "lifecycle.close",
+        "observedAt": "2026-10-02T05:38:14.985Z",
+        "transactionId": "0022c23e6393b6b12b4442244082ddad44d78ac22a9bd6b507209e0d68604d913c",
+        "indexer": {
+          "available": true,
+          "source": "https://indexer.preview.midnight.network/api/v4/graphql"
+        },
+        "registry": {
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "currentRootField": "46677307036690864556770155148696307778878028411620622839526773576279366504445",
+          "frozenRootField": "0",
+          "credentialCount": "3",
+          "frozen": false
+        },
+        "referendum": {
+          "contractAddress": "8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17",
+          "phase": "REVEAL",
+          "closed": true,
+          "issuedVotes": "2",
+          "tally": {
+            "YES": "0",
+            "NO": "0",
+            "ABSTAIN": "0"
+          }
+        }
+      },
+      {
+        "stage": "registry.deploy",
+        "observedAt": "2026-10-02T05:59:45.715Z",
+        "transactionId": "005f8eab03f5923c6c0a80eac9daac73d550e9f960f06d561f47487dc68d2c7e2c",
+        "indexer": {
+          "available": true,
+          "source": "https://indexer.preview.midnight.network/api/v4/graphql"
+        },
+        "registry": {
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "currentRootField": "46677307036690864556770155148696307778878028411620622839526773576279366504445",
+          "frozenRootField": "0",
+          "credentialCount": "3",
+          "frozen": false
+        }
+      },
+      {
+        "stage": "registry.issue",
+        "observedAt": "2026-10-02T05:59:45.900Z",
+        "transactionId": "00e6050738575d69e78cd99737d01fdf6ae0ac70852ebf42e56da472a53726f66f",
+        "indexer": {
+          "available": true,
+          "source": "https://indexer.preview.midnight.network/api/v4/graphql"
+        },
+        "registry": {
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "currentRootField": "46677307036690864556770155148696307778878028411620622839526773576279366504445",
+          "frozenRootField": "0",
+          "credentialCount": "3",
+          "frozen": false
+        }
+      },
+      {
+        "stage": "referendum.deploy",
+        "observedAt": "2026-10-02T05:59:46.938Z",
+        "transactionId": "001894d90b273124ee91b88ea224a89b17a7bf9af2ce4f965b049c3a6a95e37aeb",
+        "indexer": {
+          "available": true,
+          "source": "https://indexer.preview.midnight.network/api/v4/graphql"
+        },
+        "registry": {
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "currentRootField": "46677307036690864556770155148696307778878028411620622839526773576279366504445",
+          "frozenRootField": "0",
+          "credentialCount": "3",
+          "frozen": false
+        },
+        "referendum": {
+          "contractAddress": "8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17",
+          "phase": "REVEAL",
+          "closed": true,
+          "issuedVotes": "2",
+          "tally": {
+            "YES": "1",
+            "NO": "1",
+            "ABSTAIN": "0"
+          }
+        }
+      },
+      {
+        "stage": "lifecycle.finalize",
+        "observedAt": "2026-10-02T06:00:21.017Z",
+        "transactionId": "0099ace4228e117c4baa4979cdc2392b2ddb6f855c4d52449c30fd5769da1881c0",
+        "indexer": {
+          "available": true,
+          "source": "https://indexer.preview.midnight.network/api/v4/graphql"
+        },
+        "registry": {
+          "contractAddress": "bbc0b63a6b44b3c617effc95272d0ae651d3854c3dca6f985aa62de46c33b387",
+          "currentRootField": "46677307036690864556770155148696307778878028411620622839526773576279366504445",
+          "frozenRootField": "0",
+          "credentialCount": "3",
+          "frozen": false
+        },
+        "referendum": {
+          "contractAddress": "8321bb113995bcb5921a3b1f7fdc59509c682497efbbfd11b0b4c38154afca17",
+          "phase": "FINALIZED",
+          "closed": true,
+          "issuedVotes": "2",
+          "tally": {
+            "YES": "1",
+            "NO": "1",
+            "ABSTAIN": "0"
+          }
+        }
+      }
+    ]
+  }
+}

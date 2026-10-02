@@ -10,10 +10,18 @@ named.
 until 9 October 2026, 16:00 UTC. No person has sealed or counted an answer on
 Preview, and none may be claimed.
 
-A separate consultation was taken from a sealed answer to a final tally the
-same night, as a rehearsal with a fixture pass:
-[REHEARSAL.md](REHEARSAL.md). It is not this consultation, and its one answer
-is not a person's.
+Rehearsals were run the same night, on other consultations. None of their
+answers is a person's, and none is in this consultation.
+
+| Document | What it rehearsed |
+| --- | --- |
+| [REHEARSAL.md](REHEARSAL.md) | One consultation from a sealed answer to a final tally, with a fixture pass |
+| [REHEARSAL-2.md](REHEARSAL-2.md) | A pass answering after later passes changed the registry's root; a pass that is too new, and one that is too late, refused before a proof. It also records the root this consultation was given afterwards |
+| [DRESS-REHEARSAL.md](DRESS-REHEARSAL.md) | The credential service and the relay end to end, on a registry of its own, with a stand-in for the passport scan |
+
+After the second rehearsal the registry this consultation uses holds two
+passes. Both are fixtures held by the operator. This consultation admits the
+root that holds both.
 
 ## Contracts
 

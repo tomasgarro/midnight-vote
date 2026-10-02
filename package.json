@@ -47,6 +47,7 @@
     "deploy:preview:consultation": "node scripts/deploy-consultation.mjs",
     "deploy:preview:test": "node scripts/deploy-consultation.mjs test",
     "check:preview": "node scripts/check-preview-services.mjs",
+    "rehearse:dress": "node --env-file-if-exists=relayer/.env scripts/rehearse-with-stand-in-verifier.mjs",
     "deploy:preview:operator-dust": "npm run build --workspace midnight-referendum-relayer && node --env-file-if-exists=relayer/.env --env-file-if-exists=.env.v2.preview scripts/register-operator-dust.mjs",
     "deploy:undeployed": "node --env-file-if-exists=relayer/.env.undeployed --env-file-if-exists=.env.v2.undeployed scripts/deploy-passport-v2.mjs",
     "deploy:v2:preview": "npm run deploy:preview",
