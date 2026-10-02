@@ -182,6 +182,11 @@ export type CivicCredentialErrorCode =
   | 'ENROLLMENT_EXPIRED'
   | 'CREDENTIAL_NOT_FOUND'
   | 'POLICY_NOT_SATISFIED'
+  /**
+   * The pass is in the registry, and the consultation has not admitted the
+   * registry's current root yet. It passes by itself; retry shortly.
+   */
+  | 'CREDENTIAL_NOT_ADMITTED'
   | 'INVALID_CREDENTIAL_CLAIMS'
   | 'ISSUANCE_FAILED'
   | 'ADAPTER_UNAVAILABLE'

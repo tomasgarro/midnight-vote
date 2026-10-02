@@ -3,6 +3,7 @@ import type { CivicPassportSession, CredentialSummary } from 'midnight-referendu
 import {
   browserBallotOpeningVault,
   browserCivicCredentialVault,
+  isCivicCredentialError,
   MidnightCivicActionAdapter,
   RarimoCivicCredentialAdapter,
 } from 'midnight-referendum-api';
@@ -656,9 +657,13 @@ function CivicApp() {
         throw new Error(RUNTIME_COPY[locale].manifestMissing(APP_NETWORK_LABEL));
       } catch (error) {
         setPreviewError(
-          error instanceof Error
-            ? error.message
-            : RUNTIME_COPY[locale].transactionFailed(APP_NETWORK_LABEL),
+          // The one refusal a person meets right after getting a pass, so it
+          // is said in their language. It clears by itself within a minute.
+          isCivicCredentialError(error) && error.code === 'CREDENTIAL_NOT_ADMITTED'
+            ? RUNTIME_COPY[locale].passNotAdmitted
+            : error instanceof Error
+              ? error.message
+              : RUNTIME_COPY[locale].transactionFailed(APP_NETWORK_LABEL),
         );
         setFlowStage('review');
       }

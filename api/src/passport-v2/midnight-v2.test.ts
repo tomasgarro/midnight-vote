@@ -138,6 +138,16 @@ describe('Passport v2 compiled bindings', () => {
       ).toThrow('has not admitted the latest passes yet');
     });
 
+    it('says so with a code the app can translate, and marks it as worth retrying', () => {
+      let refusal: unknown;
+      try {
+        assertCanonicalReferendumBinding(catalogRegistry, openRegistry(120n), referendum([99n]));
+      } catch (error) {
+        refusal = error;
+      }
+      expect(refusal).toMatchObject({ code: 'CREDENTIAL_NOT_ADMITTED', retryable: true });
+    });
+
     it('treats a revoked root as not admitted', () => {
       expect(() =>
         assertCanonicalReferendumBinding(

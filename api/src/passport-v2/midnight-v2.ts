@@ -7,7 +7,7 @@ import type {
 import * as GeneratedRegistry from '../generated/credential-registry-v1/index.js';
 import * as GeneratedReferendumV2 from '../generated/referendum-v2/index.js';
 import { deriveRegistryContractBinding } from './crypto.js';
-import type { VoteChoice } from './types.js';
+import { CivicCredentialError, type VoteChoice } from './types.js';
 import { credentialRegistryV1Witnesses, referendumV2Witnesses } from './witnesses.js';
 
 export { choiceToGenerated } from './witnesses.js';
@@ -295,8 +295,10 @@ export function assertCanonicalReferendumBinding(
     referendum.acceptedCredentialRoots.some((root) => root.field === current) &&
     !referendum.revokedCredentialRoots.some((root) => root.field === current);
   if (!admitted) {
-    throw new Error(
+    throw new CivicCredentialError(
+      'CREDENTIAL_NOT_ADMITTED',
       'This consultation has not admitted the latest passes yet. Try again in a few minutes.',
+      true,
     );
   }
 }

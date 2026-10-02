@@ -19,6 +19,8 @@ export const RUNTIME_COPY = {
     actionUnavailable: 'La acción no está disponible; la respuesta fue bloqueada.',
     authorizationMissing:
       'Tu pase no tiene una autorización vigente para responder. Verificá de nuevo tu pasaporte.',
+    passNotAdmitted:
+      'Tu pase todavía no fue admitido en esta consulta. Suele tardar un minuto. Probá de nuevo en un momento.',
     manifestMissing: (network: string) =>
       `${network} requiere un manifiesto v2 completo; el flujo anterior está deshabilitado.`,
     transactionFailed: (network: string) => `Falló la transacción en ${network}`,
@@ -38,6 +40,8 @@ export const RUNTIME_COPY = {
     actionUnavailable: 'The action is not available, so the answer was blocked.',
     authorizationMissing:
       'Your pass holds no current authorization to answer. Verify your passport again.',
+    passNotAdmitted:
+      'Your pass has not been admitted to this consultation yet. It usually takes a minute. Try again shortly.',
     manifestMissing: (network: string) =>
       `${network} needs a complete v2 manifest. The earlier flow is disabled.`,
     transactionFailed: (network: string) => `The transaction failed on ${network}`,
@@ -57,6 +61,8 @@ export const RUNTIME_COPY = {
     actionUnavailable: 'L’action n’est pas disponible ; la réponse a été bloquée.',
     authorizationMissing:
       'Votre laissez-passer n’a pas d’autorisation en cours pour répondre. Vérifiez à nouveau votre passeport.',
+    passNotAdmitted:
+      'Votre laissez-passer n’est pas encore admis dans cette consultation. Cela prend en général une minute. Réessayez dans un instant.',
     manifestMissing: (network: string) =>
       `${network} exige un manifeste v2 complet. L’ancien parcours est désactivé.`,
     transactionFailed: (network: string) => `La transaction a échoué sur ${network}`,
