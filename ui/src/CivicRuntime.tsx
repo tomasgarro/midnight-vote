@@ -73,9 +73,9 @@ import { CatalogueChat, type CatalogueMessage } from '@/views/CatalogueChat';
 import { AppHeader, BottomNav } from '@/views/Chrome';
 import { CredentialsView } from '@/views/CredentialsView';
 import { canUseCatalogueDialogue } from '@/views/catalogue-guide';
-import { canUseDemoPass } from '@/views/discovery-presentation';
 import { PolicyDetailView } from '@/views/PolicyDetailView';
 import { ProfileView } from '@/views/ProfileView';
+import { passBlock, passBlockLine } from '@/views/pass-fit';
 import {
   type Choice,
   DEFAULT_POLL,
@@ -550,18 +550,13 @@ function CivicApp() {
       setPreviewError(RUNTIME_COPY[locale].consultationClosed);
       return;
     }
-    if (
-      !CHAIN_RUNTIME_ENABLED &&
-      credential?.kind === 'synthetic-demo-credential' &&
-      !canUseDemoPass(poll, credential)
-    ) {
-      setPreviewError(
-        locale === 'es'
-          ? 'Esta consulta requiere un pase de prueba vigente, del país correspondiente y de 18 años o más.'
-          : locale === 'fr'
-            ? 'Cette consultation exige un pass de test valide, du pays concerné, et un âge de 18 ans ou plus.'
-            : 'This consultation requires a current test pass for the matching country and age 18 or older.',
-      );
+    // A simulated pass that cannot answer says exactly why, as the card did.
+    const block =
+      !CHAIN_RUNTIME_ENABLED && credential?.kind === 'synthetic-demo-credential'
+        ? passBlock(poll, credential)
+        : null;
+    if (block) {
+      setPreviewError(passBlockLine(block, locale));
       return;
     }
     setActivePollId(pollId);

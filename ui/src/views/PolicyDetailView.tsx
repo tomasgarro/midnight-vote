@@ -18,7 +18,7 @@ import { getPollAvailability } from '@/integration/poll-lifecycle';
 import { ConsultationBrief } from '@/views/ConsultationBrief';
 import { COUNTRY_POLL_COUNTRIES, localizePoll, type Poll } from '@/views/poll-model';
 import './policy-detail-view.css';
-import { canUseDemoPass } from './discovery-presentation';
+import { passBlock, passBlockLine } from './pass-fit';
 
 /**
  * The dossier: everything a person needs to decide, and the action.
@@ -169,8 +169,8 @@ export function PolicyDetailView({
   const displayPoll = localizePoll(poll, locale);
   const runtimePoll = Boolean(poll.runtimeContractAddress);
   const isOpen = getPollAvailability(poll).isOpen;
-  const demoBlocked =
-    credential?.kind === 'synthetic-demo-credential' && !canUseDemoPass(poll, credential);
+  const block =
+    credential?.kind === 'synthetic-demo-credential' ? passBlock(poll, credential) : null;
   const consultationCountry = poll.runtimeCountryCode ?? COUNTRY_POLL_COUNTRIES.get(poll.id);
   const consultationCountryName = consultationCountry
     ? getCountryName(consultationCountry, locale)
@@ -196,18 +196,10 @@ export function PolicyDetailView({
         isOpen ? (
           <Button
             block
-            disabled={demoBlocked}
+            disabled={Boolean(block)}
             onClick={() => (credential ? onStartVote(poll.id) : onOpenPassportJourney())}
           >
-            {demoBlocked
-              ? locale === 'es'
-                ? 'Requiere pase válido del país · 18+'
-                : locale === 'fr'
-                  ? 'Pass valide du pays requis · 18+'
-                  : 'Valid country pass required · 18+'
-              : credential
-                ? copy.vote
-                : copy.prepare}
+            {block ? passBlockLine(block, locale) : credential ? copy.vote : copy.prepare}
           </Button>
         ) : undefined
       }
