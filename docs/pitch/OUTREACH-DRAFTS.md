@@ -32,8 +32,15 @@ The two sentences:
 | 9 | Government | One cantonal chancellery. Geneva is the nearest; St. Gallen runs the e-collecting pilot | FR or DE | D |
 | 10 | Grants | Prototype Fund Switzerland | EN or DE | E |
 
-German versions are not written yet. Send the English one, or ask for a German
-draft.
+Drafts A and B have a German version, for the newsroom and the campaign
+platforms in German-speaking Switzerland. Have a native speaker read a German
+message once before it goes out. The demo and live sentences in German:
+
+- **Demo:** «Eine funktionierende Demo steht auf midnight.vote. Sie läuft mit
+  simulierten Nachweisen.»
+- **Live:** «Eine erste Konsultation läuft auf dem öffentlichen Testnetz von
+  Midnight: Die Teilnehmenden weisen sich mit dem Chip ihres Passes aus,
+  antworten einmal, und die Auszählung kann von allen überprüft werden.»
 
 ## A. A newsroom
 
@@ -97,6 +104,39 @@ draft.
 > Tomas Garro
 > midnight.vote
 
+**Betreff (DE):** Ein verifiziertes Stimmungsbild Ihrer Leserschaft zum 29. November
+
+> Guten Tag [Name]
+>
+> Vor jeder eidgenössischen Abstimmung veröffentlichen Redaktionen offene
+> Umfragen: Alle können antworten, beliebig oft. Ich baue eine Möglichkeit,
+> Ihrer Leserschaft dieselbe Frage so zu stellen, dass jede verifizierte
+> erwachsene Person genau einmal antwortet und Sie nie erfahren, wer
+> geantwortet hat oder wie.
+>
+> Das Projekt heisst midnight.vote. Die Person weist mit dem Chip ihres Passes
+> nach, dass sie volljährig ist, auf ihrem eigenen Telefon. Der Nachweis wird
+> auf einer öffentlichen, auf Vertraulichkeit ausgelegten Blockchain (Midnight)
+> geprüft. Ihre Redaktion erhält eine Auszählung, die alle überprüfen können,
+> und hält keinerlei Personendaten.
+>
+> Zu jeder Frage kann eine kurze Zusammenfassung stehen: was das Parlament
+> beschlossen hat und welche Argumente fielen, jeder Satz mit Verweis auf das
+> Amtliche Bulletin. Die Zusammenfassungen zu den Abstimmungen vom September
+> liegen vor; jene für November sind in Arbeit.
+>
+> [Demo- oder Live-Satz.] Es ist ein Prototyp auf einem Testnetz, keine
+> offizielle Abstimmung, und ein Pass belegt die Staatsangehörigkeit, nicht
+> den Wohnort.
+>
+> Hätten Sie diese oder nächste Woche 20 Minuten Zeit? Ich möchte verstehen,
+> ob ein verifiziertes Stimmungsbild zum 29. November für Ihre Leserschaft und
+> Ihre Redaktion interessant wäre und was es für Sie brauchbar machen würde.
+>
+> Freundliche Grüsse
+> Tomas Garro
+> midnight.vote
+
 ## B. A campaign platform or committee
 
 **Subject (EN):** Verified support signals, without holding anyone's data
@@ -120,6 +160,33 @@ draft.
 > Could we speak for 20 minutes? I would like to understand what a committee
 > would need from such a signal to trust it and use it.
 >
+> Tomas Garro
+> midnight.vote
+
+**Betreff (DE):** Verifizierte Unterstützung, ohne Personendaten zu halten
+
+> Guten Tag [Name]
+>
+> Sie sammeln Unterstützung für Initiativen und Referenden und tragen die
+> Verantwortung für die Personendaten, die dabei anfallen.
+>
+> Mit midnight.vote kann eine verifizierte erwachsene Person ihre Unterstützung
+> genau einmal ausdrücken. Sie erhalten eine Zahl, die alle überprüfen können,
+> und keine Namensliste. Die Verifikation erfolgt mit dem Chip des Passes auf
+> dem Telefon der Person; der Nachweis wird auf Midnight geprüft, einer
+> öffentlichen Blockchain, die auf Vertraulichkeit ausgelegt ist.
+>
+> Das ist keine rechtsgültige Unterschrift. Ich sehe es als frühes,
+> verifiziertes Signal vor einer Sammlung und als Vorarbeit für das
+> E-Collecting, dem das Parlament im Juni den Weg geebnet hat und das
+> St. Gallen derzeit erprobt.
+>
+> [Demo- oder Live-Satz.] Es ist ein Prototyp auf einem Testnetz.
+>
+> Könnten wir 20 Minuten sprechen? Ich möchte verstehen, was ein Komitee von
+> einem solchen Signal braucht, um ihm zu vertrauen und es zu nutzen.
+>
+> Freundliche Grüsse
 > Tomas Garro
 > midnight.vote
 
