@@ -187,8 +187,8 @@
 .finale-invitation > div:first-child {
   position: relative;
   z-index: 1;
-  padding: 80px 6vw 0;
-  margin: 0 auto -50px;
+  padding: 80px 6vw 8px;
+  margin: 0 auto;
 }
 .finale-invitation .midnight-cta {
   margin: 32px auto 0;
@@ -205,51 +205,52 @@
   margin-top: 17px;
   font-size: 14px;
 }
-/* The engraving was drawn on paper of nearly the ground colour. Multiplying
-   it onto the ground removes the last difference, so the sky has no edge. */
-.finale-landscape {
+/* The footer is the engraving: the Geneva harbour from the Quai Wilson, printed in the
+   site's own sanguine. Its paper is the page ground, and its top dissolves into the
+   invitation, so the links sit in the picture's sky rather than on a slab. */
+.finale-footer {
   position: relative;
-  aspect-ratio: 2.5;
-  min-height: 300px;
+  background: var(--ground);
+  color: var(--ink);
+  overflow: clip;
+}
+.lake-scene {
+  position: relative;
+  aspect-ratio: 3 / 2;
   background: var(--ground);
 }
-.finale-landscape img {
+.lake-scene :where(img, video) {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  position: absolute;
-  inset: 0;
   object-fit: cover;
-  object-position: center bottom;
-  mix-blend-mode: multiply;
-  mask-image: linear-gradient(transparent, #000 34%);
-}
-.finale-footer {
-  background: var(--ink);
-  color: var(--ground);
-  padding: 64px 8vw 28px;
-}
-.finale-footer .midnight-brand {
-  color: var(--surface);
-}
-.finale-footer .midnight-brand__suffix {
-  color: #c1beb3;
+  object-position: 50% 100%;
+  mask-image: linear-gradient(transparent, rgb(0 0 0 / 0.6) 10%, #000 24%);
 }
 .finale-footer__top {
+  position: absolute;
+  inset: 0 0 auto;
   display: flex;
-  justify-content: space-between;
-  gap: 50px;
-  padding-bottom: 56px;
+  gap: clamp(40px, 7vw, 110px);
+  padding: clamp(96px, 11vw, 180px) 8vw 0;
+}
+.finale-footer .midnight-brand {
+  color: var(--ink);
+}
+.finale-footer .midnight-brand__suffix {
+  color: #7f7b68;
 }
 .finale-footer__top > div > p {
-  color: #c1beb3;
+  color: var(--ink-muted);
   font-size: 16px;
   line-height: 1.6;
   margin: 22px 0 0;
 }
 .finale-footer nav {
   display: flex;
-  gap: 80px;
+  gap: clamp(40px, 5vw, 80px);
 }
 .finale-footer nav > div {
   display: flex;
@@ -257,7 +258,7 @@
   gap: 15px;
 }
 .finale-footer nav strong {
-  color: var(--surface);
+  color: var(--ink);
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 6px;
@@ -267,34 +268,13 @@
   align-items: center;
   gap: 5px;
   font-size: 14px;
-  color: var(--line);
+  color: #3e403a;
   min-height: 26px;
 }
 .finale-footer a:hover {
-  color: #ffffff;
+  color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 5px;
-}
-.finale-footer__bottom {
-  border-top: 1px solid #ffffff26;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 30px;
-  padding-top: 24px;
-  color: #bbb8ac;
-  font-size: 13px;
-  line-height: 1.65;
-}
-.finale-footer__bottom p {
-  margin: 0;
-}
-.finale-footer__bottom a {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  white-space: nowrap;
-  min-height: 44px;
 }
 .runtime-loading {
   min-height: 100svh;
@@ -368,18 +348,6 @@
   }
   .finale-invitation > div:first-child {
     padding-top: 56px;
-    margin-bottom: 0;
-  }
-  .finale-landscape {
-    min-height: 280px;
-  }
-  .finale-footer {
-    padding: 44px 6vw 24px;
-  }
-  .finale-footer__top {
-    flex-direction: column;
-    gap: 35px;
-    padding-bottom: 36px;
   }
   .finale-footer nav {
     gap: 50px;
@@ -387,10 +355,26 @@
   .finale-footer nav a {
     min-height: 34px;
   }
-  .finale-footer__bottom {
+}
+@media (max-width: 900px) {
+  .finale-footer {
+    display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
+  }
+  .finale-footer__top {
+    position: relative;
+    order: -1;
+    flex-direction: column;
+    gap: 35px;
+    padding: 48px 6vw 0;
+  }
+  .lake-scene {
+    margin-top: -48px;
+  }
+}
+@media (max-width: 700px) {
+  .lake-scene {
+    aspect-ratio: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
