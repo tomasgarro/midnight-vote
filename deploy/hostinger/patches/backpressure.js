@@ -8,8 +8,13 @@ export function createSocketBackpressure(high = 16, low = 8) {
   let paused = false;
   const update = () => {
     if (!socket) return;
-    if (!paused && pending >= high) { socket.pause(); paused = true; }
-    else if (paused && pending <= low) { socket.resume(); paused = false; }
+    if (!paused && pending >= high) {
+      socket.pause();
+      paused = true;
+    } else if (paused && pending <= low) {
+      socket.resume();
+      paused = false;
+    }
   };
   return {
     setSocket(next) {
@@ -21,10 +26,28 @@ export function createSocketBackpressure(high = 16, low = 8) {
     push(send) {
       pending++;
       update();
-      const release = () => { pending--; update(); };
-      try { return Promise.resolve(send()).then(value => { release(); return value; }, error => { release(); throw error; }); }
-      catch (error) { release(); return Promise.reject(error); }
+      const release = () => {
+        pending--;
+        update();
+      };
+      try {
+        return Promise.resolve(send()).then(
+          (value) => {
+            release();
+            return value;
+          },
+          (error) => {
+            release();
+            throw error;
+          },
+        );
+      } catch (error) {
+        release();
+        return Promise.reject(error);
+      }
     },
-    get pending() { return pending; },
+    get pending() {
+      return pending;
+    },
   };
 }
