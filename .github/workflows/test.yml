@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test wallet indexer flow control
+        run: |
+          node --test deploy/hostinger/patches/backpressure.test.mjs
+          node deploy/hostinger/patches/apply-indexer-flow-control.mjs
+          node scripts/test-indexer-backpressure.mjs
+
       - name: Validate feedback endpoint without sending email
         run: php -l ui/public/api/feedback.php && node scripts/test-feedback.mjs
 

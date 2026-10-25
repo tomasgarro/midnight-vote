@@ -13,6 +13,7 @@ COPY ui/package.json ui/package.json
 RUN npm ci --ignore-scripts
 
 COPY . .
+RUN node deploy/hostinger/patches/apply-indexer-flow-control.mjs
 ARG SERVICE_WORKSPACE
 RUN npm run build --workspace midnight-referendum-api \
  && npm run build --workspace ${SERVICE_WORKSPACE}
@@ -31,6 +32,8 @@ COPY relayer/package.json relayer/package.json
 COPY ui/package.json ui/package.json
 RUN npm ci --omit=dev --ignore-scripts \
  && rm -rf ui
+COPY deploy/hostinger/patches/ deploy/hostinger/patches/
+RUN node deploy/hostinger/patches/apply-indexer-flow-control.mjs
 
 ARG SERVICE_DIR
 COPY --from=build /src/api/dist api/dist
