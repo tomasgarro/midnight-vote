@@ -11,6 +11,9 @@ import wasm from 'vite-plugin-wasm';
 const configDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  define: { 'import.meta.env.VITE_INCLUDE_LEGACY': JSON.stringify('true') },
+  server: { proxy: { '/api/polls': process.env.POLL_API_TARGET ?? 'http://127.0.0.1:5183' } },
+  preview: { proxy: { '/api/polls': process.env.POLL_API_TARGET ?? 'http://127.0.0.1:5183' } },
   plugins: [
     react(),
     tailwindcss(),
@@ -38,6 +41,12 @@ export default defineConfig({
     plugins: () => [wasm(), topLevelAwait()],
   },
   build: {
+    rollupOptions: {
+      input: {
+        index: path.join(configDirectory, 'index.html'),
+        legacy: path.join(configDirectory, 'legacy.html'),
+      },
+    },
     target: 'esnext',
     minify: 'esbuild',
   },

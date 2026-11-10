@@ -21,7 +21,8 @@
       "!output",
       "!**/*.compact",
       "!**/tsconfig*.json",
-      "!docs/evidence"
+      "!docs/evidence",
+      "!vendor"
     ]
   },
   "formatter": {

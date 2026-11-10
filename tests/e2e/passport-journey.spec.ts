@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './demo-clock';
 import { PassportJourneyPage } from './pages/PassportJourneyPage';
 
 const showcase = process.env.CICO_E2E_MODE === 'showcase';
@@ -73,10 +73,23 @@ test('completes Passport onboarding, then creates a choice-free simulated receip
   await journey.issueSyntheticCredential();
   await expect(journey.credentialHeading).toBeVisible();
   await journey.openDashboard();
-  await expect(page.getByRole('button', { name: /^(France|Francia)$/ })).toHaveAttribute(
+  // The simulated pass defaults to France, and the France pilot closed on
+  // 4 October 2026, so at DEMO_NOW this pass can answer nothing in France.
+  // pass-fit's defaultScopeForPass then opens the list on Global, where the
+  // World question is open to it. The pass still chooses the place: France is
+  // offered but not pressed, and Global is the one chip pressed.
+  const places = page.getByRole('group', {
+    name: /^(Consultation scope|Alcance de las consultas)$/,
+  });
+  await expect(places.getByRole('button', { name: /^(France|Francia)$/ })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(places.getByRole('button', { name: /^Global$/ })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
+  await expect(places.locator('button[aria-pressed="true"]')).toHaveCount(1);
   await journey.openConsultationAndVote();
   await journey.submitSimulatedReceipt();
 

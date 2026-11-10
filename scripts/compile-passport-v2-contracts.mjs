@@ -30,7 +30,7 @@ const compiler = process.env.COMPACT_BIN?.trim() || 'compact';
 
 for (const contract of contracts) {
   mkdirSync(contract.target, { recursive: true });
-  const result = spawnSync(compiler, ['compile', contract.source, contract.target], {
+  const result = spawnSync(compiler, ['compile', '+0.31.1', contract.source, contract.target], {
     cwd: root,
     stdio: 'inherit',
     windowsHide: true,

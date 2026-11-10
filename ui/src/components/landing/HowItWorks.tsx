@@ -2,12 +2,10 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
-  GlobeHemisphereWest,
   LockKey,
   ShieldCheck,
   Sparkle,
   UserCircle,
-  WifiHigh,
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import bust from '@/assets/companion/cleisthenes-bust.webp';
@@ -19,17 +17,17 @@ const steps = [
     title: 'Make an introduction.\nKeep your privacy.',
     label: 'Connect',
     heading: 'Connect your Midnight Passport',
-    text: 'Start with your Passport. Review the information requested and choose what you consent to share.',
+    text: 'Create or connect your Midnight Passport account. Review the information requested and choose what you consent to share.',
     detail: 'Connecting your account is the introduction. Proving eligibility comes next.',
     action: 'Explore Passport',
   },
   {
     title: 'Prove you belong.\nKeep the details.',
     label: 'Prove',
-    heading: 'Prove your eligibility',
+    heading: 'Check who can participate',
     text: 'The idea is simple: prove you meet a consultation’s rules without attaching your identity to your answer.',
     detail:
-      'Passport and NFC verification are the direction. Today’s demo uses a clearly labelled simulated pass.',
+      'Midnight Passport comes first. Physical-passport NFC verification is a later credential path for polls that need it. Today’s polls are demonstrations.',
     action: 'Try the privacy lesson',
   },
   {
@@ -97,53 +95,24 @@ function ProofScene() {
   return (
     <div className="how-art how-art--proof" aria-hidden="true">
       <div className="how-art__orbit" />
-      <div className="how-physical-passport">
-        <div className="how-passport-cover">
-          <GlobeHemisphereWest size={38} weight="thin" />
-          <strong>PASSPORT</strong>
-          <WifiHigh size={25} />
+      <div className="how-eligibility-card">
+        <div className="how-eligibility-heading">
+          <ShieldCheck size={24} weight="thin" />
+          <span>THE PARTICIPATION RULE</span>
         </div>
-        <div className="how-passport-page">
-          <span>TRAVEL DOCUMENT · SPECIMEN</span>
-          <div className="how-passport-identity">
-            <UserCircle size={35} weight="thin" />
-            <div>
-              <i />
-              <i />
-              <i />
-            </div>
-          </div>
-          <div className="how-passport-mrz">
-            P&lt;XXX&lt;&lt;SAMPLE&lt;&lt;&lt;&lt;&lt;
-            <br />
-            000000&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
-          </div>
-          <div className="how-passport-scan" />
+        <h4>Only what matters.</h4>
+        <div>
+          <small>Open community poll</small>
+          <strong>Proven Midnight Passport account</strong>
         </div>
-      </div>
-      <div className="how-proof-path">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="how-proof-compute">
-        <LockKey size={16} />
-        <span>Verify → prove</span>
-        <code>0x7a · 9f · c2</code>
-      </div>
-      <div className="how-proof-seal">
-        <ShieldCheck size={60} weight="thin" />
-        <span>A ZK proof.</span>
-        <strong>Not your life story.</strong>
-      </div>
-      <div className="how-proof-result">
-        <span>
-          <Check size={17} /> Eligibility rule met
-        </span>
-        <small>Illustration · simulated in the demo</small>
+        <div>
+          <small>Regional poll</small>
+          <strong>An additional verified claim</strong>
+        </div>
+        <p>Connecting an account and proving eligibility are separate steps.</p>
       </div>
       <span className="how-art__badge">
-        <WifiHigh size={18} /> NFC passport check → ZK proof
+        <LockKey size={18} /> Physical passport NFC comes later
       </span>
     </div>
   );
@@ -180,7 +149,7 @@ function VoteScene() {
       <div className="how-receipt">
         <ShieldCheck size={28} />
         <span>
-          A receipt for you.<small>Your choice stays private.</small>
+          A receipt for you.<small>Check the poll’s visibility rules.</small>
         </span>
       </div>
       <span className="how-art__badge">
@@ -322,7 +291,14 @@ export function HowItWorks({ onStart }: { onStart: () => void }) {
                         </div>
                       </aside>
                     )}
-                    <button type="button" className="how-action" onClick={onStart}>
+                    <button
+                      type="button"
+                      className="how-action"
+                      onClick={() => {
+                        if (index === 0) window.location.hash = 'connect';
+                        else onStart();
+                      }}
+                    >
                       {step.action}
                       <ArrowUpRight className="landing-action-arrow" size={19} />
                     </button>

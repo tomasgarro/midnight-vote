@@ -127,12 +127,12 @@ export function LandingHero({ onStart }: { onStart: () => void }) {
               Keep what makes you, you.
             </p>
             <p className="midnight-hero__description">
-              Discover a more private way to participate — with zero-knowledge technology built on
-              Midnight.
+              Community decisions, with Midnight Passport at the center. Explore a poll, understand
+              its rules, and keep a way to verify your answer.
             </p>
             <div className="midnight-hero__actions">
               <button type="button" className="midnight-cta" onClick={onStart}>
-                Get started{' '}
+                Explore the demo{' '}
                 <span>
                   <ArrowUpRight className="landing-action-arrow" size={22} />
                 </span>

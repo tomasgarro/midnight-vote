@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './demo-clock';
 
 test.use({
   viewport: { width: 390, height: 844 },

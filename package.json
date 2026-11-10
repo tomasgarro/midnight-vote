@@ -7,12 +7,23 @@
     "ui",
     "api",
     "relayer",
-    "cico-service"
+    "cico-service",
+    "polls",
+    "chain",
+    "vendor/midnight-passport-connect"
   ],
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
+    "build:restart": "npm run build:restart --workspace midnight-referendum-ui",
+    "preview:restart": "npm run build:restart && node scripts/serve-restart.mjs",
+    "test:restart": "npm run test --workspace midnight-vote-polls && npm run test --workspace midnight-vote-chain-v9",
+    "compile:polls": "node scripts/compile-polls.mjs",
+    "test:e2e:restart": "playwright test --config playwright.restart.config.ts",
+    "check:restart": "npm run build --workspace midnight-vote-polls && node scripts/check-restart-readiness.mjs",
+    "verify:receipt": "node scripts/verify-receipt.mjs",
+    "polls:serve": "npm run build --workspace midnight-vote-polls && npm run start --workspace midnight-vote-polls",
     "compile": "node scripts/compile-contract.mjs",
     "compile:v2": "node scripts/compile-passport-v2-contracts.mjs",
     "test:sim": "vitest run contracts/referendum/referendum.test.ts",
