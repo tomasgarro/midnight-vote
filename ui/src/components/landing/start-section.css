@@ -1,0 +1,167 @@
+/*
+ * The page's last panel before the harbour: it scrolls up off the closing scene, so its bottom is
+ * rounded and casts a soft edge onto the picture beneath.
+ */
+.start {
+  position: relative;
+  z-index: 1;
+  padding: clamp(88px, 11vw, 150px) clamp(20px, 5vw, 72px) clamp(64px, 8vw, 104px);
+  background: var(--ground);
+  border-radius: 0 0 36px 36px;
+  box-shadow: 0 24px 48px rgba(37, 40, 35, 0.14);
+  font-family: var(--font-body);
+}
+.start * {
+  box-sizing: border-box;
+}
+.civic-landing .start h2 {
+  max-width: 1180px;
+  margin: 0 auto clamp(36px, 5vw, 56px);
+  text-align: center;
+}
+.start-doors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 2vw, 28px);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.start-door {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--surface);
+}
+.start-door__art {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+.start-door__lake {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 60%;
+}
+.start-door__bust {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  height: 92%;
+  width: auto;
+  max-width: none;
+  transform: translateX(-50%);
+  transition: transform 500ms var(--ease-out, ease);
+}
+.start-door:hover .start-door__bust {
+  transform: translateX(-50%) translateY(-6px);
+}
+.start-door--run .start-door__art {
+  display: grid;
+  place-items: center;
+  background: var(--accent-wash);
+}
+.start-rules {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 22px;
+  align-items: baseline;
+  width: min(84%, 420px);
+  padding: 24px 26px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition: transform 500ms var(--ease-out, ease);
+}
+.start-door:hover .start-rules {
+  transform: translateY(-6px);
+}
+.start-rules p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.start-rules strong {
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--ink);
+}
+.start-door__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: clamp(24px, 3vw, 36px);
+}
+.civic-landing .start-door h3 {
+  margin: 0;
+  font-size: clamp(30px, 2.6vw, 40px);
+  line-height: 1.1;
+}
+.start-door__copy p {
+  margin: 0 0 8px;
+  max-width: 30em;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+.start-door__copy .midnight-cta {
+  margin-top: auto;
+}
+.start-agents {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 1180px;
+  margin: 22px auto 0;
+  padding: 14px 22px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 17px;
+  color: var(--ink);
+  transition: border-color 200ms;
+}
+.start-agents:hover {
+  border-color: var(--line-strong);
+}
+.start-agents > span:nth-child(2) {
+  flex: 1;
+}
+.start-agents strong {
+  font-weight: 500;
+}
+.start-agents__hand {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background:
+    var(--surface-sunken) url("/art/passport/agent-hand-thumb.webp") center / cover no-repeat;
+}
+.civic-landing .start-note {
+  max-width: 1180px;
+  margin: 22px auto 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--ink-muted);
+}
+@media (max-width: 860px) {
+  .start-doors {
+    grid-template-columns: 1fr;
+  }
+  .start-agents {
+    border-radius: 24px;
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .start-door__bust,
+  .start-rules {
+    transition: none;
+  }
+}

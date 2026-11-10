@@ -1,0 +1,288 @@
+/*
+ * The chapter is the passport's black, opened. Its cards are the passport's pages.
+ * `--m` is the symbol's width while the parts play; the cards are drawn in that unit so the
+ * symbol's squares and seal land exactly on them (see PassportJourney.tsx).
+ */
+.pc {
+  --m: clamp(118px, 16.5vmin, 168px);
+  --passport: #1b1c20;
+  --page: #fbf8f1;
+  --page-soft: rgba(251, 248, 241, 0.84);
+  --page-muted: rgba(251, 248, 241, 0.68);
+  color: var(--page);
+}
+.pc-ground {
+  background-color: var(--passport);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+.pc .midnight-mark {
+  display: block;
+  overflow: visible;
+}
+.civic-landing .pc h3 {
+  margin: 0;
+  color: var(--page);
+  font-size: clamp(30px, 3vw, 46px);
+  line-height: 1.08;
+}
+.pc-part__text p {
+  margin: 18px 0 0;
+  max-width: 34em;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--page-soft);
+}
+.civic-landing .pc-part__text .pc-part__status {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(251, 248, 241, 0.18);
+  font-size: 15px;
+  color: var(--page-muted);
+}
+.pc-phrase p {
+  margin: 0;
+  font: 400 clamp(40px, 4.6vw, 72px) / 1.08 var(--font-display);
+  letter-spacing: -0.025em;
+}
+.pc-phrase__line {
+  display: block;
+}
+.pc-phrase__line + .pc-phrase__line {
+  color: rgba(251, 248, 241, 0.62);
+}
+.pc-word {
+  display: inline-block;
+  white-space: pre;
+}
+.pc-parts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pc-part__figure {
+  margin: 0;
+  width: calc(3 * var(--m));
+  max-width: 100%;
+}
+
+/* Cards: the passport's pages */
+.pc-card {
+  position: relative;
+  background: var(--page);
+  color: var(--ink);
+  border-radius: calc(var(--m) * 0.12);
+  padding: calc(var(--m) * 0.2);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+}
+.pc-card__title {
+  height: calc(var(--m) * 0.62);
+  margin: 0;
+  font: 400 19px / 1.25 var(--font-display);
+  color: var(--ink);
+}
+.pc-card dl {
+  margin: 0;
+}
+.pc-card dl > div {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: calc(var(--m) * 0.36);
+  border-top: 1px solid var(--line);
+}
+.pc-card dt {
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.pc-card dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  color: var(--ink);
+}
+.pc-redacted::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+}
+.pc-id__proof {
+  --lit: 1;
+  margin-inline: calc(var(--m) * -0.08);
+  padding-inline: calc(var(--m) * 0.08);
+  border-radius: 10px;
+  background: rgba(162, 79, 64, calc(var(--lit) * 0.1));
+  opacity: calc(0.4 + var(--lit) * 0.6);
+}
+.pc-id__proof dt {
+  color: var(--ink);
+  font-weight: 500;
+}
+.pc-id__proof dd,
+.pc-receipt__counted dd {
+  color: var(--accent);
+  font-weight: 500;
+}
+.pc-poll ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pc-poll li {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--m) * 0.14);
+  height: calc(var(--m) * 0.42);
+  border-top: 1px solid var(--line);
+}
+.pc-poll__bullet {
+  flex: none;
+  width: calc(var(--m) * 0.094);
+  height: calc(var(--m) * 0.094);
+  background: var(--accent);
+}
+.pc-poll__rule {
+  display: flex;
+  flex-direction: column;
+  font-size: 16px;
+  line-height: 1.2;
+}
+.pc-poll__rule small {
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.pc-receipt__seal {
+  position: absolute;
+  left: calc(var(--m) * (2.5 - 0.21));
+  top: calc(var(--m) * (0.52 - 0.21));
+  width: calc(var(--m) * 0.42);
+  height: calc(var(--m) * 0.42);
+  color: var(--accent);
+}
+
+/* Motion on: one stage, one symbol, the parts take turns. */
+.journey[data-motion="on"] .pc {
+  pointer-events: none;
+}
+.journey[data-motion="on"] .pc-ground {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  clip-path: inset(0px 0px 0px 0px round 0px);
+}
+.journey[data-motion="on"] .pc-mark {
+  position: absolute;
+  z-index: 3;
+  left: calc(50% - var(--m) / 2);
+  top: calc(50% - var(--m) / 2);
+  width: var(--m);
+  height: var(--m);
+  color: var(--page);
+  opacity: 0;
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-mark svg {
+  width: 100%;
+  height: 100%;
+}
+.journey[data-motion="on"] .pc-phrase {
+  position: absolute;
+  z-index: 2;
+  inset: 57% 0 auto;
+  text-align: center;
+}
+.journey[data-motion="on"] .pc-phrase__mark,
+.journey[data-motion="on"] .pc-part__mark,
+.journey[data-motion="on"] .pc-receipt__seal {
+  display: none;
+}
+.journey[data-motion="on"] .pc-word {
+  opacity: 0;
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-parts {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+.journey[data-motion="on"] .pc-part__text {
+  position: absolute;
+  inset: 0 6% 0 54%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-part__figure {
+  position: absolute;
+  left: calc(27% - 1.5 * var(--m));
+  top: calc(27% + 0.72 * var(--m));
+  opacity: 0;
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-poll__bullet {
+  background: transparent;
+  outline: 1.5px dashed var(--line-strong);
+  outline-offset: -1.5px;
+}
+.journey[data-motion="on"] .pc-poll__rule,
+.journey[data-motion="on"] .pc-receipt__counted {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Motion off: the same chapter as a page, on a rounded passport-black panel. */
+.journey[data-motion="off"] .pc {
+  --m: clamp(104px, 27vw, 150px);
+  position: relative;
+  margin: 0 clamp(10px, 2vw, 24px);
+  padding: clamp(64px, 9vw, 112px) clamp(20px, 5vw, 72px) clamp(56px, 8vw, 96px);
+  border-radius: 32px;
+  background: var(--passport);
+}
+.journey[data-motion="off"] .pc-ground,
+.journey[data-motion="off"] .pc-mark {
+  display: none;
+}
+.journey[data-motion="off"] .pc-phrase {
+  text-align: center;
+}
+.pc-phrase__mark {
+  width: calc(var(--m) * 0.9);
+  height: calc(var(--m) * 0.9);
+  margin: 0 auto 36px;
+  color: var(--page);
+}
+.journey[data-motion="off"] .pc-parts {
+  display: grid;
+  gap: clamp(64px, 9vw, 112px);
+  max-width: 1180px;
+  margin: clamp(72px, 10vw, 120px) auto 0;
+}
+.journey[data-motion="off"] .pc-part {
+  display: grid;
+  gap: 32px;
+  justify-items: center;
+}
+.journey[data-motion="off"] .pc-part__text {
+  justify-self: stretch;
+}
+.pc-part__mark {
+  width: calc(var(--m) * 0.62);
+  height: calc(var(--m) * 0.62);
+  margin: 0 auto 24px;
+  color: var(--page);
+}
+@media (min-width: 961px) {
+  .journey[data-motion="off"] .pc-part {
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+}

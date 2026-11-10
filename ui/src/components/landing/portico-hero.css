@@ -1,0 +1,340 @@
+/*
+ * One stage for the opening and the chapter. With motion on (large screens) the section is tall and
+ * the stage is pinned while GSAP plays the scenes; with motion off it is a normal page.
+ */
+.journey {
+  position: relative;
+  background: var(--ground);
+  font-family: var(--font-body);
+}
+.journey * {
+  box-sizing: border-box;
+}
+.journey-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  scroll-margin-top: 0;
+}
+.journey[data-motion="on"] {
+  height: 560svh;
+}
+.journey[data-motion="on"] .journey-stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: clip;
+}
+.journey[data-motion="on"] .ph,
+.journey[data-motion="on"] .pc {
+  position: absolute;
+  inset: 0;
+}
+
+/* The opening */
+.ph {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-height: max(640px, 100svh);
+  color: var(--ink);
+}
+.ph-sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transform-origin: 50% 62%;
+}
+.ph-sky img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 62%;
+}
+/* The sky stays a paper sky: the copy is set in ink on it. */
+.ph-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 62% 48% at 50% 22%,
+    rgba(243, 237, 223, 0.78),
+    rgba(243, 237, 223, 0) 100%
+  );
+}
+.ph-hand-wrap {
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 0;
+  height: min(52svh, 580px);
+  display: flex;
+  justify-content: center;
+}
+.ph-columns {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: 50% 55%;
+}
+/*
+ * Two cuts of the same portico: one full column at each edge of the window. Each cut keeps its
+ * column (11.5–23.5% of the picture from its side) and is moved flush to the edge.
+ */
+.ph-column {
+  position: absolute;
+  bottom: 0;
+  height: 100%;
+  width: auto;
+  max-width: none;
+  user-select: none;
+}
+.ph-column--left {
+  left: 0;
+  clip-path: inset(0 76.5% 0 11.5%);
+  transform: translateX(-11.5%);
+}
+.ph-column--right {
+  right: 0;
+  clip-path: inset(0 11.5% 0 76.5%);
+  transform: translateX(11.5%);
+}
+.ph-copy {
+  position: absolute;
+  z-index: 3;
+  inset: 0 0 auto;
+  padding: clamp(96px, 13svh, 150px) 24px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.ph-copy h1 {
+  margin: 0;
+  font: 400 min(6vw, 8.8svh, 92px) / 1.02 var(--font-display);
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.ph-copy h1 > :is(span, em) {
+  display: inline-block;
+  white-space: nowrap;
+}
+.civic-landing .ph-copy h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+.ph-lead {
+  margin: 18px 0 0;
+  font: 400 clamp(18px, 1.45vw, 22px) / 1.35 var(--font-display);
+  color: var(--ink);
+}
+.ph-actions {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  margin-top: 20px;
+}
+.midnight-cta {
+  display: inline-flex;
+  gap: 30px;
+  align-items: center;
+  border: 0;
+  background: var(--ink);
+  color: var(--ground);
+  border-radius: 999px;
+  padding: 6px 6px 6px 24px;
+  font: 500 16px var(--font-body);
+  min-height: 58px;
+  cursor: pointer;
+  transition: transform 200ms;
+}
+.midnight-cta > span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  transition: background 220ms;
+}
+.midnight-cta:hover {
+  transform: translateY(-2px);
+}
+.midnight-cta:hover > span {
+  background: var(--accent-hover);
+}
+.ph-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-size: 16px;
+  color: var(--ink);
+  transition: color 200ms;
+}
+.ph-more:hover {
+  color: var(--accent);
+}
+@media (max-height: 680px) and (min-width: 961px) {
+  .ph-lead {
+    display: none;
+  }
+}
+
+/* The hand, and the agent's hand under the cursor */
+.hero-hand {
+  --reveal-x: 0px;
+  --reveal-y: 0px;
+  --reveal-radius: 0px;
+  --hand-rx: 0deg;
+  --hand-ry: 0deg;
+  --cover-flat: 0;
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+  flex: none;
+  overflow: clip;
+  /* The source picture ends at the sleeve: fade only that edge. */
+  mask-image: linear-gradient(90deg, #000 88%, transparent);
+}
+.hero-hand__window,
+.hero-hand__pose {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hero-hand__pose {
+  transform-origin: 76% 94%;
+  transform: perspective(1100px) rotateX(var(--hand-rx)) rotateY(var(--hand-ry));
+}
+.hero-hand__picture {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+}
+.hero-hand__canvas,
+.hero-hand__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hero-hand__source {
+  display: none;
+}
+/* The symbol is drawn, never painted into the picture, so it stays sharp when the page zooms in. */
+.hero-hand__symbol {
+  position: absolute;
+  left: calc(var(--sx) * 100%);
+  top: calc(var(--sy) * 100%);
+  width: calc(var(--ss) * 100%);
+  height: auto;
+  aspect-ratio: 1;
+  max-width: none;
+  transform: translate(-50%, -50%) rotate(calc((1 - var(--cover-flat)) * var(--srot)))
+    skewX(calc((1 - var(--cover-flat)) * var(--sskew)));
+  opacity: calc(0.87 + var(--cover-flat) * 0.13);
+  user-select: none;
+}
+.hero-hand__shade {
+  position: absolute;
+  inset: -2px;
+  background: #1b1c20;
+  opacity: 0;
+  pointer-events: none;
+}
+.hero-hand__symbol.hero-hand__symbol--zoom {
+  opacity: 0;
+  visibility: hidden;
+}
+.hero-hand__window--agent {
+  visibility: hidden;
+}
+.hero-hand[data-interactive="true"] .hero-hand__window--human {
+  mask-image: radial-gradient(
+    circle at var(--reveal-x) var(--reveal-y),
+    transparent max(0px, calc(var(--reveal-radius) - 1px)),
+    #000 var(--reveal-radius)
+  );
+}
+.hero-hand[data-interactive="true"] .hero-hand__window--agent {
+  visibility: visible;
+  mask-image: radial-gradient(
+    circle at var(--reveal-x) var(--reveal-y),
+    #000 max(0px, calc(var(--reveal-radius) - 1px)),
+    transparent var(--reveal-radius)
+  );
+}
+.hero-hand[data-failed="true"] .hero-hand__window {
+  display: none;
+}
+.hero-hand__fallback {
+  position: absolute;
+  inset: 35% 0 auto;
+  margin: 0;
+  text-align: center;
+  font: 400 24px var(--font-display);
+}
+
+/* Phones and tablets: the same opening, laid out as a column. */
+@media (max-width: 960px) {
+  .ph {
+    min-height: auto;
+    display: flex;
+    flex-direction: column;
+    padding-top: clamp(96px, 16vw, 128px);
+  }
+  .ph-copy {
+    position: relative;
+    padding: 0 clamp(56px, 12vw, 120px);
+  }
+  .ph-copy h1 {
+    font-size: clamp(40px, 9.5vw, 72px);
+  }
+  .ph-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px 22px;
+  }
+  .ph-hand-wrap {
+    position: relative;
+    order: 1;
+    inset: auto;
+    height: min(118vw, 520px);
+    margin-top: 28px;
+  }
+  /* Half a column at each edge, flanking the hand. */
+  .ph-column {
+    height: min(110vw, 620px);
+  }
+  .ph-column--left {
+    clip-path: inset(0 78.5% 0 13%);
+    transform: translateX(-17%);
+  }
+  .ph-column--right {
+    clip-path: inset(0 13% 0 78.5%);
+    transform: translateX(17%);
+  }
+}
+@media (max-width: 900px), (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .hero-hand__pose {
+    transform: none;
+  }
+  .hero-hand[data-interactive="true"] .hero-hand__window--human {
+    mask-image: none;
+  }
+  .hero-hand[data-interactive="true"] .hero-hand__window--agent {
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .midnight-cta,
+  .midnight-cta > span,
+  .ph-more {
+    transition: none;
+  }
+}

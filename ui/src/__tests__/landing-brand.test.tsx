@@ -1,9 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { CivicHeroArt } from '../components/landing/CivicHeroArt';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const landing = join(here, '..', 'components', 'landing');
@@ -37,30 +35,6 @@ function hueAndSaturation(hex: string): { hue: number; saturation: number } {
     max === r ? ((g - b) / spread) % 6 : max === g ? (b - r) / spread + 2 : (r - g) / spread + 4;
   return { hue: (sector * 60 + 360) % 360, saturation };
 }
-
-describe('the hero picture', () => {
-  it('is one picture for a screen reader, with nothing to read inside it', () => {
-    const { container, getByRole } = render(<CivicHeroArt />);
-
-    expect(getByRole('img').getAttribute('aria-label')).toMatch(/Cleisthenes/u);
-    const pictures = [...container.querySelectorAll('img')];
-    expect(pictures).toHaveLength(2);
-    for (const picture of pictures) expect(picture.getAttribute('alt')).toBe('');
-    expect(container.querySelector('.civic-art__frame')?.getAttribute('aria-hidden')).toBe('true');
-    expect(container.querySelector('.civic-art__fallback')).toBeNull();
-  });
-
-  it('says the headline in words when a picture cannot be loaded', () => {
-    const { container } = render(<CivicHeroArt />);
-
-    const view = container.querySelector('.civic-art__view');
-    if (!view) throw new Error('The landscape is missing');
-    fireEvent.error(view);
-
-    expect(container.querySelector('.civic-art__stage')?.getAttribute('data-failed')).toBe('true');
-    expect(container.querySelector('.civic-art__fallback')?.textContent).toMatch(/Your secret/u);
-  });
-});
 
 describe('the printed pages', () => {
   const sheets = printedStylesheets();

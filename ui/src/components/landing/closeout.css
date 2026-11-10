@@ -1,0 +1,136 @@
+/*
+ * The harbour is the last scene. It sticks to the bottom of the window inside `.landing-end`, so
+ * the doors panel above it scrolls away and uncovers it, rather than the page ending on a footer
+ * nobody reaches.
+ */
+.landing-end {
+  position: relative;
+}
+.landing-end__edge {
+  height: 1px;
+}
+.closeout {
+  position: sticky;
+  bottom: 0;
+  z-index: 0;
+  height: 100svh;
+  min-height: 560px;
+  overflow: clip;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+.closeout * {
+  box-sizing: border-box;
+}
+.lake-scene {
+  position: absolute;
+  inset: 0;
+  background: var(--ground);
+}
+.lake-scene :where(img, video) {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 100%;
+}
+.closeout__invite {
+  position: absolute;
+  z-index: 1;
+  /* Centred on the open sky, left of the plane trees. */
+  inset: clamp(96px, 15svh, 170px) 22% auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  text-align: center;
+}
+.civic-landing .closeout h2 {
+  margin: 0;
+  font-size: clamp(42px, 5.4vw, 84px);
+  line-height: 1.02;
+}
+.closeout h2 span {
+  color: var(--accent);
+}
+.closeout__ledger {
+  position: absolute;
+  z-index: 1;
+  inset: auto clamp(12px, 2vw, 24px) clamp(12px, 2vw, 24px);
+  display: flex;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 22px clamp(20px, 3vw, 36px);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-card);
+}
+.closeout__brand p {
+  margin: 10px 0 0;
+  font-size: 15px;
+  color: var(--ink-muted);
+}
+.closeout nav {
+  display: flex;
+  gap: clamp(32px, 5vw, 72px);
+}
+.closeout nav > div {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px 28px;
+  align-content: start;
+}
+.closeout nav strong {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+.closeout nav :where(a, button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 400 15px var(--font-body);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.closeout nav :where(a, button):hover {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+@media (max-width: 900px) {
+  .closeout {
+    height: auto;
+    min-height: 100svh;
+  }
+  .closeout__ledger {
+    flex-direction: column;
+    gap: 18px;
+  }
+  .closeout nav {
+    flex-direction: column;
+    gap: 18px;
+  }
+}
+@media (max-width: 900px) {
+  .closeout__invite {
+    inset-inline: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .closeout__invite {
+    inset-block-start: 88px;
+  }
+  .closeout nav > div {
+    grid-template-columns: 1fr 1fr;
+  }
+}

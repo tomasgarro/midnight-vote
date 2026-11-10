@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { LandingPage } from './components/landing/LandingPage';
+import './styles/runtime-loading.css';
 
 const PollWorkspace = lazy(() => import('./views/PollWorkspace'));
 const DocsPage = lazy(() => import('./views/DocsPage'));
