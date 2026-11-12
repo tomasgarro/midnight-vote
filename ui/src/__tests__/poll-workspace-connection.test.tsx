@@ -141,7 +141,7 @@ it('ignores an old callback result after disconnect and reconnect', async () => 
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Disconnect profile' }));
   await user.click(screen.getByRole('button', { name: 'Create or connect Midnight Passport' }));
-  expect(await screen.findByRole('link', { name: 'New', exact: true })).toBeTruthy();
+  expect(await screen.findByRole('link', { name: 'New' })).toBeTruthy();
   await act(async () => resolve({ responseSignature: 'verified', blockers: ['Old result'] }));
   expect(screen.queryByRole('heading', { name: 'Server verification result' })).toBeNull();
   expect(screen.queryByText('Old result')).toBeNull();

@@ -178,7 +178,7 @@ describe('official Midnight Passport connector boundary', () => {
     await expect(client.verifyCallbackOnServer()).rejects.toThrow(
       'Invalid account-verification result',
     );
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
       challengeId: 'a'.repeat(64),
       envelope: { payload: 'signed' },
     });
