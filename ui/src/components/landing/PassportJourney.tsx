@@ -2,20 +2,44 @@ import { useEffect, useRef, useState } from 'react';
 import { HERO_ASSETS } from './hero-assets';
 import { PassportChapter } from './PassportChapter';
 import { PorticoHero } from './PorticoHero';
+import { BEATS, beatAt, STEP as PART_LENGTH, PARTS_AT, STEPS } from './passport-beats';
 import './portico-hero.css';
 import './passport-chapter.css';
 import type { PassportScene } from './passport-scene';
 import { loadScroll, SCROLL_SCENES, useMediaQuery } from './scroll';
+
+type Beat = (at: number) => number;
 
 /** The ring's opening, as a share of its outer diameter. */
 const RING_OPENING = 0.8156;
 /** Timeline positions, in screens of scrolling. */
 const LOGO_AT = 1.3;
 const PHRASE_AT = 1.95;
-const PARTS_AT = 3.0;
-const PART_LENGTH = 0.8;
-const STEPS = 5;
 const END_AT = PARTS_AT + STEPS * PART_LENGTH;
+const GLYPHS = 'abcdefghjkmnpqrstuvwxyz0123456789';
+
+/**
+ * Decodes the address into the name, left to right, as `q` goes from 0 to 1: a front sweeps across
+ * the line; behind it the name, ahead of it the address, and on it characters still turning over.
+ */
+function decode(card: HTMLElement, q: number) {
+  const address = card.querySelector<HTMLElement>('.pc-decode__addr');
+  const name = card.querySelector<HTMLElement>('.pc-decode__name');
+  const edge = card.querySelector<HTMLElement>('.pc-decode__edge');
+  if (!address || !name || !edge) return;
+  // the sweep crosses the longer of the two, and the band of turning characters on either side
+  const band = 72;
+  const width = Math.max(address.offsetWidth, name.offsetWidth);
+  card.style.setProperty('--q', q.toFixed(4));
+  card.style.setProperty('--front', `${(-band + q * (width + 2 * band)).toFixed(1)}px`);
+  const key = Math.round(q * 240);
+  let text = '';
+  for (let i = 0; i < 9; i += 1) {
+    const n = Math.abs(Math.sin((i + key * 0.37) * 12.9898) * 43758.5453) % 1;
+    text += GLYPHS[Math.floor(n * GLYPHS.length)] ?? 'x';
+  }
+  edge.textContent = q > 0 && q < 1 ? text : '';
+}
 
 /**
  * The hero and the chapter share one pinned stage. Scrolling flies through the portico and into the
@@ -215,88 +239,117 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
                 at + PART_LENGTH - 0.14,
               );
           }
-          const rows = (selector: string, at: number) =>
+          const [home, ask, unlock, name, agents] = [0, 1, 2, 3, 4].map(
+            (k) => (at: number) => beatAt(k, at),
+          ) as [Beat, Beat, Beat, Beat, Beat];
+          const length = (from: number, to: number) => (to - from) * PART_LENGTH;
+          /** Cards come out of the Midnight Passport (on their left), one after another. */
+          const comeOut = (
+            selector: string,
+            k: Beat,
+            beats: { first: number; gap: number; length: number },
+          ) =>
             timeline.fromTo(
               selector,
-              { autoAlpha: 0, x: -12 },
-              { autoAlpha: 1, x: 0, duration: 0.1, stagger: 0.07 },
-              at,
+              { autoAlpha: 0, x: -48, scale: 0.94, transformOrigin: '0% 50%' },
+              {
+                autoAlpha: 1,
+                x: 0,
+                scale: 1,
+                duration: beats.length * PART_LENGTH,
+                stagger: beats.gap * PART_LENGTH,
+                ease: 'power3.out',
+              },
+              k(beats.first),
             );
 
           // 1. One place: money (hidden), identity, agents.
-          rows('.pc-home .pc-row', PARTS_AT + 0.15);
+          comeOut('.pc-fig--home .pc-tile', home, BEATS.home);
 
-          // 2. Selective disclosure: an app asks, the hidden details are read into a proof, and only
-          //    the answer lights up.
-          const second = PARTS_AT + PART_LENGTH;
+          // 2. Selective disclosure: the app asks, the hidden details are read into a proof, and
+          //    only the answer fills in.
+          const [askFrom, askTo] = BEATS.ask.question;
+          const [scanFrom, scanTo] = BEATS.ask.scan;
+          const [provenFrom, provenTo] = BEATS.ask.proven;
           timeline
             .fromTo(
               '.pc-ask',
-              { autoAlpha: 0, y: 12, scale: 0.92, transformOrigin: '100% 100%' },
-              { autoAlpha: 1, y: 0, scale: 1, duration: 0.12, ease: 'back.out(1.8)' },
-              second + 0.12,
+              { autoAlpha: 0, y: 16, scale: 0.94, transformOrigin: '100% 0%', '--lit': 0 },
+              {
+                autoAlpha: 1,
+                y: 0,
+                scale: 1,
+                duration: length(askFrom, askTo),
+                ease: 'back.out(1.6)',
+              },
+              ask(askFrom),
             )
             .fromTo(
               '.pc-id__scan',
               { autoAlpha: 1, top: '0%' },
-              { top: '100%', duration: 0.2, ease: 'power1.inOut' },
-              second + 0.24,
+              { top: '100%', duration: length(scanFrom, scanTo), ease: 'power1.inOut' },
+              ask(scanFrom),
             )
-            .to('.pc-id__scan', { autoAlpha: 0, duration: 0.04 }, second + 0.44)
-            .fromTo(
-              '.pc-id__proof',
-              { '--lit': 0 },
-              { '--lit': 1, duration: 0.12, ease: 'power2.out' },
-              second + 0.44,
+            .to('.pc-id__scan', { autoAlpha: 0, duration: 0.03 }, ask(scanTo))
+            .to(
+              '.pc-ask',
+              { '--lit': 1, duration: length(provenFrom, provenTo), ease: 'power2.out' },
+              ask(provenFrom),
             );
 
-          // 3. No seed phrase: a fingerprint is read; the seed phrase's words fold away.
-          const third = PARTS_AT + 2 * PART_LENGTH;
+          // 3. No seed phrase (drawn in 3D; this is the flat card's fingerprint, if there is no 3D).
+          const [printFrom, printTo] = BEATS.unlock.print;
           timeline.fromTo(
             '.pc-print path',
             { strokeDashoffset: 1 },
-            { strokeDashoffset: 0, duration: 0.16, stagger: 0.025, ease: 'power1.inOut' },
-            third + 0.08,
+            {
+              strokeDashoffset: 0,
+              duration: length(printFrom, printTo),
+              stagger: 0.02,
+              ease: 'power1.inOut',
+            },
+            unlock(printFrom),
           );
-          rows('.pc-unlock .pc-row', third + 0.26)
-            .to(
-              '.pc-seed__words i',
+
+          // 4. A name: the long address decodes, left to right, into the name.
+          const card = section.querySelector<HTMLElement>('.pc-decode');
+          const edge = card?.querySelector('.pc-decode__edge');
+          if (edge) edge.textContent = '';
+          const [decodeFrom, decodeTo] = BEATS.name.decode;
+          const [sendFrom, sendTo] = BEATS.name.send;
+          if (card) {
+            const progress = { q: 0 };
+            timeline.fromTo(
+              progress,
+              { q: 0 },
               {
-                scaleX: 0,
-                autoAlpha: 0,
-                duration: 0.08,
-                stagger: 0.015,
-                transformOrigin: '100% 50%',
+                q: 1,
+                duration: length(decodeFrom, decodeTo),
+                ease: 'none',
+                immediateRender: true,
+                onUpdate: () => decode(card, progress.q),
+                onStart: () => decode(card, progress.q),
               },
-              third + 0.42,
-            )
-            .fromTo(
-              '.pc-seed strong',
-              { autoAlpha: 0 },
-              { autoAlpha: 1, duration: 0.08 },
-              third + 0.5,
+              name(decodeFrom),
             );
+            decode(card, 0);
+          }
+          timeline.fromTo(
+            '.pc-decode__send',
+            { autoAlpha: 0, y: 8 },
+            { autoAlpha: 1, y: 0, duration: length(sendFrom, sendTo), ease: 'power2.out' },
+            name(sendFrom),
+          );
 
-          // 4. A name: the long address is struck through and the readable name is spelt out.
-          const fourth = PARTS_AT + 3 * PART_LENGTH;
-          timeline
+          // 5. Agents: each leaves with its own pass, then the travel pass shows what it did.
+          const [didFrom, didTo] = BEATS.agents.did;
+          comeOut('.pc-agent', agents, BEATS.agents)
             .fromTo(
-              '.pc-name__strike',
-              { scaleX: 0 },
-              { scaleX: 1, duration: 0.1, transformOrigin: '0% 50%' },
-              fourth + 0.16,
+              '.pc-pass__did',
+              { autoAlpha: 0, y: 6 },
+              { autoAlpha: 1, y: 0, duration: length(didFrom, didTo), ease: 'power2.out' },
+              agents(didFrom),
             )
-            .fromTo('.pc-name__addr', { opacity: 1 }, { opacity: 0.4, duration: 0.1 }, fourth + 0.2)
-            .fromTo(
-              '.pc-name__letter',
-              { autoAlpha: 0, y: 8 },
-              { autoAlpha: 1, y: 0, duration: 0.05, stagger: 0.022 },
-              fourth + 0.24,
-            );
-
-          // 5. Agents: what the pass allows, its cap, what it proves, then what it just did.
-          const fifth = PARTS_AT + 4 * PART_LENGTH;
-          rows('.pc-pass .pc-row', fifth + 0.18)
             // the night stays full-bleed throughout; only as it leaves do its lower corners round,
             // to sit on the paper that follows
             .fromTo(
@@ -313,7 +366,7 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
           const canvas = section.querySelector<HTMLCanvasElement>('.pc-scene');
           if (canvas)
             import('./passport-scene')
-              .then(({ createPassportScene }) => createPassportScene(canvas))
+              .then(({ createPassportScene }) => createPassportScene(canvas, chapter))
               .then((made) => {
                 if (cancelled) {
                   made.dispose();
@@ -321,6 +374,7 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
                 }
                 scene = made;
                 chapter.dataset.scene = 'on';
+                made.resize();
                 timeline.eventCallback('onUpdate', () => made.setTime(timeline.time()));
                 made.setTime(timeline.time());
                 window.addEventListener('resize', onResize);

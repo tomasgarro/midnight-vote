@@ -6,6 +6,7 @@ import {
   Robot,
   Wallet,
 } from '@phosphor-icons/react';
+import type { CSSProperties } from 'react';
 import { MidnightMark } from './MidnightMark';
 
 const PHRASE = [
@@ -81,6 +82,36 @@ export const PASSPORT_STEPS = [
   },
 ] as const;
 
+/** The address a name replaces (it decodes into the name in PassportJourney.tsx). */
+export const ADDRESS = 'mn_addr1qx7d93l2u5c0v8k2f8w0m3n6fj9w4z0ckq8';
+
+/** The three agents of the last step, each with its own pass: what it may do, and its limit. */
+const AGENT_PASSES = [
+  { name: 'Travel agent', may: 'Books train tickets', cap: 'CHF 38 of 80 this month', used: 0.475 },
+  {
+    name: 'Video agent',
+    may: 'Edits your videos',
+    cap: 'Only the skills you gave it',
+    skills: ['Cut', 'Captions'],
+  },
+  {
+    name: 'Grocery agent',
+    may: 'Does the weekly shop',
+    cap: 'CHF 86 of 120 this week',
+    used: 0.72,
+  },
+] as const;
+
+/** The closed Midnight Passport, drawn flat, for when the 3D one cannot be. */
+function Cover() {
+  return (
+    <span className="pc-cover">
+      <MidnightMark className="pc-cover__symbol" />
+      <span className="pc-cover__name">Midnight Passport</span>
+    </span>
+  );
+}
+
 /** A value nobody is shown: hatched over, under a lock. */
 function Hidden({ as: Tag = 'dd' }: { as?: 'dd' | 'span' }) {
   return (
@@ -152,31 +183,42 @@ export function PassportChapter({ anchorHere }: { anchorHere: boolean }) {
       <ol className="pc-parts">
         <li className="pc-part pc-part--1">
           <figure className="pc-part__figure" aria-hidden="true">
-            <div className="pc-card pc-home">
-              <p className="pc-card__head">
-                <MidnightMark className="pc-card__symbol" />
-                <span className="pc-label">Midnight Passport</span>
-              </p>
-              <ul>
-                <li className="pc-row">
-                  <span>
-                    <Wallet size={18} /> Money
+            <div className="pc-fig pc-fig--home">
+              <div className="pc-slot pc-slot--cover" data-slot="cover-1">
+                <Cover />
+              </div>
+              <ul className="pc-fig__stack">
+                <li className="pc-glass pc-tile">
+                  <span className="pc-chip">
+                    <Wallet size={20} />
+                  </span>
+                  <span className="pc-tile__text">
+                    <strong>Money</strong>
+                    <small>Only your proofs can move it</small>
                   </span>
                   <Hidden as="span" />
                 </li>
-                <li className="pc-row">
-                  <span>
-                    <IdentificationCard size={18} /> Identity
+                <li className="pc-glass pc-tile">
+                  <span className="pc-chip">
+                    <IdentificationCard size={20} />
                   </span>
-                  <strong className="pc-ok">
+                  <span className="pc-tile__text">
+                    <strong>Identity</strong>
+                    <small>Proven, and kept to yourself</small>
+                  </span>
+                  <span className="pc-ok">
                     <Check size={15} weight="bold" /> Verified
-                  </strong>
-                </li>
-                <li className="pc-row">
-                  <span>
-                    <Robot size={18} /> Agents
                   </span>
-                  <strong>2 with a pass</strong>
+                </li>
+                <li className="pc-glass pc-tile">
+                  <span className="pc-chip">
+                    <Robot size={20} />
+                  </span>
+                  <span className="pc-tile__text">
+                    <strong>Agents</strong>
+                    <small>Each with its own pass</small>
+                  </span>
+                  <span className="pc-tile__value">2 passes</span>
                 </li>
               </ul>
             </div>
@@ -185,37 +227,40 @@ export function PassportChapter({ anchorHere }: { anchorHere: boolean }) {
         </li>
         <li className="pc-part pc-part--2">
           <figure className="pc-part__figure" aria-hidden="true">
-            <div className="pc-stack">
-              <p className="pc-ask">
+            <div className="pc-fig pc-fig--ask">
+              <div className="pc-slot pc-slot--page" data-slot="page">
+                <div className="pc-glass pc-id">
+                  <p className="pc-glass__head">
+                    <MidnightMark className="pc-glass__symbol" />
+                    <span className="pc-label">Midnight Passport</span>
+                  </p>
+                  <dl>
+                    <div>
+                      <dt>Name</dt>
+                      <Hidden />
+                    </div>
+                    <div>
+                      <dt>Date of birth</dt>
+                      <Hidden />
+                    </div>
+                    <div>
+                      <dt>Document</dt>
+                      <Hidden />
+                    </div>
+                    <span className="pc-id__scan" />
+                  </dl>
+                </div>
+              </div>
+              <div className="pc-glass pc-ask">
                 <span className="pc-label">Car rental asks</span>
-                <strong>Over 21?</strong>
-              </p>
-              <div className="pc-card pc-id">
-                <p className="pc-card__head">
-                  <MidnightMark className="pc-card__symbol" />
-                  <span className="pc-label">Midnight Passport</span>
+                <strong className="pc-ask__question">Over 21?</strong>
+                <p className="pc-ask__answer" data-slot="proof">
+                  <span className="pc-ask__waiting">Waiting for a proof</span>
+                  <span className="pc-ask__proven">
+                    <Check size={17} weight="bold" /> Yes, proven
+                  </span>
                 </p>
-                <dl>
-                  <div>
-                    <dt>Name</dt>
-                    <Hidden />
-                  </div>
-                  <div>
-                    <dt>Date of birth</dt>
-                    <Hidden />
-                  </div>
-                  <div>
-                    <dt>Document</dt>
-                    <Hidden />
-                  </div>
-                  <span className="pc-id__scan" />
-                </dl>
-                <p className="pc-id__proof">
-                  <span>Over 21?</span>
-                  <strong>
-                    <Check size={16} weight="bold" /> Yes, proven
-                  </strong>
-                </p>
+                <small className="pc-ask__note">Your name and birthday are not shared.</small>
               </div>
             </div>
           </figure>
@@ -223,90 +268,104 @@ export function PassportChapter({ anchorHere }: { anchorHere: boolean }) {
         </li>
         <li className="pc-part pc-part--3">
           <figure className="pc-part__figure" aria-hidden="true">
-            <div className="pc-card pc-unlock">
-              <div className="pc-unlock__sensor">
-                <Print />
+            <div className="pc-fig pc-fig--unlock">
+              <div className="pc-slot pc-slot--sheet" data-slot="sheet">
+                <div className="pc-glass pc-unlock">
+                  <div className="pc-unlock__sensor">
+                    <Print />
+                  </div>
+                  <ul>
+                    <li className="pc-row">
+                      <span>Unlock</span>
+                      <strong className="pc-lit">
+                        <Fingerprint size={15} weight="bold" /> Face or fingerprint
+                      </strong>
+                    </li>
+                    <li className="pc-row">
+                      <span>Seed phrase</span>
+                      <strong>None to write down</strong>
+                    </li>
+                    <li className="pc-row">
+                      <span>Backup</span>
+                      <strong className="pc-ok">
+                        <Check size={15} weight="bold" /> Recover anywhere
+                      </strong>
+                    </li>
+                  </ul>
+                </div>
               </div>
-              <ul>
-                <li className="pc-row">
-                  <span>Unlock</span>
-                  <strong className="pc-lit">
-                    <Fingerprint size={15} weight="bold" /> Face or fingerprint
-                  </strong>
-                </li>
-                <li className="pc-row">
-                  <span>Seed phrase</span>
-                  <span className="pc-seed">
-                    <span className="pc-seed__words">
-                      {['a', 'b', 'c', 'd', 'e', 'f'].map((slot) => (
-                        <i key={slot} />
-                      ))}
-                    </span>
-                    <strong>None to write down</strong>
-                  </span>
-                </li>
-                <li className="pc-row">
-                  <span>Backup</span>
-                  <strong className="pc-ok">
-                    <Check size={15} weight="bold" /> On, recover anywhere
-                  </strong>
-                </li>
-              </ul>
+              <div className="pc-slot pc-slot--phone" data-slot="phone" />
             </div>
           </figure>
           <StepText index={2} />
         </li>
         <li className="pc-part pc-part--4">
           <figure className="pc-part__figure" aria-hidden="true">
-            <div className="pc-card pc-name">
-              <p className="pc-label">Instead of</p>
-              <p className="pc-name__addr">
-                mn_addr1qx7d93l2u5c0v8k2f8w0m3n6
-                <i className="pc-name__strike" />
-              </p>
-              <p className="pc-label">You are</p>
-              <p className="pc-name__handle">
-                {[...'yourname'].map((letter, at) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed word, spelt out letter by letter
-                  <span className="pc-name__letter" key={at}>
-                    {letter}
+            <div className="pc-fig pc-fig--name">
+              <div className="pc-glass pc-decode">
+                <p className="pc-decode__label">
+                  <span className="pc-label pc-decode__was">Instead of a long address</span>
+                  <span className="pc-label pc-decode__now">You are</span>
+                </p>
+                <div className="pc-decode__line">
+                  <span className="pc-decode__addr">{ADDRESS}</span>
+                  <span className="pc-decode__name">
+                    yourname<span>.passport.night</span>
                   </span>
-                ))}
-                <span className="pc-name__letter pc-name__tld">.passport.night</span>
-              </p>
+                  <span className="pc-decode__edge" />
+                </div>
+                <p className="pc-decode__send">
+                  <span className="pc-chip">
+                    <LockSimple size={17} />
+                  </span>
+                  People can send to it, privately.
+                </p>
+              </div>
             </div>
           </figure>
           <StepText index={3} />
         </li>
         <li className="pc-part pc-part--5">
           <figure className="pc-part__figure" aria-hidden="true">
-            <div className="pc-card pc-pass">
-              <p className="pc-card__head">
-                <Robot size={22} weight="regular" />
-                <span>Travel agent</span>
-                <span className="pc-pass__state">Revocable</span>
-              </p>
-              <ul>
-                <li className="pc-row">
-                  <span>May</span>
-                  <strong>Book train tickets</strong>
-                </li>
-                <li className="pc-row">
-                  <span>Spending cap</span>
-                  <strong>CHF 80 a month</strong>
-                </li>
-                <li className="pc-row">
-                  <span>Proves</span>
-                  <strong className="pc-lit">
-                    <Check size={14} weight="bold" /> Acts for you
-                  </strong>
-                </li>
-                <li className="pc-row pc-pass__did">
-                  <span>Just now</span>
-                  <strong className="pc-ok">
-                    Geneva → Zürich, CHF 38 <Check size={15} weight="bold" />
-                  </strong>
-                </li>
+            <div className="pc-fig pc-fig--agents">
+              <div className="pc-slot pc-slot--cover" data-slot="cover-5">
+                <Cover />
+              </div>
+              <ul className="pc-fig__stack">
+                {AGENT_PASSES.map((agent, at) => (
+                  <li className="pc-glass pc-agent" data-slot={`agent-${at}`} key={agent.name}>
+                    <p className="pc-agent__head">
+                      <span className="pc-chip">
+                        <Robot size={19} />
+                      </span>
+                      <strong>{agent.name}</strong>
+                      <span className="pc-agent__state">Revocable</span>
+                    </p>
+                    <p className="pc-agent__may">{agent.may}</p>
+                    <p className="pc-agent__cap">
+                      {'skills' in agent ? (
+                        <span className="pc-agent__skills">
+                          {agent.skills.map((skill) => (
+                            <i key={skill}>{skill}</i>
+                          ))}
+                        </span>
+                      ) : (
+                        <span
+                          className="pc-meter"
+                          style={{ '--used': agent.used } as CSSProperties}
+                        >
+                          <i />
+                        </span>
+                      )}
+                      <span>{agent.cap}</span>
+                    </p>
+                    {at === 0 && (
+                      <p className="pc-pass__did">
+                        <Check size={14} weight="bold" /> Just now: Geneva to Zürich, CHF 38
+                      </p>
+                    )}
+                  </li>
+                ))}
               </ul>
             </div>
           </figure>
