@@ -136,7 +136,7 @@
 }
 .ph-title {
   margin: 0;
-  font: 400 min(7.2vw, 9svh, 108px) / 1 var(--font-display);
+  font: 400 min(8.4vw, 10.5svh, 128px) / 1 var(--font-display);
   letter-spacing: -0.035em;
   color: var(--ink);
   text-shadow: 0 0 30px rgba(243, 237, 223, 0.9);
@@ -156,14 +156,22 @@
   gap: 0.24em;
   white-space: nowrap;
 }
+/* The turning word sits on a terracotta plate, so it carries the line. */
 .ph-rotor {
   display: inline-grid;
-  justify-items: start;
+  justify-items: center;
+  padding: 0.04em 0.2em 0.1em;
+  border-radius: 0.14em;
+  background: var(--accent);
+  box-shadow: 0 0.12em 0.32em rgba(37, 40, 35, 0.18);
+  overflow: hidden;
+  vertical-align: baseline;
 }
 .civic-landing .ph-rotor em {
   grid-area: 1 / 1;
   font-style: normal;
-  color: var(--accent);
+  color: var(--accent-ink);
+  text-shadow: none;
   animation: ph-rotor 7.5s var(--ease-out, ease) infinite both;
 }
 .ph-rotor em:nth-child(2) {
@@ -394,7 +402,7 @@
 @media (max-width: 760px) {
   /* the line stays inside the opening, clear of the columns */
   .ph-title {
-    font-size: min(10vw, 8svh, 80px);
+    font-size: min(11vw, 8.6svh, 88px);
   }
   .midnight-cta,
   .ph-more {

@@ -4,6 +4,7 @@ import { PassportChapter } from './PassportChapter';
 import { PorticoHero } from './PorticoHero';
 import './portico-hero.css';
 import './passport-chapter.css';
+import type { PassportScene } from './passport-scene';
 import { loadScroll, SCROLL_SCENES, useMediaQuery } from './scroll';
 
 /** The ring's opening, as a share of its outer diameter. */
@@ -34,6 +35,8 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
     const section = sectionRef.current;
     if (!motion || !section) return;
     let revert: (() => void) | undefined;
+    let scene: PassportScene | undefined;
+    const onResize = () => scene?.resize();
     let cancelled = false;
     loadScroll()
       .then(({ gsap, ScrollTrigger }) => {
@@ -129,13 +132,34 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
 
           // 2. In the night, the Midnight symbol appears as it is printed, and the Alps at dusk come
           //    up behind it, rising into place by the first step.
+          //    The symbol is never bent or turned: the ring is uncovered by a sweep, the squares
+          //    settle into place one by one, and a little light passes.
+          const squares = mark.querySelectorAll('.midnight-mark__square');
           timeline
-            .set(markBox, { x: 0, y: 0 }, LOGO_AT)
+            .set(markBox, { x: 0, y: 0, scale: 1.6 }, LOGO_AT)
+            .fromTo(markBox, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.04 }, LOGO_AT)
             .fromTo(
-              markBox,
-              { autoAlpha: 0, scale: 1.9 },
-              { autoAlpha: 1, scale: 1.6, duration: 0.3, ease: 'power2.out' },
+              mark,
+              { '--sweep': 0 },
+              { '--sweep': 1, duration: 0.3, ease: 'power2.inOut' },
               LOGO_AT,
+            )
+            .fromTo(
+              squares,
+              { opacity: 0, y: 28 },
+              { opacity: 1, y: 0, duration: 0.1, stagger: 0.06, ease: 'power2.out' },
+              LOGO_AT + 0.2,
+            )
+            .fromTo(
+              mark,
+              { filter: 'drop-shadow(0 0 0px rgba(251, 248, 241, 0))' },
+              {
+                filter: 'drop-shadow(0 0 26px rgba(251, 248, 241, 0.4))',
+                duration: 0.12,
+                yoyo: true,
+                repeat: 1,
+              },
+              LOGO_AT + 0.42,
             )
             .fromTo('.pc-dusk', { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, LOGO_AT + 0.3)
             .fromTo(
@@ -280,12 +304,33 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
           rows('.pc-pass .pc-row', fifth + 0.18).to({}, { duration: 0.2 }, END_AT - 0.05);
 
           ScrollTrigger.refresh();
+
+          // The five steps are drawn in 3D; the cards stay as the fallback if WebGL is missing.
+          const canvas = section.querySelector<HTMLCanvasElement>('.pc-scene');
+          if (canvas)
+            import('./passport-scene')
+              .then(({ createPassportScene }) => createPassportScene(canvas))
+              .then((made) => {
+                if (cancelled) {
+                  made.dispose();
+                  return;
+                }
+                scene = made;
+                chapter.dataset.scene = 'on';
+                timeline.eventCallback('onUpdate', () => made.setTime(timeline.time()));
+                made.setTime(timeline.time());
+                window.addEventListener('resize', onResize);
+              })
+              .catch((error: unknown) => console.warn('The 3D steps could not start', error));
         }, section);
         revert = () => context.revert();
       })
       .catch(() => setFailed(true));
     return () => {
       cancelled = true;
+      window.removeEventListener('resize', onResize);
+      scene?.dispose();
+      scene = undefined;
       revert?.();
       revealAllowed.current = true;
     };

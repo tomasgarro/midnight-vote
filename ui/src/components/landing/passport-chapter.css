@@ -58,6 +58,36 @@
   overflow: visible;
 }
 /* Over each step's words: a bar in five parts that loads as the step passes, and when it comes. */
+/* the step, said in a few plain lines */
+.pc-part__points {
+  display: grid;
+  gap: 10px;
+  max-width: 32em;
+  margin: clamp(18px, 2vw, 26px) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: clamp(15px, 1.1vw, 17px);
+  line-height: 1.45;
+  color: var(--page-soft);
+}
+.pc-part__points li {
+  position: relative;
+  padding-left: 22px;
+}
+.pc-part__points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 9px;
+  height: 9px;
+  background: var(--ember);
+}
+@media (max-width: 860px) {
+  .journey[data-motion="on"] .pc-part__points {
+    display: none;
+  }
+}
 .civic-landing .pc-part__when {
   display: flex;
   flex-wrap: wrap;
@@ -418,6 +448,31 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* The five steps in 3D: one canvas over the night, under the words. */
+.pc-scene {
+  display: none;
+}
+.journey[data-motion="on"] .pc-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.journey[data-motion="on"] .pc[data-scene="on"] .pc-part__figure {
+  display: none;
+}
+/* The symbol's ring is uncovered by a sweep (--sweep, 0 to 1); its shape never changes. */
+.journey[data-motion="on"] .pc-mark svg {
+  --sweep: 1;
+  mask-image: conic-gradient(
+    #000 calc(var(--sweep) * 360deg),
+    transparent calc(var(--sweep) * 360deg + 1deg)
+  );
 }
 
 /* Motion on: one stage, one symbol, the parts take turns. */

@@ -28,26 +28,51 @@ export const PASSPORT_STEPS = [
     title: 'One place for your money, your identity and your agents.',
     body: 'Midnight Passport is your private home on Midnight. It holds what you own, proves who you are, and sets what your agents may do.',
     when: 'Q4 2026 · Midnight Passport SDK v1',
+    points: [
+      'Money: held in your own account, which only your proofs can move.',
+      'Identity: facts about you that you can prove, and keep to yourself.',
+      'Agents: each gets its own pass, with limits you set.',
+    ],
   },
   {
     title: 'Show only what is asked.',
     body: 'When an app asks “Over 21?”, Midnight Passport answers with a proof the app can check: yes, and nothing else. Your name and birthday stay with you.',
     when: 'Q1 2027 · Midnight Passport v2, with credentials',
+    points: [
+      'The app asks one question.',
+      'Midnight Passport answers with a proof made from your details.',
+      'The app checks the proof. It never sees the details.',
+    ],
   },
   {
     title: 'No seed phrase. Just your face or fingerprint.',
     body: 'A passkey replaces the seed phrase: you unlock Midnight Passport as you unlock your phone. Use it on any device, and recover it even if you lose them all.',
     when: 'Q4 2026 · Midnight Passport SDK v1',
+    points: [
+      'A seed phrase is the 12 or 24 secret words behind a crypto wallet. Lose them, or let anyone see them, and the money is gone.',
+      'Midnight Passport uses a passkey instead: the face or fingerprint unlock your phone already has.',
+      'Set up recovery once, and restore it on a new phone, even after losing every device.',
+    ],
   },
   {
     title: 'A name, not a string of code.',
     body: 'Your Midnight Passport has a name people can read, like yourname.passport.night, in place of a long address.',
     when: 'In the Midnight Passport plan · no date yet',
+    points: [
+      'An address is a long string of code that is easy to mistype.',
+      'Your name is short, readable and yours.',
+    ],
   },
   {
     title: 'Your agents act for you, within your limits.',
     body: 'Give an AI agent a pass, not your Midnight Passport: permissions with limits, like a spending cap. Your money stays yours, and you can take the pass back.',
     when: 'Q4 2026 · Midnight Passport SDK v1',
+    points: [
+      'A travel agent books trains, up to CHF 80 a month.',
+      'A video agent edits your videos with the skills you give it.',
+      'A grocery agent does the weekly shop, never above CHF 120.',
+      'Each pass is an allowance, never your keys. Take it back, and the agent is refused.',
+    ],
   },
 ] as const;
 
@@ -101,6 +126,7 @@ export function PassportChapter({ anchorHere }: { anchorHere: boolean }) {
           <img src="/art/civic/dusk-alps.webp" alt="" width="1536" height="900" decoding="async" />
         </div>
       </div>
+      <canvas className="pc-scene" />
       <div className="pc-mark" aria-hidden="true">
         <MidnightMark />
       </div>
@@ -305,6 +331,11 @@ function StepText({ index }: { index: 0 | 1 | 2 | 3 | 4 }) {
       </p>
       <h3>{step.title}</h3>
       <p>{step.body}</p>
+      <ul className="pc-part__points">
+        {step.points.map((point) => (
+          <li key={point}>{point}</li>
+        ))}
+      </ul>
     </div>
   );
 }
