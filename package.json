@@ -90,6 +90,7 @@
   },
   "packageManager": "npm@10",
   "overrides": {
-    "@midnight-ntwrk/onchain-runtime-v3": "3.0.0"
+    "@midnight-ntwrk/onchain-runtime-v3": "3.0.0",
+    "@effect/platform": "0.97.2"
   }
 }
