@@ -42,10 +42,10 @@ test('the hand stands inside the portico, under one turning word', async ({ page
   await expect.poll(shown, { timeout: 6000 }).toEqual(['choice.']);
   await expect(page.locator('.ph-copy')).not.toContainText(/Be part of the conversation/u);
 
-  // the turning word is paper on a flat terracotta plate
+  // the turning word is terracotta, in a box of frosted glass
   const accent = page.locator('#landing-title em').first();
-  await expect(accent).toHaveCSS('color', 'rgb(255, 253, 248)');
-  await expect(page.locator('.ph-rotor')).toHaveCSS('background-color', 'rgb(162, 79, 64)');
+  await expect(accent).toHaveCSS('color', 'rgb(162, 79, 64)');
+  await expect(page.locator('.ph-rotor')).toHaveCSS('backdrop-filter', /blur/u);
   await expect(accent).toHaveCSS('background-image', 'none');
   await expect(page.locator('#landing-title')).toHaveCSS('font-family', /Source Serif 4/u);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(HEADLINE);

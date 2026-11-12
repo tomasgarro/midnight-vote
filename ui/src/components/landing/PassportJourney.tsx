@@ -183,11 +183,6 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
               [markBox, '.pc-phrase'],
               { autoAlpha: 0, y: '-=24', duration: 0.15 },
               PARTS_AT - 0.35,
-            )
-            .to(
-              '.pc-ground',
-              { clipPath: 'inset(14px 14px 14px 14px round 32px)', duration: 0.2 },
-              PARTS_AT - 0.35,
             );
 
           // 4. The five steps take turns; the bar loads one segment per step.
@@ -301,7 +296,16 @@ export function PassportJourney({ onStart }: { onStart: () => void }) {
 
           // 5. Agents: what the pass allows, its cap, what it proves, then what it just did.
           const fifth = PARTS_AT + 4 * PART_LENGTH;
-          rows('.pc-pass .pc-row', fifth + 0.18).to({}, { duration: 0.2 }, END_AT - 0.05);
+          rows('.pc-pass .pc-row', fifth + 0.18)
+            // the night stays full-bleed throughout; only as it leaves do its lower corners round,
+            // to sit on the paper that follows
+            .fromTo(
+              '.pc-ground',
+              { clipPath: 'inset(0px 0px 0px 0px round 0px 0px 0px 0px)' },
+              { clipPath: 'inset(0px 0px 0px 0px round 0px 0px 36px 36px)', duration: 0.12 },
+              END_AT - 0.05,
+            )
+            .to({}, { duration: 0.2 }, END_AT - 0.05);
 
           ScrollTrigger.refresh();
 

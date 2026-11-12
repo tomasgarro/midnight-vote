@@ -83,6 +83,8 @@ test('reduced motion lays the five steps and the three rows out as a page', asyn
 test('the passport steps play forwards and back while the stage stays in place', async ({
   page,
 }) => {
+  // the steps are drawn in WebGL, which is slow in a headless browser's software renderer
+  test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto('/');
   await expect(page.locator('.journey')).toHaveAttribute('data-motion', 'on');
@@ -94,7 +96,8 @@ test('the passport steps play forwards and back while the stage stays in place',
     await expect(step).toHaveCSS('opacity', '1');
     await expect(step.getByRole('heading', { level: 3 })).toContainText(STEPS[index]);
     await expect.poll(async () => Math.round((await stage.boundingBox())?.y ?? -1)).toBe(0);
-    await page.screenshot({ path: test.info().outputPath(`step-${index + 1}.png`) });
+    if (index === 0 || index === 4)
+      await page.screenshot({ path: test.info().outputPath(`step-${index + 1}.png`) });
   }
 });
 

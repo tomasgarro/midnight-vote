@@ -156,21 +156,25 @@
   gap: 0.24em;
   white-space: nowrap;
 }
-/* The turning word sits on a terracotta plate, so it carries the line. */
+/* The turning word, in terracotta, sits in a box of frosted glass so it carries the line. */
 .ph-rotor {
   display: inline-grid;
   justify-items: center;
   padding: 0.04em 0.2em 0.1em;
-  border-radius: 0.14em;
-  background: var(--accent);
-  box-shadow: 0 0.12em 0.32em rgba(37, 40, 35, 0.18);
+  border: 1px solid rgba(255, 253, 248, 0.75);
+  border-radius: 0.16em;
+  background: linear-gradient(160deg, rgba(255, 253, 248, 0.62), rgba(243, 237, 223, 0.38));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 0.1em 0.36em rgba(37, 40, 35, 0.12);
+  backdrop-filter: blur(12px) saturate(1.15);
   overflow: hidden;
   vertical-align: baseline;
 }
 .civic-landing .ph-rotor em {
   grid-area: 1 / 1;
   font-style: normal;
-  color: var(--accent-ink);
+  color: var(--accent);
   text-shadow: none;
   animation: ph-rotor 7.5s var(--ease-out, ease) infinite both;
 }
@@ -217,10 +221,10 @@
   background: var(--accent);
   color: var(--accent-ink);
   border-radius: 999px;
-  padding: 0 24px 0 28px;
-  font: 600 17px var(--font-body);
+  padding: 0 20px 0 24px;
+  font: 600 16px var(--font-body);
   letter-spacing: 0.005em;
-  min-height: 58px;
+  min-height: 50px;
   cursor: pointer;
   box-shadow:
     inset 0 1px 0 rgba(255, 253, 248, 0.16),
@@ -247,13 +251,13 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 58px;
-  padding: 0 24px 0 28px;
+  min-height: 50px;
+  padding: 0 20px 0 24px;
   border: 1.5px solid rgba(37, 40, 35, 0.4);
   border-radius: 999px;
   background: rgba(251, 248, 241, 0.78);
   backdrop-filter: blur(8px);
-  font: 600 17px var(--font-body);
+  font: 600 16px var(--font-body);
   color: var(--ink);
   transition:
     border-color 200ms,
@@ -406,9 +410,9 @@
   }
   .midnight-cta,
   .ph-more {
-    min-height: 52px;
-    padding: 0 20px 0 24px;
-    font-size: 16px;
+    min-height: 46px;
+    padding: 0 18px 0 22px;
+    font-size: 15px;
   }
 }
 
