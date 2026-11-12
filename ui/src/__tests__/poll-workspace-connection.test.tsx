@@ -49,7 +49,7 @@ it('keeps a newer connection pending when a cancelled attempt rejects late', asy
   );
   render(<PollWorkspace />);
   await waitFor(() =>
-    expect(window.localStorage.getItem('midnight.vote/restart/demo-polls/v1')).toBeTruthy(),
+    expect(window.localStorage.getItem('midnight.vote/restart/demo-polls/v2')).toBeTruthy(),
   );
   const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: 'Create or connect Midnight Passport' }));
