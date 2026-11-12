@@ -14,7 +14,10 @@ const PHRASE = [
 ] as const;
 
 /**
- * How Midnight Passport works, in five steps, one claim each, from Midnight's public sources only:
+ * How Midnight Passport works, in five steps, one claim each, from Midnight's public sources only
+ * (Karmel's "Introducing Midnight Passport" and Charles Hoskinson's Midnight City talk at
+ * TOKEN2049 add: data encrypted on the phone; passkey, wallet or social sign-up; private sends to
+ * an alias; an agent gets an allowance, not the master key; Nightframe, as a concept):
  * - the roadmap (midnight.network/roadmap): "Passport SDK v1", Q4 2026, accounts without a seed
  *   phrase, "own their data, identity and money, then delegate to agents"; "Passport v2", Q1 2027,
  *   decentralised identifiers, verifiable credentials and a choice of which apps see which;
@@ -32,6 +35,7 @@ export const PASSPORT_STEPS = [
       'Money: held in your own account, which only your proofs can move.',
       'Identity: facts about you that you can prove, and keep to yourself.',
       'Agents: each gets its own pass, with limits you set.',
+      'Your data: encrypted on your phone, and backed up where you choose.',
     ],
   },
   {
@@ -50,7 +54,7 @@ export const PASSPORT_STEPS = [
     when: 'Q4 2026 · Midnight Passport SDK v1',
     points: [
       'A seed phrase is the 12 or 24 secret words behind a crypto wallet. Lose them, or let anyone see them, and the money is gone.',
-      'Midnight Passport uses a passkey instead: the face or fingerprint unlock your phone already has.',
+      'Midnight Passport uses a passkey instead: the face or fingerprint unlock your phone already has. A wallet or a social login works too.',
       'Set up recovery once, and restore it on a new phone, even after losing every device.',
     ],
   },
@@ -60,7 +64,7 @@ export const PASSPORT_STEPS = [
     when: 'In the Midnight Passport plan · no date yet',
     points: [
       'An address is a long string of code that is easy to mistype.',
-      'Your name is short, readable and yours.',
+      'You pick a name when you sign up, and people can send to it privately.',
     ],
   },
   {
@@ -72,6 +76,7 @@ export const PASSPORT_STEPS = [
       'A video agent edits your videos with the skills you give it.',
       'A grocery agent does the weekly shop, never above CHF 120.',
       'Each pass is an allowance, never your keys. Take it back, and the agent is refused.',
+      'Next: Nightframe, shown at TOKEN2049 as a concept, where agents rent skills and use your Midnight Passport, and what goes in, no one else can see.',
     ],
   },
 ] as const;
