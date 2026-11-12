@@ -2,8 +2,8 @@
  * The hero's pictures, and where the Midnight symbol sits on the passport cover.
  *
  * Every position is a fraction of the hand frame: the part of the artwork the stage shows.
- * When the Blender render arrives, only this file changes: switch `hands` to `stacked-video`,
- * set `symbol.baked` and measure the symbol on the render's rest frame.
+ * The numbers come from the hero hand build (`hero-assets.json`): the symbol is measured on the
+ * loop's rest frame.
  */
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -17,11 +17,14 @@ export type HandSource =
       crop: Box;
     }
   | {
-      kind: 'stacked-video';
-      /** One video: the human hand in the top half, the robot hand in the bottom half. */
+      kind: 'packed-video';
+      /**
+       * One video, a 2 x 2 grid: human colour | human alpha over agent colour | agent alpha.
+       * Colour is premultiplied on black, alpha is greyscale.
+       */
       av1?: string;
       h264: string;
-      /** The rest frame (frame 0) of the human half: the poster, and what reduced motion sees. */
+      /** The rest frame (frame 0) of the human hand: the poster, and what reduced motion sees. */
       poster: string;
     };
 
@@ -44,17 +47,16 @@ export type HeroAssets = {
 };
 
 export const HERO_ASSETS: HeroAssets = {
-  frame: { width: 742, height: 891 },
+  frame: { width: 1200, height: 1800 },
   hands: {
-    kind: 'stills',
-    human: '/art/passport/human-hand.webp',
-    agent: '/art/passport/agent-hand.webp',
-    size: { width: 1672, height: 941 },
-    crop: { x: 930, y: 50, width: 742, height: 891 },
+    kind: 'packed-video',
+    av1: '/art/passport/hands-2x2.av1.mp4',
+    h264: '/art/passport/hands-2x2.h264.mp4',
+    poster: '/art/passport/human-poster.webp',
   },
-  symbol: { x: 0.3585, y: 0.3311, size: 0.1698, rotate: -10.95, skewX: -1.75, baked: false },
-  coverReach: { x: 0.22, y: 0.21 },
-  palm: { x: 0.5, y: 0.7 },
+  symbol: { x: 0.5008, y: 0.2318, size: 0.1756, rotate: -0.22, skewX: -0.26, baked: true },
+  coverReach: { x: 0.3267, y: 0.2268 },
+  palm: { x: 0.44, y: 0.69 },
   sky: '/art/civic/alpine-lake.webp',
   columns: '/art/civic/portico.webp',
 };

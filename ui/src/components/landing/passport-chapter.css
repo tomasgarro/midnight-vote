@@ -1,54 +1,120 @@
 /*
- * The chapter is the passport's black, opened. Its cards are the passport's pages.
- * `--m` is the symbol's width while the parts play; the cards are drawn in that unit so the
- * symbol's squares and seal land exactly on them (see PassportJourney.tsx).
+ * The chapter is the night inside the passport: the same Alps, at dusk, in the page's own brand.
+ * Warm ink above, the last terracotta light on the snow below, glass cards of paper on the night,
+ * hidden values hatched under a lock, and the one proven fact on a flat terracotta pill. No blue:
+ * the Midnight symbol stays white, as it is printed.
+ *
+ * `--m` is the symbol's width while the parts play, and `--mark-x` / `--mark-y` where it rests (as
+ * fractions of the stage). The cards are drawn in `--m`, so the symbol's squares and seal land
+ * exactly on them; PassportJourney.tsx reads the same three values.
  */
 .pc {
-  --m: clamp(118px, 16.5vmin, 168px);
-  --passport: #1b1c20;
+  --m: clamp(132px, 19vmin, 190px);
+  --mark-x: 0.28;
+  --mark-y: 0.28;
+  /* the night: the brand's dark ground, warmed to the top of the dusk painting */
+  --passport: #1d1b17;
   --page: #fbf8f1;
   --page-soft: rgba(251, 248, 241, 0.84);
-  --page-muted: rgba(251, 248, 241, 0.68);
+  --glass: rgba(251, 248, 241, 0.045);
+  --glass-line: rgba(243, 237, 223, 0.17);
+  --label: rgba(243, 237, 223, 0.7);
+  /* the accent: light on the night for small marks, full terracotta under paper type */
+  --ember: #e08e7c;
+  --terracotta: #a24f40;
   color: var(--page);
 }
 .pc-ground {
+  overflow: hidden;
   background-color: var(--passport);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+/* The Alps at dusk along the bottom; the sky darkens upward into the passport's night, and a
+   little more behind the words so they always read. */
+.pc-dusk {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.pc-dusk img {
+  --w: max(100%, 150svh);
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - var(--w) / 2);
+  width: var(--w);
+  max-width: none;
+  height: auto;
+}
+.pc-dusk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, var(--passport) 0%, rgba(29, 27, 23, 0) 42%),
+    radial-gradient(42% 46% at 76% 50%, rgba(29, 27, 23, 0.55), rgba(29, 27, 23, 0) 100%);
 }
 .pc .midnight-mark {
   display: block;
   overflow: visible;
 }
+/* Over each step's words: a bar in five parts that loads as the step passes, and when it comes. */
+.civic-landing .pc-part__when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0 0 clamp(14px, 1.6vw, 22px);
+  font: 600 12px / 1.4 var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.pc-steps {
+  display: flex;
+  gap: 5px;
+  width: clamp(150px, 14vw, 220px);
+}
+.pc-steps > span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(243, 237, 223, 0.2);
+}
+.pc-steps i {
+  display: block;
+  height: 100%;
+  background: var(--ember);
+  transform-origin: 0 50%;
+}
+.pc-steps [data-state="next"] i {
+  transform: scaleX(0);
+}
 .civic-landing .pc h3 {
   margin: 0;
   color: var(--page);
-  font-size: clamp(30px, 3vw, 46px);
-  line-height: 1.08;
+  font-size: clamp(30px, 3.2vw, 50px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 .pc-part__text p {
   margin: 18px 0 0;
-  max-width: 34em;
-  font-size: 18px;
-  line-height: 1.55;
+  max-width: 30em;
+  font-size: clamp(17px, 1.35vw, 20px);
+  line-height: 1.5;
   color: var(--page-soft);
-}
-.civic-landing .pc-part__text .pc-part__status {
-  margin-top: 22px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(251, 248, 241, 0.18);
-  font-size: 15px;
-  color: var(--page-muted);
 }
 .pc-phrase p {
   margin: 0;
-  font: 400 clamp(40px, 4.6vw, 72px) / 1.08 var(--font-display);
+  font: 400 clamp(34px, 4.6vw, 72px) / 1.08 var(--font-display);
   letter-spacing: -0.025em;
 }
 .pc-phrase__line {
   display: block;
 }
 .pc-phrase__line + .pc-phrase__line {
-  color: rgba(251, 248, 241, 0.62);
+  color: rgba(251, 248, 241, 0.6);
 }
 .pc-word {
   display: inline-block;
@@ -61,39 +127,71 @@
 }
 .pc-part__figure {
   margin: 0;
-  width: calc(3 * var(--m));
-  max-width: 100%;
+}
+.pc-card,
+.pc-stack {
+  width: min(100%, calc(3.8 * var(--m)));
+}
+.pc-row,
+.pc-card dd {
+  font-size: clamp(15px, 0.1 * var(--m), 19px);
 }
 
-/* Cards: the passport's pages */
+/* Cards: glass in the night */
 .pc-card {
   position: relative;
-  background: var(--page);
-  color: var(--ink);
+  color: var(--page);
+  background: linear-gradient(160deg, rgba(251, 248, 241, 0.12), var(--glass) 48%);
+  border: 1px solid var(--glass-line);
   border-radius: calc(var(--m) * 0.12);
   padding: calc(var(--m) * 0.2);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(251, 248, 241, 0.16),
+    0 30px 70px rgba(14, 12, 9, 0.5);
+  backdrop-filter: blur(16px);
 }
-.pc-card__title {
-  height: calc(var(--m) * 0.62);
+.pc-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: calc(var(--m) * 0.46);
   margin: 0;
-  font: 400 19px / 1.25 var(--font-display);
-  color: var(--ink);
+  font: 400 clamp(16px, 0.13 * var(--m), 20px) / 1.2 var(--font-display);
+  color: var(--page);
+}
+.pc-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.pc-card__symbol {
+  width: 22px;
+  height: 22px;
+  color: var(--page);
 }
 .pc-card dl {
   margin: 0;
 }
 .pc-card dl > div {
   display: grid;
-  grid-template-columns: 1fr 1.1fr;
+  grid-template-columns: 1fr 1.15fr;
   align-items: center;
   gap: 12px;
   min-height: calc(var(--m) * 0.36);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--glass-line);
 }
-.pc-card dt {
-  font-size: 14px;
-  color: var(--ink-muted);
+.pc-card dt,
+.pc-poll__rule small,
+.pc-row > span:first-child {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
 }
 .pc-card dd {
   margin: 0;
@@ -101,68 +199,225 @@
   align-items: center;
   gap: 6px;
   font-size: 16px;
-  color: var(--ink);
 }
-.pc-redacted::before {
-  content: "";
-  display: block;
-  width: 100%;
+/* A value the poll never sees: hatched over, under a lock. */
+.pc-hidden {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--label);
+}
+.pc-hidden > span {
+  flex: 1;
   height: 12px;
-  border-radius: 6px;
-  background: var(--surface-sunken);
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(243, 237, 223, 0.3) 0 2px,
+    rgba(243, 237, 223, 0) 2px 6px
+  );
+}
+.pc-id__proof,
+.pc-lit {
+  --lit: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 999px;
+  /* the accent is flat: it fills in, it never glows */
+  background: rgba(162, 79, 64, calc(0.18 + var(--lit) * 0.82));
+  color: #fffdf8;
 }
 .pc-id__proof {
-  --lit: 1;
-  margin-inline: calc(var(--m) * -0.08);
-  padding-inline: calc(var(--m) * 0.08);
-  border-radius: 10px;
-  background: rgba(162, 79, 64, calc(var(--lit) * 0.1));
-  opacity: calc(0.4 + var(--lit) * 0.6);
+  margin: calc(var(--m) * 0.08) 0 0;
+  padding: calc(var(--m) * 0.08) calc(var(--m) * 0.14);
+  font-size: 17px;
+  opacity: calc(0.45 + var(--lit) * 0.55);
 }
-.pc-id__proof dt {
-  color: var(--ink);
-  font-weight: 500;
+.pc-id__proof strong,
+.pc-lit,
+.pc-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
 }
-.pc-id__proof dd,
-.pc-receipt__counted dd {
-  color: var(--accent);
-  font-weight: 500;
+.pc-lit {
+  padding: 3px 12px;
+  font-size: 14px;
 }
-.pc-poll ul {
+.pc-ok {
+  color: var(--ember);
+}
+.pc-card ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.pc-poll li {
+/* A row of a card: what it is on the left, its value on the right. */
+.pc-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: calc(var(--m) * 0.14);
-  height: calc(var(--m) * 0.42);
-  border-top: 1px solid var(--line);
+  gap: 12px;
+  min-height: calc(var(--m) * 0.4);
+  border-top: 1px solid var(--glass-line);
+  font-size: clamp(15px, 0.1 * var(--m), 19px);
 }
-.pc-poll__bullet {
-  flex: none;
-  width: calc(var(--m) * 0.094);
-  height: calc(var(--m) * 0.094);
-  background: var(--accent);
+.pc-unlock .pc-row:first-child {
+  border-top: 0;
 }
-.pc-poll__rule {
-  display: flex;
-  flex-direction: column;
-  font-size: 16px;
-  line-height: 1.2;
+.pc-row strong {
+  font-weight: 500;
 }
-.pc-poll__rule small {
-  font-size: 14px;
-  color: var(--ink-muted);
+.pc-row > .pc-hidden {
+  width: 46%;
 }
-.pc-receipt__seal {
+
+/* 2. The app's question, over the card's corner. */
+.pc-stack {
+  position: relative;
+}
+.pc-ask {
   position: absolute;
-  left: calc(var(--m) * (2.5 - 0.21));
-  top: calc(var(--m) * (0.52 - 0.21));
-  width: calc(var(--m) * 0.42);
-  height: calc(var(--m) * 0.42);
-  color: var(--accent);
+  z-index: 1;
+  right: calc(var(--m) * -0.16);
+  top: calc(var(--m) * -0.5);
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: calc(var(--m) * 0.08) calc(var(--m) * 0.14);
+  border: 1px solid var(--glass-line);
+  border-radius: calc(var(--m) * 0.1) calc(var(--m) * 0.1) 4px calc(var(--m) * 0.1);
+  background: rgba(251, 248, 241, 0.95);
+  color: #252823;
+  box-shadow: 0 18px 40px rgba(14, 12, 9, 0.4);
+}
+.pc-ask .pc-label {
+  color: #5c5e53;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.pc-ask strong {
+  font: 400 clamp(18px, 0.15 * var(--m), 24px) / 1.1 var(--font-display);
+}
+/* the hidden details are read into a proof: a line of light passes over them */
+.pc-id dl {
+  position: relative;
+}
+.pc-id__scan {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(251, 248, 241, 0),
+    rgba(251, 248, 241, 0.9),
+    rgba(251, 248, 241, 0)
+  );
+  opacity: 0;
+}
+
+/* 3. The fingerprint, read on the card's sensor. */
+.pc-unlock__sensor {
+  display: grid;
+  place-items: center;
+  width: calc(var(--m) * 0.82);
+  aspect-ratio: 1;
+  margin: 0 auto calc(var(--m) * 0.12);
+  border: 1.5px solid rgba(243, 237, 223, 0.3);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(224, 142, 124, 0.12), rgba(224, 142, 124, 0) 70%);
+  color: var(--page);
+}
+.pc-print {
+  width: 76%;
+  height: 76%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.journey[data-motion="on"] .pc-print path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.pc-seed {
+  position: relative;
+  display: grid;
+  justify-items: end;
+  min-width: 46%;
+}
+.pc-seed > * {
+  grid-area: 1 / 1;
+}
+.pc-seed__words {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 100%;
+}
+.pc-seed__words i {
+  height: 7px;
+  border-radius: 2px;
+  background: rgba(243, 237, 223, 0.28);
+}
+/* 4. A long address, struck through, and the name that replaces it. */
+.pc-name .pc-label {
+  margin: 0;
+}
+.pc-name__addr {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 8px 0 calc(var(--m) * 0.18);
+  font: 400 14px / 1.4 monospace;
+  letter-spacing: 0.02em;
+  color: var(--label);
+  overflow-wrap: anywhere;
+}
+.pc-name__strike {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 52%;
+  height: 1.5px;
+  background: var(--ember);
+}
+.pc-name__handle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 6px 0 0;
+  font: 400 clamp(32px, 0.3 * var(--m), 50px) / 1.05 var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--page);
+}
+.pc-name__tld {
+  font-size: 0.5em;
+  color: var(--ember);
+}
+
+/* 5. An agent's pass: what it may do, its cap, what it proves, what it just did. */
+.pc-pass .pc-card__head {
+  gap: 10px;
+}
+.pc-pass__state {
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 999px;
+  font: 600 12px / 1.6 var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.pc-row > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Motion on: one stage, one symbol, the parts take turns. */
@@ -194,12 +449,11 @@
 .journey[data-motion="on"] .pc-phrase {
   position: absolute;
   z-index: 2;
-  inset: 57% 0 auto;
+  inset: 57% 24px auto;
   text-align: center;
 }
 .journey[data-motion="on"] .pc-phrase__mark,
-.journey[data-motion="on"] .pc-part__mark,
-.journey[data-motion="on"] .pc-receipt__seal {
+.journey[data-motion="on"] .pc-part__mark {
   display: none;
 }
 .journey[data-motion="on"] .pc-word {
@@ -222,34 +476,104 @@
 }
 .journey[data-motion="on"] .pc-part__figure {
   position: absolute;
-  left: calc(27% - 1.5 * var(--m));
-  top: calc(27% + 0.72 * var(--m));
+  inset: 10% 50% 8% 4%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
   visibility: hidden;
 }
-.journey[data-motion="on"] .pc-poll__bullet {
-  background: transparent;
-  outline: 1.5px dashed var(--line-strong);
-  outline-offset: -1.5px;
-}
-.journey[data-motion="on"] .pc-poll__rule,
-.journey[data-motion="on"] .pc-receipt__counted {
+.journey[data-motion="on"] .pc-ask,
+.journey[data-motion="on"] .pc-home .pc-row,
+.journey[data-motion="on"] .pc-unlock .pc-row,
+.journey[data-motion="on"] .pc-seed strong,
+.journey[data-motion="on"] .pc-name__letter,
+.journey[data-motion="on"] .pc-pass .pc-row {
   opacity: 0;
   visibility: hidden;
+}
+/* motion off: the seed phrase is already gone */
+.journey[data-motion="off"] .pc-seed__words {
+  visibility: hidden;
+}
+/* A narrow window: the symbol and its card above, the words below. */
+@media (max-width: 860px) {
+  .pc {
+    --m: clamp(92px, 25vw, 132px);
+    --mark-x: 0.5;
+    --mark-y: 0.15;
+  }
+  .pc-row {
+    font-size: 13.5px;
+  }
+  .pc-row > span:first-child,
+  .pc-card dt,
+  .pc-poll__rule small {
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+  }
+  .pc-lit {
+    padding: 3px 10px;
+    font-size: 13px;
+  }
+  .pc-pass__state {
+    padding: 1px 7px;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+  }
+  .pc-pass .pc-card__head {
+    gap: 7px;
+    white-space: nowrap;
+  }
+  .journey[data-motion="on"] .pc-part__text {
+    inset: auto 7% 6% 7%;
+    display: block;
+  }
+  /* the words sit low here, so the land under them darkens */
+  .pc-dusk::after {
+    background:
+      linear-gradient(to bottom, var(--passport) 0%, rgba(29, 27, 23, 0) 42%),
+      linear-gradient(
+        to top,
+        rgba(29, 27, 23, 0.86) 0%,
+        rgba(29, 27, 23, 0.6) 30%,
+        rgba(29, 27, 23, 0) 58%
+      );
+  }
+  .journey[data-motion="on"] .pc-phrase {
+    inset-block-start: 56%;
+  }
 }
 
-/* Motion off: the same chapter as a page, on a rounded passport-black panel. */
+/* Motion off: the same chapter as a page, on a rounded panel of the same dusk. */
 .journey[data-motion="off"] .pc {
   --m: clamp(104px, 27vw, 150px);
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
   margin: 0 clamp(10px, 2vw, 24px);
   padding: clamp(64px, 9vw, 112px) clamp(20px, 5vw, 72px) clamp(56px, 8vw, 96px);
   border-radius: 32px;
   background: var(--passport);
 }
-.journey[data-motion="off"] .pc-ground,
+.journey[data-motion="off"] .pc-ground {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.journey[data-motion="off"] .pc-dusk {
+  opacity: 1;
+}
+.journey[data-motion="off"] .pc-dusk img {
+  --w: max(100%, 900px);
+}
 .journey[data-motion="off"] .pc-mark {
   display: none;
+}
+.journey[data-motion="off"] .pc-ask {
+  position: static;
+  width: fit-content;
+  margin: 0 0 14px auto;
 }
 .journey[data-motion="off"] .pc-phrase {
   text-align: center;
@@ -285,4 +609,18 @@
     grid-template-columns: 1fr 1fr;
     align-items: center;
   }
+}
+
+/* A narrow window: the card in the upper half, the words below it. */
+@media (max-width: 860px) {
+  .journey[data-motion="on"] .pc-part__figure {
+    inset: 9% 5% 47% 5%;
+  }
+  .pc-steps {
+    width: 132px;
+  }
+}
+/* Motion off: the fingerprint is already read, the bars are full. */
+.journey[data-motion="off"] .pc-steps [data-state="next"] i {
+  transform: scaleX(0);
 }

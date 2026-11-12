@@ -7,7 +7,8 @@ import { HeroHand } from '../components/landing/HeroHand';
 import { HERO_ASSETS } from '../components/landing/hero-assets';
 import { LandingPage } from '../components/landing/LandingPage';
 import { MidnightMark } from '../components/landing/MidnightMark';
-import { CHAPTER_PARTS } from '../components/landing/PassportChapter';
+import { PASSPORT_STEPS } from '../components/landing/PassportChapter';
+import { VOTE_PARTS } from '../components/landing/StartSection';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -70,9 +71,9 @@ describe('the landing page', () => {
     expect(container.querySelector('#how-it-works')?.classList.contains('pc')).toBe(true);
   });
 
-  it('opens the poll workspace from the answer door and the organiser from the other', () => {
+  it('opens the poll workspace from the first row and the organiser from the second', () => {
     render(<LandingPage />);
-    const doors = within(screen.getByRole('region', { name: 'Answer a poll, or run your own.' }));
+    const doors = within(screen.getByRole('region', { name: /proves who you are/u }));
     fireEvent.click(doors.getByRole('button', { name: /Set up a poll/u }));
     expect(window.location.hash).toBe('#organizer');
     fireEvent.click(doors.getByRole('button', { name: /Try a poll/u }));
@@ -94,17 +95,29 @@ describe('the landing page', () => {
     expect(container.textContent).not.toMatch(/Margaret Mead|Never doubt/u);
   });
 
-  it('only says what the demo does, and never shortens Midnight Passport', () => {
+  it('says each step in a sentence or two, and never shortens Midnight Passport', () => {
     const { container } = render(<LandingPage />);
-    const [prove, organise, count] = CHAPTER_PARTS;
-    expect(prove.status).toMatch(/comes next/u);
-    expect(organise.status).toMatch(/demo/u);
-    expect(count.status).toMatch(/simulated/u);
-    expect(container.textContent).toMatch(/polls, answers and receipts are simulated/u);
+    // How Midnight Passport works, then what midnight.vote does with it.
+    expect(PASSPORT_STEPS).toHaveLength(5);
+    expect(VOTE_PARTS).toHaveLength(3);
+    for (const part of [...PASSPORT_STEPS, ...VOTE_PARTS])
+      expect(part.body.length).toBeLessThan(160);
+    expect(PASSPORT_STEPS[0].body).toMatch(/Midnight Passport is your private home/u);
+    // Its name has the shape Midnight's public Passport site gives (alice.passport.night).
+    expect(container.textContent).toMatch(/yourname\.passport\.night/u);
+    // Timing is only what Midnight's public roadmap says.
+    for (const step of PASSPORT_STEPS)
+      expect(step.when).toMatch(/^(Q4 2026|Q1 2027|In the Midnight Passport plan) · /u);
+    expect(container.textContent).not.toMatch(/\.midnight\b/u);
 
     const text = container.textContent ?? '';
+    // Gone since the 12 Nov review: the agents link and the demo note under the doors.
+    expect(text).not.toMatch(/And agents\?|This is a demo/u);
+    expect(text).toMatch(/Ask Cleisthenes/u);
     expect(text).not.toMatch(/never leaves|nothing leaves|per person|one person|anonymous vote/iu);
     for (const match of text.matchAll(/passport/giu)) {
+      // a name such as yourname.passport.night is an address, not the product shortened
+      if (text.slice(match.index ?? 0, (match.index ?? 0) + 14) === 'passport.night') continue;
       expect(text.slice((match.index ?? 0) - 9, match.index)).toBe('Midnight ');
     }
   });
@@ -137,7 +150,7 @@ describe('the hand', () => {
     revealAllowed: { current: true },
   });
 
-  it('is one picture for a screen reader, cropped from the supplied artwork', () => {
+  it('is one picture for a screen reader, in the frame the loop was made for', () => {
     const { container } = render(<HeroHand {...props()} />);
     expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
       'A hand holding a Midnight Passport',
@@ -145,9 +158,12 @@ describe('the hand', () => {
     for (const picture of container.querySelectorAll('img')) {
       expect(picture.getAttribute('alt')).toBe('');
     }
-    const hand = container.querySelector<HTMLImageElement>('.hero-hand__picture');
-    expect(hand?.style.width).toBe(`${(1672 / 742) * 100}%`);
-    expect(hand?.style.left).toBe(`${(-930 / 742) * 100}%`);
+    // jsdom has no WebGL, so the rest frame stands in for the loop.
+    const hand = container.querySelector<HTMLImageElement>('.hero-hand__poster');
+    expect(hand?.getAttribute('src')).toBe('/art/passport/human-poster.webp');
+    expect(container.querySelector<HTMLElement>('.hero-hand')?.style.aspectRatio).toBe(
+      '1200 / 1800',
+    );
   });
 
   it('shows only the human hand where there is no mouse or motion', () => {
@@ -158,7 +174,7 @@ describe('the hand', () => {
 
   it('says the cover in words when the picture cannot be loaded', () => {
     const { container } = render(<HeroHand {...props()} />);
-    const picture = container.querySelector('.hero-hand__picture');
+    const picture = container.querySelector('.hero-hand__poster');
     if (!picture) throw new Error('The hand is missing');
     fireEvent.error(picture);
     expect(container.querySelector('.hero-hand')?.getAttribute('data-failed')).toBe('true');

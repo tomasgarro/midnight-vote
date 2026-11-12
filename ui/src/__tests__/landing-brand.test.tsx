@@ -53,6 +53,7 @@ describe('the printed pages', () => {
   });
 
   it('carry no blue or purple: terracotta is the only accent', () => {
+    // The night inside the passport too: it is the same Alps at dusk, in the page's own colours.
     for (const { name, css } of sheets) {
       for (const match of css.matchAll(/#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/gu)) {
         const { hue, saturation } = hueAndSaturation(match[1] as string);

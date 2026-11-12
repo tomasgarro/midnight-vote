@@ -4,22 +4,22 @@ type SceneFiles = { av1: string; h264: string; start: string; end: string };
 
 const BASE = '/art/civic/lake';
 /**
- * `loop` turns on when the scene is a seamless loop (lake v2). The current clip plays once and
- * rests on its last frame, so that the boat never jumps back to the start.
+ * A seamless 30 s loop (lake v2): the boats sail through and away, so the loop point is just
+ * another moment. Its first frame is the poster, and the still that reduced motion sees.
  */
 export const LAKE = {
-  loop: false,
+  loop: true,
   desktop: {
     av1: `${BASE}/desktop.av1.mp4`,
     h264: `${BASE}/desktop.h264.mp4`,
-    start: `${BASE}/desktop-start.webp`,
-    end: `${BASE}/desktop-end.webp`,
+    start: `${BASE}/desktop-poster.webp`,
+    end: `${BASE}/desktop-poster.webp`,
   },
   phone: {
     av1: `${BASE}/phone.av1.mp4`,
     h264: `${BASE}/phone.h264.mp4`,
-    start: `${BASE}/phone-start.webp`,
-    end: `${BASE}/phone-end.webp`,
+    start: `${BASE}/phone-poster.webp`,
+    end: `${BASE}/phone-poster.webp`,
   },
 } satisfies { loop: boolean; desktop: SceneFiles; phone: SceneFiles };
 

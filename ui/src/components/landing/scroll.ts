@@ -17,11 +17,11 @@ export function loadScroll() {
 }
 
 /**
- * The pinned scenes need room and consent to move. Phones, short windows and reduced motion get
- * the same content laid out as a normal page.
+ * The pinned scenes need a little room and consent to move: phones and narrow windows play them
+ * too. Very short windows and reduced motion get the same content laid out as a normal page.
  */
 export const SCROLL_SCENES =
-  '(min-width: 961px) and (min-height: 600px) and (prefers-reduced-motion: no-preference)';
+  '(min-width: 360px) and (min-height: 560px) and (prefers-reduced-motion: no-preference)';
 
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);

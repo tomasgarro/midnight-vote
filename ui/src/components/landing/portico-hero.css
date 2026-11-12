@@ -1,6 +1,7 @@
 /*
- * One stage for the opening and the chapter. With motion on (large screens) the section is tall and
- * the stage is pinned while GSAP plays the scenes; with motion off it is a normal page.
+ * One stage for the opening and the chapter. With motion on, the section is tall and the stage is
+ * pinned while GSAP plays the scenes; with motion off (reduced motion, very short windows) it is a
+ * normal page.
  */
 .journey {
   position: relative;
@@ -17,10 +18,9 @@
   width: 1px;
   height: 1px;
   pointer-events: none;
-  scroll-margin-top: 0;
 }
 .journey[data-motion="on"] {
-  height: 560svh;
+  height: 820svh;
 }
 .journey[data-motion="on"] .journey-stage {
   position: sticky;
@@ -36,17 +36,18 @@
 
 /* The opening */
 .ph {
+  --beam: max(19svh, 10.6vw);
   position: relative;
   isolation: isolate;
   overflow: clip;
-  min-height: max(640px, 100svh);
+  min-height: max(560px, 100svh);
   color: var(--ink);
 }
 .ph-sky {
   position: absolute;
   inset: 0;
   z-index: 0;
-  transform-origin: 50% 62%;
+  transform-origin: 50% 60%;
 }
 .ph-sky img {
   width: 100%;
@@ -54,134 +55,221 @@
   object-fit: cover;
   object-position: center 62%;
 }
-/* The sky stays a paper sky: the copy is set in ink on it. */
-.ph-sky::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 62% 48% at 50% 22%,
-    rgba(243, 237, 223, 0.78),
-    rgba(243, 237, 223, 0) 100%
-  );
-}
 .ph-hand-wrap {
   position: absolute;
   z-index: 1;
-  inset: auto 0 0;
-  height: min(52svh, 580px);
+  /* right under the buttons; the forearm leaves the bottom of the frame */
+  top: calc(var(--copy-end, 46svh) + clamp(10px, 2svh, 22px));
+  left: 0;
+  right: 0;
+  height: calc(100% - var(--copy-end, 46svh) + 6svh);
   display: flex;
   justify-content: center;
 }
-.ph-columns {
+
+/*
+ * The portico fills the frame as Aristotle's arch does: the beam across the top, the columns at the
+ * sides. On a narrow window the whole picture would lose its columns, so a column is added at each
+ * edge.
+ */
+.ph-portico {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  transform-origin: 50% 55%;
+  transform-origin: 50% 42%;
 }
-/*
- * Two cuts of the same portico: one full column at each edge of the window. Each cut keeps its
- * column (11.5–23.5% of the picture from its side) and is moved flush to the edge.
- */
-.ph-column {
+.ph-portico img {
   position: absolute;
-  bottom: 0;
-  height: 100%;
-  width: auto;
   max-width: none;
   user-select: none;
 }
-.ph-column--left {
+.ph-portico__whole {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+.ph-portico__side {
+  display: none;
+  bottom: 0;
+  height: 100%;
+  width: auto;
+}
+.ph-portico__side--left {
   left: 0;
   clip-path: inset(0 76.5% 0 11.5%);
   transform: translateX(-11.5%);
 }
-.ph-column--right {
+.ph-portico__side--right {
   right: 0;
   clip-path: inset(0 11.5% 0 76.5%);
   transform: translateX(11.5%);
 }
+@media (max-aspect-ratio: 5 / 4) {
+  .ph-portico__side {
+    display: block;
+  }
+}
+@media (max-width: 560px) {
+  .ph-portico__side {
+    height: 82%;
+  }
+  .ph-portico__side--left {
+    transform: translateX(-16%);
+  }
+  .ph-portico__side--right {
+    transform: translateX(16%);
+  }
+}
+
 .ph-copy {
   position: absolute;
   z-index: 3;
   inset: 0 0 auto;
-  padding: clamp(96px, 13svh, 150px) 24px 0;
+  padding: calc(var(--beam) + clamp(12px, 2.2svh, 28px)) 24px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 }
-.ph-copy h1 {
+.ph-title {
   margin: 0;
-  font: 400 min(6vw, 8.8svh, 92px) / 1.02 var(--font-display);
-  letter-spacing: -0.03em;
+  font: 400 min(7.2vw, 9svh, 108px) / 1 var(--font-display);
+  letter-spacing: -0.035em;
   color: var(--ink);
+  text-shadow: 0 0 30px rgba(243, 237, 223, 0.9);
 }
-.ph-copy h1 > :is(span, em) {
-  display: inline-block;
+/* The sentence as it is read aloud; the moving line is for the eyes only. */
+.ph-title__said {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
-.civic-landing .ph-copy h1 em {
+.ph-title__line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.24em;
+  white-space: nowrap;
+}
+.ph-rotor {
+  display: inline-grid;
+  justify-items: start;
+}
+.civic-landing .ph-rotor em {
+  grid-area: 1 / 1;
   font-style: normal;
   color: var(--accent);
+  animation: ph-rotor 7.5s var(--ease-out, ease) infinite both;
 }
-.ph-lead {
-  margin: 18px 0 0;
-  font: 400 clamp(18px, 1.45vw, 22px) / 1.35 var(--font-display);
-  color: var(--ink);
+.ph-rotor em:nth-child(2) {
+  animation-delay: 2.5s;
 }
+.ph-rotor em:nth-child(3) {
+  animation-delay: 5s;
+}
+@keyframes ph-rotor {
+  0% {
+    opacity: 0;
+    transform: translateY(0.32em);
+    filter: blur(8px);
+  }
+  6%,
+  29% {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  35%,
+  100% {
+    opacity: 0;
+    transform: translateY(-0.32em);
+    filter: blur(8px);
+  }
+}
+
 .ph-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 26px;
-  margin-top: 20px;
+  gap: 14px;
+  margin-top: clamp(16px, 2.4svh, 28px);
 }
+/* The way in: one flat terracotta pill, the brand's one accent, the arrow inside the words. */
 .midnight-cta {
   display: inline-flex;
-  gap: 30px;
+  gap: 10px;
   align-items: center;
   border: 0;
-  background: var(--ink);
-  color: var(--ground);
-  border-radius: 999px;
-  padding: 6px 6px 6px 24px;
-  font: 500 16px var(--font-body);
-  min-height: 58px;
-  cursor: pointer;
-  transition: transform 200ms;
-}
-.midnight-cta > span {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
   background: var(--accent);
   color: var(--accent-ink);
-  transition: background 220ms;
+  border-radius: 999px;
+  padding: 0 24px 0 28px;
+  font: 600 17px var(--font-body);
+  letter-spacing: 0.005em;
+  min-height: 58px;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 253, 248, 0.16),
+    0 10px 24px rgba(37, 40, 35, 0.16);
+  transition:
+    background 200ms,
+    transform 200ms;
+}
+.midnight-cta > span {
+  display: inline-grid;
+  place-items: center;
 }
 .midnight-cta:hover {
-  transform: translateY(-2px);
-}
-.midnight-cta:hover > span {
   background: var(--accent-hover);
+  transform: translateY(-1px);
 }
+.midnight-cta:focus-visible,
+.ph-more:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+/* The other way: the same pill, drawn in ink. */
 .ph-more {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 48px;
-  font-size: 16px;
+  min-height: 58px;
+  padding: 0 24px 0 28px;
+  border: 1.5px solid rgba(37, 40, 35, 0.4);
+  border-radius: 999px;
+  background: rgba(251, 248, 241, 0.78);
+  backdrop-filter: blur(8px);
+  font: 600 17px var(--font-body);
   color: var(--ink);
-  transition: color 200ms;
+  transition:
+    border-color 200ms,
+    background 200ms;
+}
+.ph-more > span {
+  display: inline-grid;
+  place-items: center;
+}
+.ph-more > span svg {
+  animation: ph-more-nudge 2.4s ease-in-out infinite;
 }
 .ph-more:hover {
-  color: var(--accent);
+  border-color: var(--ink);
+  background: var(--surface);
 }
-@media (max-height: 680px) and (min-width: 961px) {
-  .ph-lead {
-    display: none;
+@keyframes ph-more-nudge {
+  0%,
+  60%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateY(4px);
   }
 }
 
@@ -192,14 +280,14 @@
   --reveal-radius: 0px;
   --hand-rx: 0deg;
   --hand-ry: 0deg;
+  --hand-tx: 0px;
+  --hand-ty: 0px;
   --cover-flat: 0;
   position: relative;
   isolation: isolate;
   height: 100%;
   flex: none;
   overflow: clip;
-  /* The source picture ends at the sleeve: fade only that edge. */
-  mask-image: linear-gradient(90deg, #000 88%, transparent);
 }
 .hero-hand__window,
 .hero-hand__pose {
@@ -208,8 +296,9 @@
   pointer-events: none;
 }
 .hero-hand__pose {
-  transform-origin: 76% 94%;
-  transform: perspective(1100px) rotateX(var(--hand-rx)) rotateY(var(--hand-ry));
+  /* the wrist, at the bottom of the frame: the arm turns about it */
+  transform-origin: 50% 100%;
+  transform: translate(var(--hand-tx), var(--hand-ty)) rotate(var(--hand-ry));
 }
 .hero-hand__picture {
   position: absolute;
@@ -227,7 +316,8 @@
   display: none;
 }
 /* The symbol is drawn, never painted into the picture, so it stays sharp when the page zooms in. */
-.hero-hand__symbol {
+.hero-hand__symbol,
+.hero-hand__portal {
   position: absolute;
   left: calc(var(--sx) * 100%);
   top: calc(var(--sy) * 100%);
@@ -240,12 +330,32 @@
   opacity: calc(0.87 + var(--cover-flat) * 0.13);
   user-select: none;
 }
-.hero-hand__shade {
-  position: absolute;
-  inset: -2px;
-  background: #1b1c20;
+/*
+ * The night inside the ring: the ring's own opening (its inner diameter is 81.56% of the outer).
+ * A soft warm light in it says "a way through"; the light fades as the camera passes, so the far
+ * side is the chapter's plain night.
+ */
+.hero-hand__portal {
+  --portal-light: 1;
+  width: calc(var(--ss) * 100% * 0.8156);
+  border-radius: 50%;
+  background-color: #1d1b17;
   opacity: 0;
   pointer-events: none;
+  overflow: hidden;
+}
+.hero-hand__portal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(251, 236, 214, 0.34), rgba(251, 236, 214, 0) 58%),
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, 0.55) 100%);
+  opacity: var(--portal-light);
+}
+.hero-hand__symbol--zoom {
+  color: #fff;
 }
 .hero-hand__symbol.hero-hand__symbol--zoom {
   opacity: 0;
@@ -280,47 +390,42 @@
   font: 400 24px var(--font-display);
 }
 
-/* Phones and tablets: the same opening, laid out as a column. */
+/* Narrow windows keep the scenes; the opening only tightens. */
+@media (max-width: 760px) {
+  /* the line stays inside the opening, clear of the columns */
+  .ph-title {
+    font-size: min(10vw, 8svh, 80px);
+  }
+  .midnight-cta,
+  .ph-more {
+    min-height: 52px;
+    padding: 0 20px 0 24px;
+    font-size: 16px;
+  }
+}
+
+/* Motion off on a narrow window: the opening as a column. */
 @media (max-width: 960px) {
-  .ph {
+  .journey[data-motion="off"] .ph {
     min-height: auto;
     display: flex;
     flex-direction: column;
-    padding-top: clamp(96px, 16vw, 128px);
+    padding-top: calc(var(--beam) * 0.6 + 72px);
   }
-  .ph-copy {
+  .journey[data-motion="off"] .ph-copy {
     position: relative;
-    padding: 0 clamp(56px, 12vw, 120px);
+    padding: 0 clamp(40px, 10vw, 120px);
   }
-  .ph-copy h1 {
-    font-size: clamp(40px, 9.5vw, 72px);
-  }
-  .ph-actions {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 14px 22px;
-  }
-  .ph-hand-wrap {
+  .journey[data-motion="off"] .ph-hand-wrap {
     position: relative;
     order: 1;
     inset: auto;
     height: min(118vw, 520px);
     margin-top: 28px;
   }
-  /* Half a column at each edge, flanking the hand. */
-  .ph-column {
-    height: min(110vw, 620px);
-  }
-  .ph-column--left {
-    clip-path: inset(0 78.5% 0 13%);
-    transform: translateX(-17%);
-  }
-  .ph-column--right {
-    clip-path: inset(0 13% 0 78.5%);
-    transform: translateX(17%);
-  }
 }
-@media (max-width: 900px), (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+
+@media (max-width: 599px), (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
   .hero-hand__pose {
     transform: none;
   }
@@ -332,9 +437,27 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  /* The whole sentence, still. */
+  .ph-title__said {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    display: block;
+    max-width: 9em;
+    font-size: 0.72em;
+    line-height: 1.04;
+  }
+  .ph-title__line {
+    display: none;
+  }
   .midnight-cta,
   .midnight-cta > span,
-  .ph-more {
+  .ph-more,
+  .ph-more > span svg {
     transition: none;
+    animation: none;
   }
 }
