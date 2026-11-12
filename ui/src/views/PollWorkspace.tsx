@@ -3,7 +3,8 @@ import {
   ArrowUpRight,
   Check,
   Fingerprint,
-  LockKey,
+  ListChecks,
+  LockSimple,
   Plus,
   ShieldCheck,
 } from '@phosphor-icons/react';
@@ -25,14 +26,18 @@ import {
   type VoteReceipt,
   verifyReceiptOpening,
 } from 'midnight-vote-polls';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { MidnightMark } from '@/components/landing/MidnightMark';
 import {
   MidnightPassportClient,
   type MidnightPassportConnection,
 } from '@/integration/midnight-passport-client';
+import { BRIEFINGS, examplePolls } from './poll-briefings';
 import './poll-workspace.css';
 
-const STORAGE_KEY = 'midnight.vote/restart/demo-polls/v1';
+const STORAGE_KEY = 'midnight.vote/restart/demo-polls/v2';
+/** A static host has no verification service, so the build can switch the server check off. */
+const ACCOUNT_CHECK = import.meta.env.VITE_POLL_ACCOUNT_CHECK !== 'off';
 type Tab = 'polls' | 'organizer' | 'verify' | 'connect';
 interface DemoBallot {
   pollId: string;
@@ -40,6 +45,8 @@ interface DemoBallot {
   receipt: VoteReceipt;
   publicAccount?: string;
 }
+type Eligibility = 'account' | 'nationality' | 'residence' | 'age' | 'membership';
+
 const tabFromHash = (): Tab =>
   window.location.hash === '#organizer'
     ? 'organizer'
@@ -49,6 +56,50 @@ const tabFromHash = (): Tab =>
         ? 'connect'
         : 'polls';
 
+const RESULTS: Record<Visibility, string> = {
+  public: 'Results: each answer with its account',
+  anonymous: 'Results: every answer, no names',
+  private: 'Results: totals only',
+};
+
+const CLAIMS: Record<Exclude<Eligibility, 'account'>, string> = {
+  nationality: 'Verified nationality',
+  residence: 'Verified residence',
+  age: 'Verified age',
+  membership: 'Verified membership',
+};
+
+function when(time: number) {
+  return new Date(time).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function day(time: number) {
+  return new Date(time).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function phaseLabel(poll: PublishedPoll, now: number) {
+  const phase = pollPhase(poll, now);
+  if (phase === 'open') return `Open until ${day(poll.closesAt)}`;
+  if (phase === 'scheduled') return `Opens ${day(poll.opensAt)}`;
+  return 'Closed';
+}
+
+function whoMayAnswer(poll: Pick<PollDraft, 'eligibility'>) {
+  return poll.eligibility.kind === 'midnight-passport-account'
+    ? 'Anyone with a Midnight Passport account'
+    : `Verified ${poll.eligibility.claim}: ${poll.eligibility.value || '…'}`;
+}
+
 function saveFile(value: string, name: string) {
   const url = URL.createObjectURL(new Blob([value], { type: 'application/json' }));
   const anchor = document.createElement('a');
@@ -56,6 +107,137 @@ function saveFile(value: string, name: string) {
   anchor.download = name;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function Arrow({ size = 18 }: { size?: number }) {
+  return <ArrowUpRight className="app-arrow" size={size} weight="bold" aria-hidden="true" />;
+}
+
+/** The one honest line every page carries: what is real here and what is simulated. */
+function DemoNote() {
+  return (
+    <p className="app-demo-note">
+      <span className="app-chip app-chip--accent">Demo</span>
+      Sign-in uses the real Midnight Passport. Answers and receipts are simulated on this device;
+      nothing is sent to Midnight.
+    </p>
+  );
+}
+
+function Intro({ title, lead, children }: { title: string; lead: string; children?: ReactNode }) {
+  return (
+    <div className="app-intro">
+      <h1>{title}</h1>
+      <p className="app-lead">{lead}</p>
+      {children}
+    </div>
+  );
+}
+
+function Face() {
+  return (
+    <span className="app-face" aria-hidden="true">
+      <img src="/art/civic/cleisthenes-bust.webp" alt="" />
+    </span>
+  );
+}
+
+function BriefingCard({ poll }: { poll: PublishedPoll }) {
+  const briefing = BRIEFINGS[poll.id];
+  const titleId = useId();
+  return (
+    <section className="app-card app-brief" aria-labelledby={titleId}>
+      <div className="app-brief__by">
+        <Face />
+        <p>
+          <strong id={titleId}>Cleisthenes</strong>
+          <span>
+            {briefing
+              ? 'Here is what each side says, and who says it.'
+              : 'No sources for this poll yet.'}
+          </span>
+        </p>
+      </div>
+      {briefing ? (
+        <>
+          <p className="app-brief__summary">{briefing.summary}</p>
+          <div className="app-brief__sides">
+            {(['for', 'against'] as const).map((side) => (
+              <div className="app-side" key={side}>
+                <small>{side === 'for' ? 'For' : 'Against'}</small>
+                <ul>
+                  {briefing[side].map((item) => (
+                    <li key={item.point}>
+                      <p>{item.point}</p>
+                      <span>{item.source}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="app-small">
+            An example briefing written for this demo; the sources named are examples. Cleisthenes
+            never tells you how to vote.
+          </p>
+        </>
+      ) : (
+        <p className="app-small">
+          When an organizer adds sources, Cleisthenes sets out what each side says here.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function RulesCard({
+  question,
+  visibility,
+  eligibility,
+  closesAt,
+  rulesHash,
+  preview = false,
+}: {
+  question?: string;
+  visibility: Visibility;
+  eligibility: PollDraft['eligibility'];
+  closesAt?: number;
+  rulesHash?: string;
+  preview?: boolean;
+}) {
+  return (
+    <section className="app-card app-rules" aria-label={preview ? 'Preview of the rules' : 'Rules'}>
+      <p className="app-label">{preview ? 'Preview' : 'The rules'}</p>
+      {question !== undefined && (
+        <p className="app-rules__q">{question.trim() || 'Your question appears here.'}</p>
+      )}
+      <ul>
+        <li>
+          <Check size={16} weight="bold" aria-hidden="true" /> {whoMayAnswer({ eligibility })}
+        </li>
+        <li>
+          <Check size={16} weight="bold" aria-hidden="true" />
+          <span>
+            {RESULTS[visibility]}
+            <small>{VISIBILITY_COPY[visibility].description}</small>
+          </span>
+        </li>
+        <li>
+          <Check size={16} weight="bold" aria-hidden="true" />
+          {closesAt && Number.isFinite(closesAt)
+            ? `Closes ${when(closesAt)}`
+            : 'Closing time to set'}
+        </li>
+      </ul>
+      <p className="app-rules__lock">
+        <LockSimple size={15} weight="bold" aria-hidden="true" />
+        {preview ? 'Rules lock when the poll opens' : 'Rules locked when the poll opened'}
+      </p>
+      {rulesHash && (
+        <p className="app-small app-mono">Rules fingerprint {rulesHash.slice(0, 16)}…</p>
+      )}
+    </section>
+  );
 }
 
 export default function PollWorkspace() {
@@ -80,7 +262,7 @@ export default function PollWorkspace() {
     description: '',
     options: 'Yes\nNo\nAbstain',
     visibility: 'anonymous' as Visibility,
-    eligibility: 'account',
+    eligibility: 'account' as Eligibility,
     credentialValue: '',
     opensAt: '',
     closesAt: '',
@@ -92,7 +274,8 @@ export default function PollWorkspace() {
   useEffect(() => {
     const passport = new MidnightPassportClient();
     client.current = passport;
-    document.title = 'midnight.vote — Connect. Vote. Verify.';
+    document.title = 'midnight.vote — Polls';
+    document.documentElement.lang = 'en';
     let active = true;
     const load = async () => {
       try {
@@ -122,42 +305,9 @@ export default function PollWorkspace() {
           );
       }
       const start = Date.now();
-      const examples: PollDraft[] = [
-        {
-          id: 'shared-spaces',
-          question: 'What should our community improve next?',
-          description:
-            'A small decision we can make together. Explore the voting experience with this local demonstration.',
-          options: ['A shared library', 'More green spaces', 'Community workshops'],
-          visibility: 'anonymous',
-          eligibility: { kind: 'midnight-passport-account' },
-          opensAt: start - 1000,
-          closesAt: start + 7 * 86400_000,
-        },
-        {
-          id: 'shared-budget',
-          question: 'How should we use the shared budget?',
-          description:
-            'A demonstration of private aggregate results. The live cryptographic tally remains gated.',
-          options: ['Repair the meeting room', 'Fund a community event', 'Save for next year'],
-          visibility: 'private',
-          eligibility: { kind: 'midnight-passport-account' },
-          opensAt: start - 1000,
-          closesAt: start + 7 * 86400_000,
-        },
-        {
-          id: 'open-record',
-          question: 'Should our next meeting be hybrid?',
-          description:
-            'In a public poll, participants consent to publishing their account and choice after closing.',
-          options: ['Yes', 'No', 'Abstain'],
-          visibility: 'public',
-          eligibility: { kind: 'midnight-passport-account' },
-          opensAt: start - 1000,
-          closesAt: start + 7 * 86400_000,
-        },
-      ];
-      const result = await Promise.all(examples.map((p) => publishPoll(p, 'simulation', start)));
+      const result = await Promise.all(
+        examplePolls(start).map((p) => publishPoll(p, 'simulation', start)),
+      );
       if (active) setPolls(result);
     };
     void load();
@@ -206,6 +356,8 @@ export default function PollWorkspace() {
       setSelected(null);
       setChoice(null);
       setPublicConsent(false);
+      setNotice('');
+      window.scrollTo({ top: 0 });
     };
     window.addEventListener('hashchange', onHash);
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -228,6 +380,14 @@ export default function PollWorkspace() {
       );
     }
   }, [polls]);
+
+  const openPoll = (poll: PublishedPoll | null) => {
+    setSelected(poll);
+    setChoice(null);
+    setPublicConsent(false);
+    setNotice('');
+    window.scrollTo({ top: 0 });
+  };
 
   const connect = async () => {
     const attempt = ++connectionAttempt.current;
@@ -292,9 +452,6 @@ export default function PollWorkspace() {
         },
       ]);
       setReceipt(saved);
-      setNotice(
-        'Demo answer saved for this session. No vote or transaction was sent to Midnight. Export an encrypted receipt to keep your choice.',
-      );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not save the demo answer.');
     } finally {
@@ -316,18 +473,14 @@ export default function PollWorkspace() {
         eligibility:
           draft.eligibility === 'account'
             ? { kind: 'midnight-passport-account' }
-            : {
-                kind: 'credential',
-                claim: draft.eligibility as 'nationality' | 'age' | 'membership' | 'residence',
-                value: draft.credentialValue,
-              },
+            : { kind: 'credential', claim: draft.eligibility, value: draft.credentialValue },
         opensAt: draft.opensAt ? new Date(draft.opensAt).getTime() : Date.now(),
         closesAt: new Date(draft.closesAt).getTime(),
       };
       const published = await publishPoll(value, 'simulation');
       setPolls((previous) => [...previous, published]);
       setNotice(
-        'Demo poll published on this device. Its visibility, options, schedule, and eligibility rules are now fixed. Live publishing remains unavailable.',
+        'Demo poll published on this device. Its question, options, schedule, results and who may answer are now locked. Live publishing is not available yet.',
       );
       setDraft({
         question: '',
@@ -391,187 +544,215 @@ export default function PollWorkspace() {
     }
   };
 
+  const answered = selected ? ballots.find((b) => b.pollId === selected.id) : undefined;
+  const selectedPhase = selected ? pollPhase(selected, now) : 'closed';
+  const draftCloses = draft.closesAt ? new Date(draft.closesAt).getTime() : undefined;
+  const nav: { tab: Tab; href: string; label: string; icon: ReactNode }[] = [
+    { tab: 'polls', href: '#polls', label: 'Polls', icon: <ListChecks size={20} /> },
+    { tab: 'organizer', href: '#organizer', label: 'Run a poll', icon: <Plus size={20} /> },
+    { tab: 'verify', href: '#verify', label: 'Verify', icon: <ShieldCheck size={20} /> },
+  ];
+
   return (
     <div className="poll-workspace">
       <a className="poll-skip" href="#poll-main">
         Skip to content
       </a>
-      <header className="poll-header">
-        <a href="/" className="poll-brand">
-          <img src="/brand/midnight-vote-d3-black.svg" width="38" height="24" alt="" />
-          midnight.vote
-        </a>
-        <nav aria-label="Poll workspace">
-          <a href="#polls" aria-current={tab === 'polls' ? 'page' : undefined}>
-            Explore
+      <div className="app-header-wrap">
+        <header className="app-header">
+          <a href="/" className="app-brand" aria-label="midnight.vote home">
+            <img src="/brand/midnight-vote-d3-black.svg" width="40" height="23" alt="" />
+            <span>
+              midnight<span className="app-brand__suffix">.vote</span>
+            </span>
           </a>
-          <a href="#organizer" aria-current={tab === 'organizer' ? 'page' : undefined}>
-            Organize
+          <nav className="app-nav" aria-label="Poll workspace">
+            {nav.map((item) => (
+              <a
+                key={item.tab}
+                href={item.href}
+                aria-current={tab === item.tab ? 'page' : undefined}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </nav>
+          <a
+            className="app-passport"
+            data-connected={connection ? 'true' : undefined}
+            href="#connect"
+            aria-current={tab === 'connect' ? 'page' : undefined}
+          >
+            <Fingerprint size={18} weight={connection ? 'fill' : 'regular'} />
+            <span className="app-passport__label">
+              {connection?.displayName ?? 'Midnight Passport'}
+            </span>
           </a>
-          <a href="#verify" aria-current={tab === 'verify' ? 'page' : undefined}>
-            Verify
-          </a>
-        </nav>
-        <a className="poll-account" href="#connect">
-          <Fingerprint size={18} />
-          {connection?.displayName ?? 'Midnight Passport'}
-        </a>
-      </header>
-      <div className="poll-release-note">
-        <span>Development preview</span> Official Midnight Passport connector · simulated polls ·
-        live voting unavailable
+        </header>
       </div>
-      <main id="poll-main" className="poll-main" tabIndex={-1}>
+      <main id="poll-main" className="app-main" tabIndex={-1}>
         {notice && (
-          <div className="poll-notice" role="status">
-            {notice}
+          <div className="app-notice" role="status">
+            <p>{notice}</p>
             <button type="button" aria-label="Dismiss message" onClick={() => setNotice('')}>
               ×
             </button>
           </div>
         )}
+
         {tab === 'connect' && (
           <>
-            <div className="poll-page-intro">
-              <p className="poll-kicker">Your account. Your consent.</p>
-              <h1>Start with Midnight Passport.</h1>
-              <p>
-                Create or connect your account in the official Midnight Passport window. You choose
-                which profile details to share.
-              </p>
-            </div>
-            <div className="poll-connect-grid">
-              <section className="poll-panel poll-connect-card">
-                <Fingerprint size={40} weight="thin" />
-                <h2>{connection ? 'Your profile is connected.' : 'One familiar way in.'}</h2>
-                {connection ? (
-                  <>
-                    <dl className="poll-facts">
-                      <dt>Display name</dt>
-                      <dd>{connection.displayName ?? 'Not shared'}</dd>
-                      <dt>Account network</dt>
-                      <dd>{connection.account?.network ?? 'Account not shared'}</dd>
-                      <dt>Account</dt>
-                      <dd className="poll-mono">{connection.account?.address ?? 'Not shared'}</dd>
-                      <dt>Voting authority</dt>
-                      <dd>Unavailable — profile consent is not an account-control proof</dd>
-                      <dt>Preview compatibility</dt>
-                      <dd>
-                        {connection.account?.network === 'stagenet'
-                          ? 'Different network — this is a Stagenet account'
-                          : 'Preview account authority still needs verification'}
-                      </dd>
-                    </dl>
-                    {connection.account && (
-                      <>
+            <Intro
+              title="Sign in with Midnight Passport."
+              lead="Create or connect your account in the official Midnight Passport window. You choose which profile details to share."
+            />
+            <div className="app-split">
+              <section className="app-card app-connect">
+                <div className="app-cover" aria-hidden="true">
+                  <span>Passport</span>
+                  <MidnightMark className="app-cover__mark" />
+                  <span>Midnight Network</span>
+                </div>
+                <div className="app-connect__body">
+                  <h2>
+                    {connection ? 'Your profile is connected.' : 'One way in, no seed phrase.'}
+                  </h2>
+                  {connection ? (
+                    <>
+                      <dl className="app-facts">
+                        <dt>Display name</dt>
+                        <dd>{connection.displayName ?? 'Not shared'}</dd>
+                        <dt>Account network</dt>
+                        <dd>{connection.account?.network ?? 'Account not shared'}</dd>
+                        <dt>Account</dt>
+                        <dd className="app-mono">{connection.account?.address ?? 'Not shared'}</dd>
+                        <dt>Voting authority</dt>
+                        <dd>Unavailable — profile consent is not an account-control proof</dd>
+                        <dt>Preview compatibility</dt>
+                        <dd>
+                          {connection.account?.network === 'stagenet'
+                            ? 'Different network — this is a Stagenet account'
+                            : 'Preview account authority still needs verification'}
+                        </dd>
+                      </dl>
+                      {connection.account && ACCOUNT_CHECK && (
+                        <>
+                          <button
+                            className="app-pill"
+                            type="button"
+                            disabled={connecting}
+                            onClick={() => void verifyAccount()}
+                          >
+                            {connecting ? 'Starting verification…' : 'Check account verification'}
+                          </button>
+                          <p className="app-small">
+                            Checks a fresh signed response on our server. The current Midnight
+                            Passport connector cannot yet prove account authority.
+                          </p>
+                        </>
+                      )}
+                      {accountVerification && (
+                        <div className="app-report" role="status">
+                          <h3>Server verification result</h3>
+                          <p>Response signature and fresh request: verified.</p>
+                          <p>Account authority: unavailable. Live voting remains blocked.</p>
+                          <ul>
+                            {accountVerification.blockers.map((blocker) => (
+                              <li key={blocker}>{blocker}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="app-actions">
+                        <a className="app-pill" href="#polls">
+                          Try a poll <Arrow />
+                        </a>
                         <button
-                          className="poll-primary"
+                          className="app-pill app-pill--ghost"
+                          type="button"
+                          onClick={() => {
+                            connectionAttempt.current++;
+                            client.current?.cancel();
+                            setConnection(null);
+                            setAccountVerification(null);
+                            setConnecting(false);
+                          }}
+                        >
+                          Disconnect profile
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        midnight.vote never asks for a seed phrase, a payment or a scan of your
+                        travel passport.
+                      </p>
+                      <div className="app-actions">
+                        <button
+                          className="app-pill"
                           type="button"
                           disabled={connecting}
-                          onClick={() => void verifyAccount()}
+                          onClick={() => void connect()}
                         >
-                          {connecting ? 'Starting verification…' : 'Check account verification'}
+                          {connecting
+                            ? 'Waiting for Midnight Passport…'
+                            : 'Create or connect Midnight Passport'}
+                          <Arrow />
                         </button>
-                        <p className="poll-small">
-                          Checks a fresh signed response on our server. The current Midnight
-                          Passport connector cannot yet prove account authority.
-                        </p>
-                      </>
-                    )}
-                    {accountVerification && (
-                      <div className="poll-verification-report" role="status">
-                        <h3>Server verification result</h3>
-                        <p>Response signature and fresh request: verified.</p>
-                        <p>Account authority: unavailable. Live voting remains blocked.</p>
-                        <ul>
-                          {accountVerification.blockers.map((blocker) => (
-                            <li key={blocker}>{blocker}</li>
-                          ))}
-                        </ul>
+                        {connecting && (
+                          <button
+                            className="app-pill app-pill--ghost"
+                            type="button"
+                            onClick={() => {
+                              connectionAttempt.current++;
+                              client.current?.cancel();
+                              setConnecting(false);
+                              setNotice('Connection cancelled. No voting permission was granted.');
+                            }}
+                          >
+                            Cancel connection
+                          </button>
+                        )}
                       </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        connectionAttempt.current++;
-                        client.current?.cancel();
-                        setConnection(null);
-                        setAccountVerification(null);
-                        setConnecting(false);
-                      }}
-                    >
-                      Disconnect profile
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      No seed phrase, payment, or physical-passport scan is requested by
-                      midnight.vote.
-                    </p>
-                    <button
-                      className="poll-primary"
-                      type="button"
-                      disabled={connecting}
-                      onClick={() => void connect()}
-                    >
-                      {connecting
-                        ? 'Waiting for Midnight Passport…'
-                        : 'Create or connect Midnight Passport'}
-                      <ArrowUpRight size={18} />
-                    </button>
-                    {connecting && (
                       <button
+                        className="app-text-button"
                         type="button"
                         onClick={() => {
-                          connectionAttempt.current++;
-                          client.current?.cancel();
-                          setConnecting(false);
-                          setNotice('Connection cancelled. No voting permission was granted.');
+                          try {
+                            client.current?.redirect();
+                          } catch (error) {
+                            setNotice(
+                              error instanceof Error
+                                ? error.message
+                                : 'Could not start the redirect.',
+                            );
+                          }
                         }}
                       >
-                        Cancel connection
+                        Connect using a full-page redirect
                       </button>
-                    )}
-                    <button
-                      className="poll-text-button"
-                      type="button"
-                      onClick={() => {
-                        try {
-                          client.current?.redirect();
-                        } catch (error) {
-                          setNotice(
-                            error instanceof Error
-                              ? error.message
-                              : 'Could not start the redirect.',
-                          );
-                        }
-                      }}
-                    >
-                      Connect using a full-page redirect
-                    </button>
-                  </>
-                )}
-                <a href="#polls" className="poll-text-link">
-                  Explore the demonstration <ArrowUpRight size={16} />
-                </a>
+                    </>
+                  )}
+                </div>
               </section>
-              <aside className="poll-panel">
-                <h2>Connection and eligibility are separate.</h2>
+              <aside className="app-card app-aside">
+                <h2>Signing in and being eligible are separate.</h2>
                 <p>
-                  A Midnight Passport account is the entry point. Open polls will require proof that
-                  you control that account, with one response per account.
+                  Your Midnight Passport account is the way in. Open polls will ask for proof that
+                  you control that account, with one answer per account.
                 </p>
                 <p>
-                  Regional rules need an additional verified claim. A physical passport scanned over
-                  NFC is a later credential path; it is not Midnight Passport.
+                  Polls for one country, an age or a membership need a proven fact as well. That
+                  comes with verifiable credentials, planned for Midnight Passport v2 (Q1 2027).
                 </p>
-                <p className="poll-small">
+                <p className="app-small">
                   Current account network: Stagenet. Voting target: Midnight Preview. A Stagenet
                   profile does not become a Preview account.
                 </p>
                 <details>
-                  <summary>Upstream and midnight.vote work</summary>
+                  <summary>What upstream and midnight.vote still have to build</summary>
                   <ul>
                     {PILOT_GATES.map((gate) => (
                       <li key={gate.id}>
@@ -584,191 +765,220 @@ export default function PollWorkspace() {
             </div>
           </>
         )}
-        {tab === 'polls' && (
+
+        {tab === 'polls' && !selected && (
           <>
-            <div className="poll-page-intro">
-              <p className="poll-kicker">Small questions. Shared possibilities.</p>
-              <h1>A voice in what comes next.</h1>
-              <p>
-                Connect with Midnight Passport. Check the rules. Vote once. Keep a way to verify.
-              </p>
-            </div>
-            {selected ? (
-              <section className="poll-panel poll-ballot">
-                <button
-                  type="button"
-                  className="poll-text-button"
-                  onClick={() => {
-                    setSelected(null);
-                    setChoice(null);
-                  }}
-                >
-                  <ArrowLeft size={16} /> All polls
-                </button>
-                <div className="poll-card-meta">
-                  <span>{VISIBILITY_COPY[selected.visibility].label}</span>
-                  <span>Demo</span>
-                </div>
-                <h2>{selected.question}</h2>
-                <p>{selected.description}</p>
-                <div className="poll-rule">
-                  <LockKey size={19} />
-                  <p>
-                    {VISIBILITY_COPY[selected.visibility].description}
-                    <small>
-                      These are the intended live rules. This demonstration sends nothing to the
-                      blockchain.
-                    </small>
-                  </p>
-                </div>
-                <fieldset
-                  disabled={
-                    pollPhase(selected, now) !== 'open' ||
-                    ballots.some((b) => b.pollId === selected.id) ||
-                    selected.eligibility.kind !== 'midnight-passport-account'
-                  }
-                >
-                  <legend>Your answer</legend>
-                  {selected.options.map((option, index) => (
-                    <label className="poll-option" key={option}>
-                      <input
-                        type="radio"
-                        name="choice"
-                        checked={choice === index}
-                        onChange={() => setChoice(index)}
-                      />
-                      <span>{option}</span>
-                    </label>
-                  ))}
-                </fieldset>
-                {selected.eligibility.kind !== 'midnight-passport-account' && (
-                  <p className="poll-unavailable">
-                    Requires verified {selected.eligibility.claim}: {selected.eligibility.value}.
-                    This credential is unavailable. Choosing a country or connecting a profile does
-                    not grant eligibility.
-                  </p>
-                )}
-                {selected.visibility === 'public' && (
-                  <label className="poll-public-consent">
-                    <input
-                      type="checkbox"
-                      checked={publicConsent}
-                      onChange={(event) => setPublicConsent(event.target.checked)}
-                    />
-                    I understand that a public poll publishes the account and its choice after
-                    closing. This demonstration uses a simulated account.
-                  </label>
-                )}
-                <button
-                  className="poll-primary"
-                  type="button"
-                  disabled={
-                    choice === null ||
-                    (selected.visibility === 'public' && !publicConsent) ||
-                    busy ||
-                    ballots.some((b) => b.pollId === selected.id) ||
-                    pollPhase(selected, now) !== 'open' ||
-                    selected.eligibility.kind !== 'midnight-passport-account'
-                  }
-                  onClick={() => void simulateVote()}
-                >
-                  {ballots.some((b) => b.pollId === selected.id)
-                    ? 'Demo answer saved'
-                    : 'Save a demo answer'}
-                  <Check size={18} />
-                </button>
-                <p className="poll-small">
-                  The live design counts an accepted vote without another visit. Current
-                  demonstration answers last for this browser session.
-                </p>
-                {receipt?.opening.pollId === selected.id && (
-                  <a href="#verify" className="poll-text-link">
-                    Export and verify your demo receipt <ArrowUpRight size={16} />
-                  </a>
-                )}
-                {pollPhase(selected, now) === 'closed' && (
-                  <div className="poll-results">
-                    <h3>Local demonstration totals</h3>
-                    {selected.options.map((option, index) => (
-                      <p key={option}>
-                        {option}
-                        <strong>
-                          {
-                            ballots.filter((b) => b.pollId === selected.id && b.choice === index)
-                              .length
-                          }
-                        </strong>
-                      </p>
-                    ))}
-                    <small>Not a blockchain tally or a cryptographic aggregate proof.</small>
-                    {selected.visibility !== 'private' && (
-                      <>
-                        <h3>
-                          {selected.visibility === 'public'
-                            ? 'Public demonstration answers'
-                            : 'Anonymous demonstration answers'}
-                        </h3>
-                        {ballots
-                          .filter((ballot) => ballot.pollId === selected.id)
-                          .map((ballot) => (
-                            <p key={ballot.receipt.commitment}>
-                              {selected.visibility === 'public' ? `${ballot.publicAccount}: ` : ''}
-                              {selected.options[ballot.choice]}
-                            </p>
-                          ))}
-                      </>
-                    )}
-                  </div>
-                )}
-              </section>
-            ) : (
-              <div className="poll-grid">
-                {polls.map((poll, index) => (
-                  <article className="poll-card" key={poll.id}>
-                    <div className="poll-card-meta">
-                      <span>{VISIBILITY_COPY[poll.visibility].label}</span>
-                      <span>{pollPhase(poll, now)}</span>
+            <Intro
+              title="Understand before you answer."
+              lead="Each poll comes with Cleisthenes’ briefing: what each side says, and who says it. Then the answer is yours."
+            >
+              <DemoNote />
+            </Intro>
+            <div className="app-poll-grid">
+              {polls.map((poll) => {
+                const briefing = BRIEFINGS[poll.id];
+                const done = ballots.some((b) => b.pollId === poll.id);
+                return (
+                  <article className="app-card app-poll-card" key={poll.id}>
+                    <div className="app-poll-card__top">
+                      <span className="app-chip">{VISIBILITY_COPY[poll.visibility].label}</span>
+                      <span className="app-status" data-phase={pollPhase(poll, now)}>
+                        {done ? 'Answered' : phaseLabel(poll, now)}
+                      </span>
                     </div>
-                    <span className="poll-card-number">{String(index + 1).padStart(2, '0')}</span>
                     <h2>{poll.question}</h2>
                     <p>{poll.description}</p>
-                    <div className="poll-card-foot">
+                    <div className="app-poll-card__by">
+                      <Face />
                       <span>
-                        {poll.eligibility.kind === 'midnight-passport-account'
-                          ? 'Midnight Passport account'
-                          : `Verified ${poll.eligibility.claim}`}
+                        <strong>Cleisthenes</strong>
+                        {briefing
+                          ? `${briefing.for.length + briefing.against.length} points, both sides`
+                          : 'No briefing yet'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelected(poll);
-                          setChoice(null);
-                          setPublicConsent(false);
-                        }}
-                      >
-                        Explore demo <ArrowUpRight size={17} />
+                    </div>
+                    <div className="app-poll-card__foot">
+                      <span>{whoMayAnswer(poll)}</span>
+                      <button type="button" className="app-pill" onClick={() => openPoll(poll)}>
+                        Open poll <Arrow />
                       </button>
                     </div>
                   </article>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </>
         )}
+
+        {tab === 'polls' && selected && (
+          <div className="app-ballot">
+            <section className="app-ballot__main" aria-labelledby="ballot-question">
+              <button type="button" className="app-back" onClick={() => openPoll(null)}>
+                <ArrowLeft size={16} weight="bold" /> All polls
+              </button>
+              <div className="app-chips">
+                <span className="app-chip">{VISIBILITY_COPY[selected.visibility].label}</span>
+                <span className="app-status" data-phase={selectedPhase}>
+                  {phaseLabel(selected, now)}
+                </span>
+                <span className="app-chip app-chip--accent">Demo</span>
+              </div>
+              <h1 id="ballot-question">{selected.question}</h1>
+              <p className="app-lead">{selected.description}</p>
+              <div className="app-ballot__brief-inline">
+                <BriefingCard poll={selected} />
+              </div>
+
+              {answered ? (
+                <div className="app-card app-saved" role="status">
+                  <span className="app-seal" aria-hidden="true">
+                    <Check size={26} weight="bold" />
+                  </span>
+                  <div>
+                    <h2>Your demo answer is saved.</h2>
+                    <p>
+                      You chose <strong>{selected.options[answered.choice]}</strong>. Nothing was
+                      sent to Midnight: the answer stays in this browser session. In the live
+                      design, an accepted answer is counted without another visit.
+                    </p>
+                    <div className="app-actions">
+                      <a className="app-pill" href="#verify">
+                        Keep a receipt <Arrow />
+                      </a>
+                      <button
+                        type="button"
+                        className="app-pill app-pill--ghost"
+                        onClick={() => openPoll(null)}
+                      >
+                        Back to polls
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <form
+                  className="app-answer"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void simulateVote();
+                  }}
+                >
+                  <fieldset
+                    disabled={
+                      selectedPhase !== 'open' ||
+                      selected.eligibility.kind !== 'midnight-passport-account'
+                    }
+                  >
+                    <legend>Your answer</legend>
+                    {selected.options.map((option, index) => (
+                      <label className="app-option" key={option}>
+                        <input
+                          type="radio"
+                          name="choice"
+                          checked={choice === index}
+                          onChange={() => setChoice(index)}
+                        />
+                        <span className="app-option__dot" aria-hidden="true" />
+                        <span>{option}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  {selected.eligibility.kind !== 'midnight-passport-account' && (
+                    <p className="app-unavailable">
+                      Requires verified {selected.eligibility.claim}: {selected.eligibility.value}.
+                      Proving it needs verifiable credentials, planned for Midnight Passport v2 (Q1
+                      2027), so this poll cannot take answers yet. Choosing a country or connecting
+                      a profile does not grant eligibility.
+                    </p>
+                  )}
+                  {selected.visibility === 'public' && (
+                    <label className="app-consent">
+                      <input
+                        type="checkbox"
+                        checked={publicConsent}
+                        onChange={(event) => setPublicConsent(event.target.checked)}
+                      />
+                      <span>
+                        I understand that a public poll publishes the account and its choice after
+                        closing. This demonstration uses a simulated account.
+                      </span>
+                    </label>
+                  )}
+                  {selectedPhase === 'open' && (
+                    <button
+                      className="app-pill app-pill--large"
+                      type="submit"
+                      disabled={
+                        choice === null ||
+                        (selected.visibility === 'public' && !publicConsent) ||
+                        busy ||
+                        selected.eligibility.kind !== 'midnight-passport-account'
+                      }
+                    >
+                      Save a demo answer <Check size={18} weight="bold" />
+                    </button>
+                  )}
+                </form>
+              )}
+
+              {selectedPhase === 'closed' && (
+                <div className="app-card app-results">
+                  <h3>Local demonstration totals</h3>
+                  {selected.options.map((option, index) => (
+                    <p key={option}>
+                      {option}
+                      <strong>
+                        {
+                          ballots.filter((b) => b.pollId === selected.id && b.choice === index)
+                            .length
+                        }
+                      </strong>
+                    </p>
+                  ))}
+                  <small>Not a blockchain tally or a cryptographic aggregate proof.</small>
+                  {selected.visibility !== 'private' && (
+                    <>
+                      <h3>
+                        {selected.visibility === 'public'
+                          ? 'Public demonstration answers'
+                          : 'Anonymous demonstration answers'}
+                      </h3>
+                      {ballots
+                        .filter((ballot) => ballot.pollId === selected.id)
+                        .map((ballot) => (
+                          <p key={ballot.receipt.commitment}>
+                            {selected.visibility === 'public' ? `${ballot.publicAccount}: ` : ''}
+                            {selected.options[ballot.choice]}
+                          </p>
+                        ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </section>
+            <aside className="app-ballot__side">
+              <BriefingCard poll={selected} />
+              <RulesCard
+                visibility={selected.visibility}
+                eligibility={selected.eligibility}
+                closesAt={selected.closesAt}
+                rulesHash={selected.rulesHash}
+              />
+            </aside>
+          </div>
+        )}
+
         {tab === 'organizer' && (
           <>
-            <div className="poll-page-intro">
-              <p className="poll-kicker">For people who bring people together.</p>
-              <h1>Make room for a shared decision.</h1>
-              <p>Draft a question, choose who can answer, and explain what becomes public.</p>
-            </div>
-            <div className="poll-organizer-grid">
-              <form className="poll-panel poll-form" onSubmit={(event) => void publishDemo(event)}>
-                <h2>Create a demonstration poll</h2>
-                <p className="poll-small">
-                  This local workspace stores poll definitions on this device. It is not an
-                  authenticated live organizer account.
-                </p>
+            <Intro
+              title="Run a poll for your group."
+              lead="Ask your club, your class or your building. Choose who can answer and what the results show; the rules lock when the poll opens."
+            >
+              <DemoNote />
+            </Intro>
+            <div className="app-organizer">
+              <form className="app-card app-form" onSubmit={(event) => void publishDemo(event)}>
+                <h2>Your question</h2>
                 <label>
                   Question
                   <input
@@ -786,6 +996,7 @@ export default function PollWorkspace() {
                     value={draft.description}
                     onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                     rows={3}
+                    placeholder="A sentence or two so everyone knows what is being decided."
                   />
                 </label>
                 <label>
@@ -797,10 +1008,10 @@ export default function PollWorkspace() {
                     rows={4}
                   />
                 </label>
-                <fieldset>
+                <fieldset className="app-modes">
                   <legend>What becomes public after closing?</legend>
-                  {(['public', 'anonymous', 'private'] as const).map((mode) => (
-                    <label className="poll-visibility-option" key={mode}>
+                  {(['private', 'anonymous', 'public'] as const).map((mode) => (
+                    <label className="app-mode" key={mode}>
                       <input
                         type="radio"
                         name="visibility"
@@ -818,13 +1029,16 @@ export default function PollWorkspace() {
                   Who may answer?
                   <select
                     value={draft.eligibility}
-                    onChange={(e) => setDraft({ ...draft, eligibility: e.target.value })}
+                    onChange={(e) =>
+                      setDraft({ ...draft, eligibility: e.target.value as Eligibility })
+                    }
                   >
-                    <option value="account">Any proven Midnight Passport account</option>
-                    <option value="nationality">Verified nationality</option>
-                    <option value="residence">Verified residence</option>
-                    <option value="age">Verified age</option>
-                    <option value="membership">Verified community membership</option>
+                    <option value="account">Anyone with a Midnight Passport account</option>
+                    {(Object.keys(CLAIMS) as (keyof typeof CLAIMS)[]).map((claim) => (
+                      <option key={claim} value={claim}>
+                        {CLAIMS[claim]} (Midnight Passport v2)
+                      </option>
+                    ))}
                   </select>
                 </label>
                 {draft.eligibility !== 'account' && (
@@ -836,12 +1050,12 @@ export default function PollWorkspace() {
                       onChange={(e) => setDraft({ ...draft, credentialValue: e.target.value })}
                     />
                     <small>
-                      Credential-restricted polls remain unavailable until a genuine provider
-                      verifies this claim.
+                      Proven facts like this come with verifiable credentials, planned for Midnight
+                      Passport v2 (Q1 2027). Until then this poll cannot take answers.
                     </small>
                   </label>
                 )}
-                <div className="poll-dates">
+                <div className="app-dates">
                   <label>
                     Opens — optional
                     <input
@@ -860,64 +1074,81 @@ export default function PollWorkspace() {
                     />
                   </label>
                 </div>
-                <p className="poll-small">
-                  Publishing fixes the question, options, schedule, visibility, and eligibility.
-                  Published rules cannot be edited.
-                </p>
-                <button className="poll-primary" type="submit" disabled={busy}>
-                  <Plus size={18} />
+                <button className="app-pill app-pill--large" type="submit" disabled={busy}>
+                  <Plus size={18} weight="bold" />
                   Publish demo on this device
                 </button>
-              </form>
-              <aside className="poll-panel">
-                <h2>Before a live pilot</h2>
-                <p>
-                  Live organizer actions require independently verified Midnight Passport account
-                  authority.
+                <p className="app-small">
+                  Publishing locks the question, options, schedule, results and who may answer.
+                  Nobody can edit them afterwards, the organizer included.
                 </p>
-                <ul>
-                  {releaseBlockers().map((blocker) => (
-                    <li key={blocker}>{blocker}</li>
+              </form>
+              <aside className="app-organizer__side">
+                <RulesCard
+                  preview
+                  question={draft.question}
+                  visibility={draft.visibility}
+                  eligibility={
+                    draft.eligibility === 'account'
+                      ? { kind: 'midnight-passport-account' }
+                      : {
+                          kind: 'credential',
+                          claim: draft.eligibility,
+                          value: draft.credentialValue,
+                        }
+                  }
+                  closesAt={draftCloses}
+                />
+                <section className="app-card app-records">
+                  <h2>Your polls on this device</h2>
+                  {polls.map((poll) => (
+                    <div className="app-record" key={poll.id}>
+                      <strong>{poll.question}</strong>
+                      <span>
+                        {VISIBILITY_COPY[poll.visibility].label} · {phaseLabel(poll, now)}
+                      </span>
+                      <button
+                        type="button"
+                        className="app-text-button"
+                        onClick={() => {
+                          saveFile(
+                            JSON.stringify({ kind: 'midnight.vote/demo-poll/v1', poll }, null, 2),
+                            `${poll.id}.demo-poll.json`,
+                          );
+                        }}
+                      >
+                        Download poll definition
+                      </button>
+                    </div>
                   ))}
-                </ul>
-                <h3>Published on this device</h3>
-                {polls.map((poll) => (
-                  <div className="poll-organizer-record" key={poll.id}>
-                    <strong>{poll.question}</strong>
-                    <span>
-                      {VISIBILITY_COPY[poll.visibility].label} · {pollPhase(poll, now)}
-                    </span>
-                    <small className="poll-mono">Rules: {poll.rulesHash.slice(0, 18)}…</small>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        saveFile(
-                          JSON.stringify({ kind: 'midnight.vote/demo-poll/v1', poll }, null, 2),
-                          `${poll.id}.demo-poll.json`,
-                        );
-                      }}
-                    >
-                      Download poll definition
-                    </button>
-                  </div>
-                ))}
+                  <details>
+                    <summary>Before a live pilot</summary>
+                    <p className="app-small">
+                      Live organizer actions need independently verified Midnight Passport account
+                      authority.
+                    </p>
+                    <ul>
+                      {releaseBlockers().map((blocker) => (
+                        <li key={blocker}>{blocker}</li>
+                      ))}
+                    </ul>
+                  </details>
+                </section>
               </aside>
             </div>
           </>
         )}
+
         {tab === 'verify' && (
           <>
-            <div className="poll-page-intro">
-              <p className="poll-kicker">A record you can check.</p>
-              <h1>Your answer. Your evidence.</h1>
-              <p>
-                Recover a private receipt and check its ballot commitment. Live chain confirmation
-                and tally proofs are separate checks.
-              </p>
-            </div>
-            <div className="poll-connect-grid">
-              <section className="poll-panel poll-form">
-                <ShieldCheck size={38} weight="thin" />
+            <Intro
+              title="Keep a receipt you can check."
+              lead="Save your answer as an encrypted file. Restore it later to check that it matches your ballot commitment."
+            >
+              <DemoNote />
+            </Intro>
+            <div className="app-split">
+              <section className="app-card app-form">
                 <h2>Keep or restore your receipt</h2>
                 <label>
                   Recovery passphrase
@@ -930,13 +1161,13 @@ export default function PollWorkspace() {
                     placeholder="At least 12 characters"
                   />
                 </label>
-                <p className="poll-small">
-                  Encryption happens on your device. The passphrase is never uploaded. Exported
-                  files contain private choice material; keep them secure.
+                <p className="app-small">
+                  Encryption happens on your device and the passphrase is never uploaded. The file
+                  holds your private choice, so keep it safe.
                 </p>
-                <div className="poll-button-row">
+                <div className="app-actions">
                   <button
-                    className="poll-primary"
+                    className="app-pill"
                     disabled={!receipt || busy || passphrase.length < 12}
                     type="button"
                     onClick={() => void download()}
@@ -944,6 +1175,7 @@ export default function PollWorkspace() {
                     Export encrypted receipt
                   </button>
                   <button
+                    className="app-pill app-pill--ghost"
                     disabled={busy || passphrase.length < 12}
                     type="button"
                     onClick={() => fileInput.current?.click()}
@@ -951,6 +1183,12 @@ export default function PollWorkspace() {
                     Restore receipt
                   </button>
                 </div>
+                {!receipt && (
+                  <p className="app-small">
+                    No receipt yet. <a href="#polls">Answer a demo poll</a> first, or restore a file
+                    you kept.
+                  </p>
+                )}
                 <input
                   ref={fileInput}
                   type="file"
@@ -962,15 +1200,18 @@ export default function PollWorkspace() {
                   }}
                 />
                 {receipt && (
-                  <div className="poll-receipt">
-                    <span className="poll-badge">
+                  <div className="app-receipt">
+                    <span className="app-chip app-chip--accent">
                       {receipt.environment === 'simulation'
                         ? 'Simulation receipt'
                         : 'Unverified imported Preview receipt'}
                     </span>
-                    <dl className="poll-facts">
+                    <dl className="app-facts">
                       <dt>Poll</dt>
-                      <dd>{receipt.opening.pollId}</dd>
+                      <dd>
+                        {polls.find((p) => p.id === receipt.opening.pollId)?.question ??
+                          receipt.opening.pollId}
+                      </dd>
                       <dt>Your private answer</dt>
                       <dd>
                         {polls.find((p) => p.id === receipt.opening.pollId)?.options[
@@ -978,16 +1219,19 @@ export default function PollWorkspace() {
                         ] ?? `Option ${receipt.opening.choice + 1}`}
                       </dd>
                       <dt>Commitment</dt>
-                      <dd className="poll-mono">{receipt.commitment}</dd>
+                      <dd className="app-mono">{receipt.commitment}</dd>
                     </dl>
-                    <ol className="poll-verification-steps">
-                      <li>Opening matches commitment — checked locally on import</li>
+                    <ol className="app-checks">
+                      <li data-done="true">
+                        Opening matches commitment — checked locally on import
+                      </li>
                       <li>Blockchain confirmation — not established</li>
                       <li>Included in final tally — not established</li>
                       <li>Aggregate proof — not established</li>
                     </ol>
                     <button
                       type="button"
+                      className="app-text-button"
                       onClick={() => {
                         setReceipt(null);
                         setPassphrase('');
@@ -998,26 +1242,29 @@ export default function PollWorkspace() {
                   </div>
                 )}
               </section>
-              <aside className="poll-panel">
-                <h2>Verification has four parts.</h2>
-                <p>
-                  <strong>Submitted:</strong> the relay received a request.
-                </p>
-                <p>
-                  <strong>Confirmed:</strong> the blockchain independently records the ballot.
-                </p>
-                <p>
-                  <strong>Included:</strong> that ballot belongs to the complete set counted.
-                </p>
-                <p>
-                  <strong>Finalized:</strong> the published result and its proof verify.
-                </p>
-                <p>
-                  A receipt file alone cannot establish the last three. A future live verifier must
-                  read canonical chain data and verify the tally proof.
+              <aside className="app-card app-aside">
+                <h2>Four checks, one answer.</h2>
+                <ol className="app-steps">
+                  <li>
+                    <strong>Submitted</strong> The relay received your answer.
+                  </li>
+                  <li>
+                    <strong>Confirmed</strong> The blockchain records the ballot on its own.
+                  </li>
+                  <li>
+                    <strong>Included</strong> The ballot is in the complete set that was counted.
+                  </li>
+                  <li>
+                    <strong>Finalized</strong> The published result and its proof verify.
+                  </li>
+                </ol>
+                <p className="app-small">
+                  A receipt file alone cannot prove the last three. A live verifier will read the
+                  chain and check the tally proof.
                 </p>
                 <button
                   type="button"
+                  className="app-text-button"
                   onClick={() =>
                     void digest(releaseBlockers()).then((reportHash) =>
                       saveFile(
@@ -1038,16 +1285,35 @@ export default function PollWorkspace() {
           </>
         )}
       </main>
-      <footer className="poll-footer">
-        <span>midnight.vote · Understand more. Disclose less.</span>
-        <a href="https://github.com/tomasgarro/midnight-vote" target="_blank" rel="noreferrer">
-          Source code <ArrowUpRight size={14} />
-        </a>
-        {import.meta.env.VITE_INCLUDE_LEGACY === 'true' && (
-          <a href="/legacy.html#app">Previous consultation demo</a>
-        )}
+      <footer className="app-footer">
+        <div className="app-footer__brand">
+          <a href="/" className="app-brand">
+            <img src="/brand/midnight-vote-d3-black.svg" width="34" height="20" alt="" />
+            <span>
+              midnight<span className="app-brand__suffix">.vote</span>
+            </span>
+          </a>
+          <p>Understand more. Disclose less.</p>
+        </div>
+        <nav aria-label="Footer">
+          <a href="#polls">Polls</a>
+          <a href="#organizer">Run a poll</a>
+          <a href="#verify">Verify</a>
+          <a href="/docs">Docs</a>
+          <a href="/feedback">Feedback</a>
+          <a href="https://github.com/tomasgarro/midnight-vote" target="_blank" rel="noreferrer">
+            Source code <Arrow size={13} />
+          </a>
+          <a href="https://midnight.network" target="_blank" rel="noreferrer">
+            Midnight <Arrow size={13} />
+          </a>
+          {import.meta.env.VITE_INCLUDE_LEGACY === 'true' && (
+            <a href="/legacy.html#app">Previous consultation demo</a>
+          )}
+        </nav>
         <button
           type="button"
+          className="app-text-button"
           onClick={() => {
             try {
               localStorage.removeItem(STORAGE_KEY);
@@ -1057,12 +1323,21 @@ export default function PollWorkspace() {
             setBallots([]);
             setReceipt(null);
             setPolls([]);
+            openPoll(null);
             setNotice('Local demonstration polls and this session’s answers cleared.');
           }}
         >
           Clear local demo data
         </button>
       </footer>
+      <nav className="app-tabbar" aria-label="Poll workspace, phone">
+        {nav.map((item) => (
+          <a key={item.tab} href={item.href} aria-current={tab === item.tab ? 'page' : undefined}>
+            {item.icon}
+            <span>{item.label}</span>
+          </a>
+        ))}
+      </nav>
     </div>
   );
 }
