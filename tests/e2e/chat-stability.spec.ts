@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './demo-clock';
 
 test.use({ video: 'on' });
 
@@ -60,11 +60,18 @@ test('landing story animates on laptop height and respects reduced motion', asyn
   await page.setViewportSize({ width: 1440, height: 740 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await expect(page.locator('.how-track')).toHaveAttribute('data-pinned', 'true');
-  await page.getByRole('button', { name: '02 Prove', exact: true }).click();
-  await expect(page.locator('.how-track')).toHaveAttribute('data-step', '2');
+  await expect(page.locator('.journey')).toHaveAttribute('data-motion', 'on');
+  await page.locator('.landing-header').getByRole('link', { name: 'How it works' }).click();
+  await expect
+    .poll(() =>
+      page
+        .locator('.pc-word')
+        .last()
+        .evaluate((el) => getComputedStyle(el).opacity),
+    )
+    .toBe('1');
   await page.screenshot({ path: 'outputs/landing-laptop-motion.png' });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(page.locator('.how-track')).toHaveAttribute('data-pinned', 'false');
-  await expect(page.locator('.how-panel[aria-hidden="true"]')).toHaveCount(0);
+  await expect(page.locator('.journey')).toHaveAttribute('data-motion', 'off');
+  await expect(page.locator('.pc-part__text').first()).toBeVisible();
 });

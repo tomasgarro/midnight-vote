@@ -1,0 +1,14 @@
+pragma language_version 0.28;
+import CompactStandardLibrary;
+
+// Typed calls follow the compiler's composable/direct example. No production
+// deployment or complete credential-registry integration is implied.
+contract RegistryRootOracle { circuit assertRoot(candidate: Bytes<32>): []; }
+ledger registry: RegistryRootOracle;
+export ledger admittedRoots: Set<Bytes<32>>;
+constructor(oracle: RegistryRootOracle) { registry = disclose(oracle); }
+export circuit admitRoot(candidate: Bytes<32>): [] {
+  const root = disclose(candidate);
+  registry.assertRoot(root);
+  admittedRoots.insert(root);
+}

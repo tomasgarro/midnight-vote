@@ -1,0 +1,411 @@
+import { useEffect, useRef, useState } from 'react';
+import { HERO_ASSETS } from './hero-assets';
+import { PassportChapter } from './PassportChapter';
+import { PorticoHero } from './PorticoHero';
+import { BEATS, beatAt, STEP as PART_LENGTH, PARTS_AT, STEPS } from './passport-beats';
+import './portico-hero.css';
+import './passport-chapter.css';
+import type { PassportScene } from './passport-scene';
+import { loadScroll, SCROLL_SCENES, useMediaQuery } from './scroll';
+
+type Beat = (at: number) => number;
+
+/** The ring's opening, as a share of its outer diameter. */
+const RING_OPENING = 0.8156;
+/** Timeline positions, in screens of scrolling. */
+const LOGO_AT = 1.3;
+const PHRASE_AT = 1.95;
+const END_AT = PARTS_AT + STEPS * PART_LENGTH;
+const GLYPHS = 'abcdefghjkmnpqrstuvwxyz0123456789';
+
+/**
+ * Decodes the address into the name, left to right, as `q` goes from 0 to 1: a front sweeps across
+ * the line; behind it the name, ahead of it the address, and on it characters still turning over.
+ */
+function decode(card: HTMLElement, q: number) {
+  const address = card.querySelector<HTMLElement>('.pc-decode__addr');
+  const name = card.querySelector<HTMLElement>('.pc-decode__name');
+  const edge = card.querySelector<HTMLElement>('.pc-decode__edge');
+  if (!address || !name || !edge) return;
+  // the sweep crosses the longer of the two, and the band of turning characters on either side
+  const band = 72;
+  const width = Math.max(address.offsetWidth, name.offsetWidth);
+  card.style.setProperty('--q', q.toFixed(4));
+  card.style.setProperty('--front', `${(-band + q * (width + 2 * band)).toFixed(1)}px`);
+  const key = Math.round(q * 240);
+  let text = '';
+  for (let i = 0; i < 9; i += 1) {
+    const n = Math.abs(Math.sin((i + key * 0.37) * 12.9898) * 43758.5453) % 1;
+    text += GLYPHS[Math.floor(n * GLYPHS.length)] ?? 'x';
+  }
+  edge.textContent = q > 0 && q < 1 ? text : '';
+}
+
+/**
+ * The hero and the chapter share one pinned stage. Scrolling flies through the portico and into the
+ * passport; the Midnight symbol on the cover becomes a doorway, the dusk shows through it, and the
+ * camera passes through. Inside, the symbol builds itself again and then carries the five steps of
+ * how Midnight Passport works. Without motion the same content is a plain page.
+ */
+export function PassportJourney({ onStart }: { onStart: () => void }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const revealAllowed = useRef(true);
+  const wantsMotion = useMediaQuery(SCROLL_SCENES);
+  const [failed, setFailed] = useState(false);
+  const motion = wantsMotion && !failed;
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!motion || !section) return;
+    let revert: (() => void) | undefined;
+    let scene: PassportScene | undefined;
+    const onResize = () => scene?.resize();
+    let cancelled = false;
+    loadScroll()
+      .then(({ gsap, ScrollTrigger }) => {
+        if (cancelled) return;
+        const context = gsap.context(() => {
+          const stage = section.querySelector<HTMLElement>('.journey-stage');
+          const chapter = section.querySelector<HTMLElement>('.pc');
+          const wrap = section.querySelector<HTMLElement>('.ph-hand-wrap');
+          const hand = section.querySelector<HTMLElement>('.hero-hand');
+          const markBox = section.querySelector<HTMLElement>('.pc-mark');
+          const mark = markBox?.querySelector<SVGSVGElement>('svg');
+          if (!stage || !chapter || !wrap || !hand || !markBox || !mark) return;
+          const { symbol } = HERO_ASSETS;
+
+          const W = () => stage.clientWidth;
+          const H = () => stage.clientHeight;
+          const logoX = () => wrap.offsetLeft + hand.offsetLeft + symbol.x * hand.offsetWidth;
+          const logoY = () => wrap.offsetTop + hand.offsetTop + symbol.y * hand.offsetHeight;
+          /** Enough zoom for the ring's opening to cover the whole stage: then we are through. */
+          const through = () =>
+            (Math.hypot(W(), H()) / (RING_OPENING * symbol.size * hand.offsetWidth)) * 1.3;
+
+          gsap.set(hand, {
+            transformOrigin: `${symbol.x * 100}% ${symbol.y * 100}%`,
+            '--cover-flat': 0,
+          });
+          gsap.set(markBox, { autoAlpha: 0 });
+
+          const timeline = gsap.timeline({
+            defaults: { ease: 'none' },
+            scrollTrigger: {
+              trigger: section,
+              start: 'top top',
+              end: 'bottom bottom',
+              scrub: 0.6,
+              invalidateOnRefresh: true,
+              onUpdate: (self) => {
+                // the hand stays interactive until the zoom really starts (0.12 of 5.4+ screens)
+                revealAllowed.current = self.progress < 0.02;
+              },
+              onRefresh: (self) => {
+                const anchor = anchorRef.current;
+                if (anchor)
+                  anchor.style.top = `${((PHRASE_AT + 0.55) / timeline.duration()) * (self.end - self.start)}px`;
+              },
+            },
+          });
+
+          // 1. Through the portico, into the passport, through the ring.
+          timeline
+            .to(
+              '.ph-copy',
+              { autoAlpha: 0, y: -50, filter: 'blur(6px)', duration: 0.25, ease: 'power1.in' },
+              0,
+            )
+            .to('.ph-portico', { scale: 2.8, duration: 0.6, ease: 'power2.in' }, 0)
+            .to('.ph-portico', { autoAlpha: 0, duration: 0.15 }, 0.45)
+            .to('.ph-sky', { scale: 1.35, duration: 1.2 }, 0)
+            .to(
+              hand,
+              {
+                scale: through,
+                x: () => W() / 2 - logoX(),
+                y: () => H() / 2 - logoY(),
+                duration: 1.13,
+                ease: 'power3.in',
+              },
+              0.12,
+            )
+            .to(hand, { '--cover-flat': 1, duration: 0.35 }, 0.4)
+            .fromTo(
+              '.hero-hand__symbol--zoom',
+              { autoAlpha: 0 },
+              { autoAlpha: 1, duration: 0.1 },
+              0.55,
+            )
+            .fromTo(
+              '.hero-hand__portal',
+              { opacity: 0, '--portal-light': 1 },
+              { opacity: 1, duration: 0.18 },
+              0.62,
+            )
+            // the squares step aside: only the ring is the doorway
+            .to(
+              '.hero-hand__symbol--zoom .midnight-mark__square',
+              { opacity: 0, duration: 0.14, stagger: 0.03 },
+              0.66,
+            )
+            .to('.hero-hand__portal', { '--portal-light': 0, duration: 0.2 }, 0.98)
+            .to('.hero-hand__symbol--zoom', { autoAlpha: 0, duration: 0.15 }, 1.04)
+            .fromTo('.pc-ground', { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.02 }, 1.22)
+            .set('.ph', { autoAlpha: 0 }, 1.25);
+
+          // 2. In the night, the Midnight symbol appears as it is printed, and the Alps at dusk come
+          //    up behind it, rising into place by the first step.
+          //    The symbol is never bent or turned: the ring is uncovered by a sweep, the squares
+          //    settle into place one by one, and a little light passes.
+          const squares = mark.querySelectorAll('.midnight-mark__square');
+          timeline
+            .set(markBox, { x: 0, y: 0, scale: 1.6 }, LOGO_AT)
+            .fromTo(markBox, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.04 }, LOGO_AT)
+            .fromTo(
+              mark,
+              { '--sweep': 0 },
+              { '--sweep': 1, duration: 0.3, ease: 'power2.inOut' },
+              LOGO_AT,
+            )
+            .fromTo(
+              squares,
+              { opacity: 0, y: 28 },
+              { opacity: 1, y: 0, duration: 0.1, stagger: 0.06, ease: 'power2.out' },
+              LOGO_AT + 0.2,
+            )
+            .fromTo(
+              mark,
+              { filter: 'drop-shadow(0 0 0px rgba(251, 248, 241, 0))' },
+              {
+                filter: 'drop-shadow(0 0 26px rgba(251, 248, 241, 0.4))',
+                duration: 0.12,
+                yoyo: true,
+                repeat: 1,
+              },
+              LOGO_AT + 0.42,
+            )
+            .fromTo('.pc-dusk', { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, LOGO_AT + 0.3)
+            .fromTo(
+              '.pc-dusk img',
+              { yPercent: 18 },
+              { yPercent: 0, duration: PARTS_AT - LOGO_AT - 0.3, ease: 'power1.out' },
+              LOGO_AT + 0.3,
+            );
+
+          // 3. The phrase under the symbol, word by word; then the symbol leaves the stage to the
+          //    steps.
+          timeline
+            .to(markBox, { y: () => -0.14 * H(), duration: 0.3, ease: 'power2.inOut' }, PHRASE_AT)
+            .fromTo(
+              '.pc-word',
+              { autoAlpha: 0, y: 14, filter: 'blur(8px)' },
+              { autoAlpha: 1, y: 0, filter: 'blur(0px)', duration: 0.12, stagger: 0.04 },
+              PHRASE_AT + 0.1,
+            )
+            .to(
+              [markBox, '.pc-phrase'],
+              { autoAlpha: 0, y: '-=24', duration: 0.15 },
+              PARTS_AT - 0.35,
+            );
+
+          // 4. The five steps take turns; the bar loads one segment per step.
+          for (let index = 0; index < STEPS; index += 1) {
+            const at = PARTS_AT + index * PART_LENGTH;
+            const part = `.pc-part--${index + 1}`;
+            timeline
+              .fromTo(
+                `${part} .pc-steps [data-state="now"] i`,
+                { scaleX: 0 },
+                { scaleX: 1, duration: PART_LENGTH - 0.1, ease: 'none' },
+                at,
+              )
+              .fromTo(
+                `${part} .pc-part__text`,
+                { autoAlpha: 0, y: 28 },
+                { autoAlpha: 1, y: 0, duration: 0.15, ease: 'power2.out' },
+                at,
+              )
+              .fromTo(
+                `${part} .pc-part__figure`,
+                { autoAlpha: 0, y: 24 },
+                { autoAlpha: 1, y: 0, duration: 0.15, ease: 'power2.out' },
+                at + 0.03,
+              );
+            if (index < STEPS - 1)
+              timeline.to(
+                [`${part} .pc-part__text`, `${part} .pc-part__figure`],
+                { autoAlpha: 0, y: -24, duration: 0.12, ease: 'power1.in' },
+                at + PART_LENGTH - 0.14,
+              );
+          }
+          const [home, ask, unlock, name, agents] = [0, 1, 2, 3, 4].map(
+            (k) => (at: number) => beatAt(k, at),
+          ) as [Beat, Beat, Beat, Beat, Beat];
+          const length = (from: number, to: number) => (to - from) * PART_LENGTH;
+          /** Cards come out of the Midnight Passport (on their left), one after another. */
+          const comeOut = (
+            selector: string,
+            k: Beat,
+            beats: { first: number; gap: number; length: number },
+          ) =>
+            timeline.fromTo(
+              selector,
+              { autoAlpha: 0, x: -48, scale: 0.94, transformOrigin: '0% 50%' },
+              {
+                autoAlpha: 1,
+                x: 0,
+                scale: 1,
+                duration: beats.length * PART_LENGTH,
+                stagger: beats.gap * PART_LENGTH,
+                ease: 'power3.out',
+              },
+              k(beats.first),
+            );
+
+          // 1. One place: money (hidden), identity, agents.
+          comeOut('.pc-fig--home .pc-tile', home, BEATS.home);
+
+          // 2. Selective disclosure: the app asks, the hidden details are read into a proof, and
+          //    only the answer fills in.
+          const [askFrom, askTo] = BEATS.ask.question;
+          const [scanFrom, scanTo] = BEATS.ask.scan;
+          const [provenFrom, provenTo] = BEATS.ask.proven;
+          timeline
+            .fromTo(
+              '.pc-ask',
+              { autoAlpha: 0, y: 16, scale: 0.94, transformOrigin: '100% 0%', '--lit': 0 },
+              {
+                autoAlpha: 1,
+                y: 0,
+                scale: 1,
+                duration: length(askFrom, askTo),
+                ease: 'back.out(1.6)',
+              },
+              ask(askFrom),
+            )
+            .fromTo(
+              '.pc-id__scan',
+              { autoAlpha: 1, top: '0%' },
+              { top: '100%', duration: length(scanFrom, scanTo), ease: 'power1.inOut' },
+              ask(scanFrom),
+            )
+            .to('.pc-id__scan', { autoAlpha: 0, duration: 0.03 }, ask(scanTo))
+            .to(
+              '.pc-ask',
+              { '--lit': 1, duration: length(provenFrom, provenTo), ease: 'power2.out' },
+              ask(provenFrom),
+            );
+
+          // 3. No seed phrase (drawn in 3D; this is the flat card's fingerprint, if there is no 3D).
+          const [printFrom, printTo] = BEATS.unlock.print;
+          timeline.fromTo(
+            '.pc-print path',
+            { strokeDashoffset: 1 },
+            {
+              strokeDashoffset: 0,
+              duration: length(printFrom, printTo),
+              stagger: 0.02,
+              ease: 'power1.inOut',
+            },
+            unlock(printFrom),
+          );
+
+          // 4. A name: the long address decodes, left to right, into the name.
+          const card = section.querySelector<HTMLElement>('.pc-decode');
+          const edge = card?.querySelector('.pc-decode__edge');
+          if (edge) edge.textContent = '';
+          const [decodeFrom, decodeTo] = BEATS.name.decode;
+          const [sendFrom, sendTo] = BEATS.name.send;
+          if (card) {
+            const progress = { q: 0 };
+            timeline.fromTo(
+              progress,
+              { q: 0 },
+              {
+                q: 1,
+                duration: length(decodeFrom, decodeTo),
+                ease: 'none',
+                immediateRender: true,
+                onUpdate: () => decode(card, progress.q),
+                onStart: () => decode(card, progress.q),
+              },
+              name(decodeFrom),
+            );
+            decode(card, 0);
+          }
+          timeline.fromTo(
+            '.pc-decode__send',
+            { autoAlpha: 0, y: 8 },
+            { autoAlpha: 1, y: 0, duration: length(sendFrom, sendTo), ease: 'power2.out' },
+            name(sendFrom),
+          );
+
+          // 5. Agents: each leaves with its own pass, then the travel pass shows what it did.
+          const [didFrom, didTo] = BEATS.agents.did;
+          comeOut('.pc-agent', agents, BEATS.agents)
+            .fromTo(
+              '.pc-pass__did',
+              { autoAlpha: 0, y: 6 },
+              { autoAlpha: 1, y: 0, duration: length(didFrom, didTo), ease: 'power2.out' },
+              agents(didFrom),
+            )
+            // the night stays full-bleed throughout; only as it leaves do its lower corners round,
+            // to sit on the paper that follows
+            .fromTo(
+              '.pc-ground',
+              { clipPath: 'inset(0px 0px 0px 0px round 0px 0px 0px 0px)' },
+              { clipPath: 'inset(0px 0px 0px 0px round 0px 0px 36px 36px)', duration: 0.12 },
+              END_AT - 0.05,
+            )
+            .to({}, { duration: 0.2 }, END_AT - 0.05);
+
+          ScrollTrigger.refresh();
+
+          // The five steps are drawn in 3D; the cards stay as the fallback if WebGL is missing.
+          const canvas = section.querySelector<HTMLCanvasElement>('.pc-scene');
+          if (canvas)
+            import('./passport-scene')
+              .then(({ createPassportScene }) => createPassportScene(canvas, chapter))
+              .then((made) => {
+                if (cancelled) {
+                  made.dispose();
+                  return;
+                }
+                scene = made;
+                chapter.dataset.scene = 'on';
+                made.resize();
+                timeline.eventCallback('onUpdate', () => made.setTime(timeline.time()));
+                made.setTime(timeline.time());
+                window.addEventListener('resize', onResize);
+              })
+              .catch((error: unknown) => console.warn('The 3D steps could not start', error));
+        }, section);
+        revert = () => context.revert();
+      })
+      .catch(() => setFailed(true));
+    return () => {
+      cancelled = true;
+      window.removeEventListener('resize', onResize);
+      scene?.dispose();
+      scene = undefined;
+      revert?.();
+      revealAllowed.current = true;
+    };
+  }, [motion]);
+
+  return (
+    <section
+      ref={sectionRef}
+      className="journey"
+      data-motion={motion ? 'on' : 'off'}
+      aria-labelledby="landing-title"
+    >
+      {motion && <span ref={anchorRef} id="how-it-works" className="journey-anchor" />}
+      <div className="journey-stage">
+        <PorticoHero assets={HERO_ASSETS} onStart={onStart} revealAllowed={revealAllowed} />
+        <PassportChapter anchorHere={!motion} />
+      </div>
+    </section>
+  );
+}
