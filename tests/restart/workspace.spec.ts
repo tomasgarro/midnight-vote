@@ -9,8 +9,10 @@ test('explores polls, saves one simulated answer, exports encrypted recovery and
   const card = page.getByRole('article').filter({ hasText: 'on Sundays?' });
   await card.getByRole('button', { name: 'Open poll' }).click();
   // Cleisthenes' briefing comes with the poll, marked as an example.
-  await expect(page.getByText('Quieter, safer Sundays for people on foot.')).toBeVisible();
-  await expect(page.getByText(/An example briefing written for this demo/)).toBeVisible();
+  // (a phone shows it above the answers, a wide screen beside them: only one copy is visible)
+  const briefing = page.locator('.app-brief').filter({ visible: true });
+  await expect(briefing.getByText('Quieter, safer Sundays for people on foot.')).toBeVisible();
+  await expect(briefing.getByText(/An example briefing written for this demo/)).toBeVisible();
   await page.getByRole('radio', { name: 'Yes', exact: true }).check();
   await page.getByRole('button', { name: 'Save a demo answer' }).click();
   await expect(page.getByRole('heading', { name: 'Your demo answer is saved.' })).toBeVisible();
