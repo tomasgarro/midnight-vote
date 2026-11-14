@@ -1,0 +1,80 @@
+pragma language_version 0.28;
+
+import CompactStandardLibrary;
+
+// BOUNDED RESEARCH CONTRACT. Not a live voting contract.
+// Missing release gates: Midnight Passport authority, ciphertext/opening binding,
+// encryption-key custody and availability, and an approved disclosure model.
+// It demonstrates complete-set batch counting without a second voter action.
+export sealed ledger pollId: Bytes<32>;
+export sealed ledger opensAt: Uint<64>;
+export sealed ledger closesAt: Uint<64>;
+export sealed ledger optionCount: Uint<8>;
+export ledger commitments: Map<Uint<8>, Bytes<32>>;
+export ledger encryptedOpenings: Map<Uint<8>, Bytes<1024>>;
+export ledger nullifiers: Set<Bytes<32>>;
+export ledger ballotCount: Uint<8>;
+export ledger totals: Vector<6, Uint<32>>;
+export ledger finalized: Boolean;
+
+witness voterSecret(): Bytes<32>;
+witness tallyChoices(): Vector<16, Uint<8>>;
+witness tallySalts(): Vector<16, Bytes<32>>;
+
+constructor(id: Bytes<32>, opening: Uint<64>, closing: Uint<64>, options: Uint<8>) {
+  assert(opening < closing, "Invalid voting window");
+  assert(options >= 2 && options <= 6, "Invalid option count");
+  pollId = disclose(id);
+  opensAt = disclose(opening);
+  closesAt = disclose(closing);
+  optionCount = disclose(options);
+  ballotCount = 0;
+  totals = [0, 0, 0, 0, 0, 0];
+  finalized = false;
+}
+
+export circuit castBallot(commitment: Bytes<32>, encryptedOpening: Bytes<1024>): [] {
+  assert(!finalized, "Poll is finalized");
+  assert(blockTimeGte(opensAt) && blockTimeLt(closesAt), "Voting is closed");
+  assert(ballotCount < 16, "Prototype capacity reached");
+  const nullifier = persistentHash<Vector<3, Bytes<32>>>([pad(32, "mv:prototype:nullifier:"), pollId, voterSecret()]);
+  assert(!nullifiers.member(disclose(nullifier)), "Already voted");
+  nullifiers.insert(disclose(nullifier));
+  commitments.insert(ballotCount, disclose(commitment));
+  encryptedOpenings.insert(ballotCount, disclose(encryptedOpening));
+  ballotCount = (ballotCount + 1) as Uint<8>;
+}
+
+export circuit finalize(): [] {
+  assert(!finalized, "Already finalized");
+  assert(blockTimeGte(closesAt), "Poll has not closed");
+  const choices = tallyChoices();
+  const salts = tallySalts();
+  // Accumulate in private locals. Publishing a counter after EACH opening
+  // would reveal individual choices through the public execution transcript.
+  const indices: Vector<16, Uint<8>> = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+  const optionIndices: Vector<6, Uint<8>> = [0, 1, 2, 3, 4, 5];
+  const emptyTotals: Vector<6, Uint<32>> = [0, 0, 0, 0, 0, 0];
+  const finalTotals = fold(
+    (acc: Vector<6, Uint<32>>, choice: Uint<8>, salt: Bytes<32>, i: Uint<8>): Vector<6, Uint<32>> => {
+      if (i < ballotCount) {
+        assert(choice < optionCount, "Invalid ballot choice");
+        const commitment = persistentCommit<Vector<3, Bytes<32>>>([pad(32, "mv:prototype:ballot:"), pollId, choice as Bytes<32>], salt);
+        assert(commitment == commitments.lookup(i), "Missing or mismatched opening");
+        return map(
+          (count: Uint<32>, option: Uint<8>): Uint<32> => (count + (choice == option ? 1 : 0)) as Uint<32>,
+          acc,
+          optionIndices
+        );
+      } else {
+        return acc;
+      }
+    },
+    emptyTotals,
+    choices,
+    salts,
+    indices
+  );
+  totals = disclose(finalTotals);
+  finalized = true;
+}

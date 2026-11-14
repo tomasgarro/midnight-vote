@@ -1,0 +1,9 @@
+pragma language_version 0.28;
+import CompactStandardLibrary;
+
+// A frozen root oracle for the composability experiment, not the issuer service.
+export sealed ledger root: Bytes<32>;
+constructor(initialRoot: Bytes<32>) { root = disclose(initialRoot); }
+export circuit assertRoot(candidate: Bytes<32>): [] {
+  assert(candidate == root, "Root does not belong to this registry");
+}

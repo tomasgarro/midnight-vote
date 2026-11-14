@@ -1,0 +1,108 @@
+.landing-header {
+  position: fixed;
+  z-index: 30;
+  inset: 18px 18px auto;
+  max-width: 980px;
+  margin-inline: auto;
+  min-height: 60px;
+  padding: 8px 8px 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  color: var(--ink);
+  font-family: var(--font-body);
+  box-shadow: var(--shadow-card);
+  transition: transform 320ms var(--ease-out, ease);
+}
+.landing-header[data-hidden="true"]:not(:focus-within) {
+  transform: translateY(calc(-100% - 24px));
+}
+.landing-header * {
+  box-sizing: border-box;
+}
+.midnight-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.midnight-brand__suffix {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+.landing-header__links {
+  display: flex;
+  gap: 26px;
+  margin-left: auto;
+  font-size: 15px;
+}
+.landing-header__links a {
+  position: relative;
+  padding-block: 10px;
+}
+.landing-header__links a::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 4px;
+  height: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms;
+}
+.landing-header__links a:hover::after {
+  transform: scaleX(1);
+}
+.landing-header__start {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 600 15px var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 180ms;
+}
+.landing-header__start:hover {
+  background: var(--accent-hover);
+}
+@media (max-width: 700px) {
+  .landing-header {
+    inset: 12px 12px auto;
+    min-height: 56px;
+    padding-left: 14px;
+    gap: 12px;
+  }
+  .landing-header__links {
+    display: none;
+  }
+  .landing-header__start {
+    margin-left: auto;
+  }
+}
+@media (max-width: 380px) {
+  .midnight-brand {
+    font-size: 17px;
+  }
+  .midnight-brand > img {
+    width: 32px;
+    height: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-header {
+    transition: none;
+  }
+}

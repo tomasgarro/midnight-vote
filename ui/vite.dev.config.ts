@@ -34,6 +34,7 @@ export default defineConfig({
     },
   },
   server: {
+    proxy: { '/api/polls': process.env.POLL_API_TARGET ?? 'http://127.0.0.1:5183' },
     fs: {
       allow: [path.resolve(configDirectory, '..')],
     },

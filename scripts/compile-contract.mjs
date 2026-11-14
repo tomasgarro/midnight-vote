@@ -38,7 +38,7 @@ if (compactc) {
   status = run('compactc', [source, target]);
 }
 if (status === null && compact) {
-  status = run(compact, ['compile', source, target]);
+  status = run(compact, ['compile', '+0.31.1', source, target]);
 }
 if (
   status === null &&
@@ -46,7 +46,7 @@ if (
   process.platform !== 'win32' &&
   isUsable('compact', ['compile', '--version'])
 ) {
-  status = run('compact', ['compile', source, target]);
+  status = run('compact', ['compile', '+0.31.1', source, target]);
 }
 
 if (status === null) {

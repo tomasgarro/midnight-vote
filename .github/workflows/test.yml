@@ -30,6 +30,12 @@ jobs:
       - name: Validate feedback endpoint without sending email
         run: php -l ui/public/api/feedback.php && node scripts/test-feedback.mjs
 
+      - name: Verify retained legacy wallet transport flow control
+        run: |
+          node --test deploy/hostinger/patches/backpressure.test.mjs
+          node deploy/hostinger/patches/apply-indexer-flow-control.mjs
+          node scripts/test-indexer-backpressure.mjs
+
       - name: Install Compact developer tools
         run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
 
@@ -37,7 +43,17 @@ jobs:
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install pinned Compact toolchain
-        run: $HOME/.local/bin/compact update 0.31.1
+        run: |
+          $HOME/.local/bin/compact update 0.31.1
+          $HOME/.local/bin/compact update 0.36.0
+
+      - name: Verify Midnight Passport restart modules and bounded Ledger 9 experiment
+        run: |
+          npm run build --workspace midnight-vote-polls
+          npm run build --workspace @midnight-passport/connect
+          npm run build --workspace midnight-vote-chain-v9
+          npm run compile:polls -- --skip-zk
+          npm run test:restart
 
       - name: Verify compile, build, and unit tests
         run: npm run verify:linux -- demo
@@ -83,11 +99,21 @@ jobs:
           name: api-dist
           path: api/dist
 
+      - name: Build restart dependencies
+        run: |
+          npm run build --workspace midnight-vote-polls
+          npm run build --workspace @midnight-passport/connect
+
       - name: Install desktop and mobile browser engines
         run: npx playwright install chromium webkit --with-deps
 
       - name: Run headless browser journey
         run: npm run test:e2e
+        env:
+          CI: 'true'
+
+      - name: Build and verify the restart browser journeys
+        run: npm run build:restart && npm run test:e2e:restart
         env:
           CI: 'true'
 

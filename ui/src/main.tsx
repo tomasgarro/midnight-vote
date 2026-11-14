@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { startPassportHandshakeWatch } from '@/integration/passport';
-import { PASSPORT_ORIGIN } from '@/views/app-runtime';
+import { PASSPORT_ORIGIN, startPassportHandshakeWatch } from '@/integration/passport';
 import { App } from './App';
 import './index.css';
 

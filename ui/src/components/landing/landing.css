@@ -61,3 +61,13 @@
   letter-spacing: -0.015em;
   color: var(--ink);
 }
+body:has(.civic-landing) {
+  padding: 0;
+  min-width: 0;
+}
+.civic-landing .landing-skip {
+  z-index: 50;
+}
+.civic-landing #how-it-works.pc {
+  scroll-margin-top: 90px;
+}

@@ -1,8 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { LandingPage } from './components/landing/LandingPage';
+import './styles/runtime-loading.css';
 
 const FeedbackPage = lazy(() => import('./views/FeedbackPage'));
 const DocsPage = lazy(() => import('./views/DocsPage'));
+const PollWorkspace = lazy(() => import('./views/PollWorkspace'));
 
 const CivicRuntime = lazy(async () => {
   const module = await import('./CivicRuntime');
@@ -19,6 +21,17 @@ function isAppHash(hash: string): boolean {
 }
 
 export function App() {
+  const [restartRoute, setRestartRoute] = useState(() =>
+    ['#polls', '#organizer', '#verify', '#connect'].includes(window.location.hash),
+  );
+  useEffect(() => {
+    const sync = () =>
+      setRestartRoute(
+        ['#polls', '#organizer', '#verify', '#connect'].includes(window.location.hash),
+      );
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
   const [inApp, setInApp] = useState(
     () => isAppHash(window.location.hash) || window.parent !== window,
   );
@@ -42,6 +55,13 @@ export function App() {
     return (
       <Suspense fallback={<main className="runtime-loading">Loading…</main>}>
         <FeedbackPage />
+      </Suspense>
+    );
+  }
+  if (restartRoute || window.location.pathname.replace(/\/$/, '') === '/passport-callback') {
+    return (
+      <Suspense fallback={<main className="runtime-loading">Preparing the poll workspace…</main>}>
+        <PollWorkspace />
       </Suspense>
     );
   }

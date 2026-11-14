@@ -14,6 +14,10 @@ export default defineConfig({
     'import.meta.env.VITE_APP_MODE': JSON.stringify('demo'),
   },
   test: {
+    // Each worker loads the historical WASM graph. Bound memory and startup
+    // concurrency so native Linux, WSL and CI exercise the same tests reliably.
+    maxWorkers: 2,
+    minWorkers: 1,
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],

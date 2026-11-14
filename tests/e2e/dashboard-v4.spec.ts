@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
 import { PULSE_COPY } from '../../ui/src/pulse/pulse-copy';
+import { expect, test } from './demo-clock';
 
 test.use({ video: { mode: 'on', size: { width: 390, height: 844 } } });
 

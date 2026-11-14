@@ -1,5 +1,32 @@
 # midnight.vote
 
+## Midnight Passport restart — November 2026
+
+The current development branch introduces a Midnight Passport-centered polling
+workspace, an organizer demonstration, encrypted receipt recovery, and an
+isolated Ledger 9 runtime/tally experiment. See the [capability and validation
+record](docs/RESTART-2026-11-09.md) for what works and what remains gated.
+
+```bash
+npm ci
+npm run preview:restart
+```
+
+Open `http://localhost:4184/#polls`. `#connect`, `#organizer`, and `#verify`
+open the other development surfaces. The profile connection is real; poll
+answers and receipts are simulated. Live account authority, fresh chain
+deployment and private aggregate proofs remain unavailable. The pilot is not
+ready, and `npm run check:restart` intentionally exits nonzero.
+
+The account-verification service now validates fresh signed redirect responses
+on the server with durable request/replay storage. It refuses to treat wallet
+signatures as authority over a claimed Midnight Passport account. The
+[account verification report](docs/MIDNIGHT-PASSPORT-AUTHORITY.md) separates
+the specific upstream authorization/protocol gaps from our remaining work.
+
+The rest of this README records the historical consultation implementation.
+Its September/October Preview deployments do not survive the Ledger 9 reset.
+
 **Understand more. Disclose less. Participate as yourself.**
 
 [![Test suite](https://github.com/tomasgarro/midnight-vote/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tomasgarro/midnight-vote/actions/workflows/test.yml)

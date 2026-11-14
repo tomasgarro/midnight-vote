@@ -1,0 +1,1026 @@
+/*
+ * The chapter is the night inside the passport: the same Alps, at dusk, in the page's own brand.
+ * Warm ink above, the last terracotta light on the snow below, glass cards on the night, hidden
+ * values hatched under a lock, and the one proven fact on a flat terracotta pill. No blue: the
+ * Midnight symbol stays white, as it is printed.
+ *
+ * With motion on, each step is one screen: the figure beside the words (above them on a narrow
+ * window), the same height as the stage allows. In the figure, the information is in glass cards
+ * of real type, and the 3D objects (the Midnight Passport, the seed sheet, the phone) are drawn
+ * into empty slots that CSS lays out (`data-slot`, read by passport-scene.ts), so both line up
+ * with the words at every width.
+ */
+.pc {
+  --m: clamp(132px, 19vmin, 190px);
+  /* the night: the brand's dark ground, warmed to the top of the dusk painting */
+  --passport: #1d1b17;
+  --page: #fbf8f1;
+  --page-soft: rgba(251, 248, 241, 0.84);
+  --glass-line: rgba(243, 237, 223, 0.2);
+  --label: rgba(243, 237, 223, 0.72);
+  /* the accent: light on the night for small marks, full terracotta under paper type */
+  --ember: #e08e7c;
+  --terracotta: #a24f40;
+  color: var(--page);
+}
+.pc-ground {
+  overflow: hidden;
+  background-color: var(--passport);
+}
+/* The Alps at dusk along the bottom; the sky darkens upward into the passport's night, and a
+   little more behind the words so they always read. */
+.pc-dusk {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.pc-dusk img {
+  --w: max(100%, 150svh);
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - var(--w) / 2);
+  width: var(--w);
+  max-width: none;
+  height: auto;
+}
+.pc-dusk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, var(--passport) 0%, rgba(29, 27, 23, 0) 42%),
+    radial-gradient(42% 46% at 76% 50%, rgba(29, 27, 23, 0.55), rgba(29, 27, 23, 0) 100%);
+}
+.pc .midnight-mark {
+  display: block;
+  overflow: visible;
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* The words of a step                                                                          */
+
+.pc-part__points {
+  display: grid;
+  gap: 10px;
+  max-width: 32em;
+  margin: clamp(18px, 2vw, 26px) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: clamp(15px, 1.1vw, 17px);
+  line-height: 1.45;
+  color: var(--page-soft);
+}
+.pc-part__points li {
+  position: relative;
+  padding-left: 22px;
+}
+.pc-part__points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 9px;
+  height: 9px;
+  background: var(--ember);
+}
+@media (max-width: 860px) {
+  .journey[data-motion="on"] .pc-part__points {
+    display: none;
+  }
+}
+/* Over each step's words: a bar in five parts that loads as the step passes, and when it comes. */
+.civic-landing .pc-part__when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0 0 clamp(14px, 1.6vw, 22px);
+  font: 600 12px / 1.4 var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.pc-steps {
+  display: flex;
+  gap: 5px;
+  width: clamp(150px, 14vw, 220px);
+}
+.pc-steps > span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(243, 237, 223, 0.2);
+}
+.pc-steps i {
+  display: block;
+  height: 100%;
+  background: var(--ember);
+  transform-origin: 0 50%;
+}
+.pc-steps [data-state="next"] i {
+  transform: scaleX(0);
+}
+.civic-landing .pc h3 {
+  margin: 0;
+  color: var(--page);
+  font-size: clamp(30px, 3.2vw, 50px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.pc-part__text p {
+  margin: 18px 0 0;
+  max-width: 30em;
+  font-size: clamp(17px, 1.35vw, 20px);
+  line-height: 1.5;
+  color: var(--page-soft);
+}
+.pc-phrase p {
+  margin: 0;
+  font: 400 clamp(34px, 4.6vw, 72px) / 1.08 var(--font-display);
+  letter-spacing: -0.025em;
+}
+.pc-phrase__line {
+  display: block;
+}
+.pc-phrase__mark {
+  width: calc(var(--m) * 0.9);
+  height: calc(var(--m) * 0.9);
+  margin: 0 auto 36px;
+  color: var(--page);
+}
+.pc-phrase__line + .pc-phrase__line {
+  color: rgba(251, 248, 241, 0.6);
+}
+.pc-word {
+  display: inline-block;
+  white-space: pre;
+}
+.pc-parts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pc-part__figure {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* Glass: the cards on the night                                                                */
+
+.pc-glass {
+  position: relative;
+  color: var(--page);
+  border: 1px solid var(--glass-line);
+  border-radius: 22px;
+  background: linear-gradient(
+    150deg,
+    rgba(251, 248, 241, 0.16),
+    rgba(251, 248, 241, 0.05) 58%,
+    rgba(251, 248, 241, 0.09)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 253, 248, 0.22),
+    0 28px 60px -18px rgba(10, 8, 6, 0.72);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+.pc-glass p {
+  margin: 0;
+}
+.pc-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+/* An icon in a round ember chip. */
+.pc-chip {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 142, 124, 0.34);
+  background: rgba(224, 142, 124, 0.14);
+  color: var(--ember);
+}
+.pc-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ember);
+  white-space: nowrap;
+}
+/* A value nobody is shown: hatched over, under a lock. */
+.pc-hidden {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--label);
+}
+.pc-hidden > span {
+  flex: 1;
+  height: 12px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(243, 237, 223, 0.34) 0 2px,
+    rgba(243, 237, 223, 0) 2px 6px
+  );
+}
+.pc-glass__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pc-glass__symbol {
+  width: 22px;
+  height: 22px;
+  color: var(--page);
+}
+
+/* The closed Midnight Passport, drawn flat, while the 3D one is not there. */
+.pc-cover {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.2em;
+  width: 100%;
+  height: 100%;
+  border-radius: 7% / 5%;
+  background: linear-gradient(160deg, #2c2620, #1a1714);
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 209, 164, 0.2),
+    0 30px 60px -20px rgba(0, 0, 0, 0.7);
+  color: #e8d1a4;
+}
+.pc-cover__symbol {
+  width: 34%;
+  height: auto;
+}
+.pc-cover__name {
+  font: 600 12px / 1.2 var(--font-body);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+/* 1. Money, identity, agents: one tile each. */
+.pc-fig__stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pc-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px 14px 14px;
+  font-size: 15px;
+}
+.pc-tile__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.pc-tile__text strong {
+  font: 400 clamp(18px, 3.4cqw, 23px) / 1.15 var(--font-display);
+}
+.pc-tile__text small {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--page-soft);
+}
+.pc-tile > .pc-hidden {
+  width: clamp(64px, 14cqw, 104px);
+}
+.pc-tile__value {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 2. The app's question, and the proven answer. `--lit` fills the answer in. */
+.pc-ask {
+  --lit: 1;
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+}
+.pc-ask__question {
+  font: 400 clamp(28px, 6cqw, 42px) / 1.05 var(--font-display);
+}
+.pc-glass .pc-ask__answer {
+  position: relative;
+  height: 46px;
+  margin-top: 8px;
+  border: 1px solid var(--glass-line);
+  border-radius: 999px;
+  overflow: hidden;
+  font-size: 15px;
+}
+.pc-ask__answer > span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  white-space: nowrap;
+}
+.pc-ask__waiting {
+  color: var(--label);
+  opacity: calc(1 - var(--lit));
+}
+/* the accent is flat: it fills in, it never glows */
+.pc-ask__proven {
+  background: var(--terracotta);
+  color: #fffdf8;
+  font-weight: 600;
+  opacity: var(--lit);
+}
+.pc-ask__note {
+  font-size: 13px;
+  color: var(--page-soft);
+  opacity: var(--lit);
+}
+/* the hidden details, read into a proof (the flat card is the data page when there is no 3D) */
+.pc-id {
+  padding: 18px 20px;
+}
+.pc-id dl {
+  position: relative;
+  margin: 0;
+}
+.pc-id dl > div {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  border-top: 1px solid var(--glass-line);
+}
+.pc-id dt,
+.pc-row > span:first-child {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.pc-id dd {
+  margin: 0;
+}
+.pc-id__scan {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(251, 248, 241, 0),
+    rgba(251, 248, 241, 0.9),
+    rgba(251, 248, 241, 0)
+  );
+  opacity: 0;
+}
+
+/* 3. The unlock, flat (the seed sheet and the phone, when there is no 3D). */
+.pc-unlock {
+  padding: 18px 20px;
+}
+.pc-unlock ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  border-top: 1px solid var(--glass-line);
+  font-size: 15px;
+}
+.pc-row:first-child {
+  border-top: 0;
+}
+.pc-row strong {
+  font-weight: 500;
+}
+.pc-lit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--terracotta);
+  color: #fffdf8;
+  font-size: 14px;
+  font-weight: 600;
+}
+.pc-unlock__sensor {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  aspect-ratio: 1;
+  margin: 0 auto 12px;
+  border: 1.5px solid rgba(243, 237, 223, 0.3);
+  border-radius: 50%;
+  color: var(--page);
+}
+.pc-print {
+  width: 76%;
+  height: 76%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.journey[data-motion="on"] .pc-print path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+/* 4. A long address, decoded left to right into a name. JavaScript moves `--front` (px) and `--q`
+   (0 to 1); still, the card shows the name. */
+.pc-decode {
+  --q: 1;
+  --front: 9999px;
+  --band: 72px;
+  --pad: clamp(18px, 4.4cqw, 30px);
+  --name-size: min(58px, calc((min(100cqw, 600px) - 2 * var(--pad)) / 8.3));
+  --addr-size: min(17px, calc((min(100cqw, 600px) - 2 * var(--pad)) / 26.6));
+  display: grid;
+  gap: 16px;
+  width: min(100cqw, 600px);
+  padding: var(--pad);
+}
+.pc-decode__label {
+  position: relative;
+  height: 1.4em;
+}
+.pc-decode__label > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.pc-decode__was {
+  opacity: clamp(0, 1 - var(--q) * 2, 1);
+}
+.pc-decode__now {
+  color: var(--ember);
+  opacity: clamp(0, var(--q) * 2 - 1, 1);
+}
+.pc-decode__line {
+  position: relative;
+  height: calc(var(--name-size) * 1.2);
+}
+.pc-decode__line > span {
+  position: absolute;
+  left: 0;
+  white-space: nowrap;
+}
+.pc-decode__addr {
+  bottom: calc(var(--name-size) * 0.22);
+  font:
+    400 var(--addr-size) / 1 ui-monospace,
+    Consolas,
+    monospace;
+  color: var(--label);
+  clip-path: inset(-0.4em -2px -0.4em var(--front));
+}
+.pc-decode__name {
+  bottom: calc(var(--name-size) * 0.08);
+  font: 400 var(--name-size) / 1 var(--font-display);
+  letter-spacing: -0.015em;
+  clip-path: inset(-0.4em calc(100% - max(0px, var(--front) - var(--band))) -0.4em -2px);
+}
+.pc-decode__name > span {
+  margin-left: 0.08em;
+  font-size: 0.48em;
+  color: var(--ember);
+}
+.pc-decode__line > .pc-decode__edge {
+  bottom: calc(var(--name-size) * 0.22);
+  left: calc(var(--front) - var(--band));
+  width: var(--band);
+  overflow: hidden;
+  border-right: 2px solid rgba(224, 142, 124, 0.6);
+  font:
+    600 var(--addr-size) / 1 ui-monospace,
+    Consolas,
+    monospace;
+  color: var(--ember);
+  opacity: clamp(0, (1 - var(--q)) * 30, 1);
+}
+.pc-decode__send {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--glass-line);
+  font-size: 15px;
+  color: var(--page-soft);
+}
+.pc-decode__send .pc-chip {
+  width: 34px;
+  height: 34px;
+}
+
+/* 5. An agent's pass: what it may do, and its limit; the travel pass shows what it just did. */
+.pc-agent {
+  display: grid;
+  gap: 8px;
+  padding: 14px 18px 14px 14px;
+}
+.pc-agent__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pc-agent__head strong {
+  min-width: 0;
+  overflow: hidden;
+  font: 400 clamp(18px, 3.3cqw, 22px) / 1.15 var(--font-display);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pc-agent__head .pc-chip {
+  width: 36px;
+  height: 36px;
+}
+.pc-agent__state {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 999px;
+  font: 600 11px / 1.6 var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.pc-agent__may,
+.pc-agent__cap,
+.pc-pass__did {
+  padding-left: 48px;
+}
+.pc-agent__may {
+  font-size: 15px;
+  font-weight: 600;
+}
+.pc-agent__cap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--page-soft);
+}
+.pc-agent__cap > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc-meter {
+  flex: none;
+  width: 72px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(243, 237, 223, 0.18);
+  overflow: hidden;
+}
+.pc-meter i {
+  display: block;
+  width: calc(var(--used) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ember);
+}
+.pc-agent__skills {
+  display: flex;
+  gap: 4px;
+}
+.pc-agent__skills i {
+  padding: 1px 8px;
+  border: 1px solid rgba(224, 142, 124, 0.42);
+  border-radius: 999px;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--ember);
+}
+.pc-pass__did {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid var(--glass-line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ember);
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* Motion on: one stage, the steps take turns                                                    */
+
+.pc-scene {
+  display: none;
+}
+.journey[data-motion="on"] .pc-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* The symbol's ring is uncovered by a sweep (--sweep, 0 to 1); its shape never changes. */
+.journey[data-motion="on"] .pc-mark svg {
+  --sweep: 1;
+  mask-image: conic-gradient(
+    #000 calc(var(--sweep) * 360deg),
+    transparent calc(var(--sweep) * 360deg + 1deg)
+  );
+}
+.journey[data-motion="on"] .pc {
+  pointer-events: none;
+}
+.journey[data-motion="on"] .pc-ground {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  clip-path: inset(0px 0px 0px 0px round 0px 0px 0px 0px);
+}
+.journey[data-motion="on"] .pc-mark {
+  position: absolute;
+  z-index: 3;
+  left: calc(50% - var(--m) / 2);
+  top: calc(50% - var(--m) / 2);
+  width: var(--m);
+  height: var(--m);
+  color: var(--page);
+  opacity: 0;
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-mark svg {
+  width: 100%;
+  height: 100%;
+}
+.journey[data-motion="on"] .pc-phrase {
+  position: absolute;
+  z-index: 2;
+  inset: 57% 24px auto;
+  text-align: center;
+}
+.journey[data-motion="on"] .pc-phrase__mark {
+  display: none;
+}
+.journey[data-motion="on"] .pc-word {
+  opacity: 0;
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-parts {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+/* a step: the figure on the left, the words on the right, centred on each other */
+.journey[data-motion="on"] .pc-part {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  column-gap: clamp(32px, 4.5vw, 80px);
+  padding: clamp(84px, 12svh, 124px) 6% clamp(52px, 9svh, 96px) 5%;
+}
+.journey[data-motion="on"] .pc-part__text,
+.journey[data-motion="on"] .pc-part__figure {
+  opacity: 0;
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-part__figure {
+  position: relative;
+  align-self: stretch;
+  min-height: 0;
+}
+.journey[data-motion="on"] .pc-fig {
+  position: absolute;
+  inset: 0;
+  container: fig / size;
+}
+/* the 3D draws into the slots; their flat stand-ins wait underneath in case it cannot */
+.pc[data-scene="on"] .pc-slot > * {
+  visibility: hidden;
+}
+.journey[data-motion="on"] .pc-slot {
+  flex: none;
+}
+.journey[data-motion="on"] .pc-slot > .pc-glass {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 1 and 5: the closed Midnight Passport, and the cards that come out of it */
+.journey[data-motion="on"] .pc-fig--home,
+.journey[data-motion="on"] .pc-fig--agents {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.journey[data-motion="on"] .pc-slot--cover {
+  aspect-ratio: 1 / 1.42;
+}
+.journey[data-motion="on"] .pc-fig--home .pc-slot--cover {
+  width: min(44cqw, 64cqh);
+}
+.journey[data-motion="on"] .pc-fig--home .pc-fig__stack {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 440px;
+  margin-left: -5cqw;
+}
+.journey[data-motion="on"] .pc-fig--agents .pc-slot--cover {
+  width: min(30cqw, 56cqh);
+}
+.journey[data-motion="on"] .pc-fig--agents .pc-fig__stack {
+  flex: 1;
+  min-width: 0;
+  max-width: 460px;
+  margin-left: 7cqw;
+}
+
+/* 2: the open Midnight Passport low on the right, its cover opening left, under the question */
+.journey[data-motion="on"] .pc-fig--ask {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
+.journey[data-motion="on"] .pc-fig--ask > * {
+  grid-area: 1 / 1;
+}
+/* the data page sits right: its cover opens out to the left, into the free space */
+.journey[data-motion="on"] .pc-slot--page {
+  align-self: end;
+  justify-self: end;
+  height: min(74cqh, 64cqw);
+  aspect-ratio: 0.965 / 1.38;
+  margin-right: 2cqw;
+}
+.journey[data-motion="on"] .pc-ask {
+  z-index: 1;
+  align-self: start;
+  justify-self: start;
+  width: min(56cqw, 350px);
+}
+
+/* 3: the seed sheet and the phone, side by side */
+.journey[data-motion="on"] .pc-fig--unlock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4cqw;
+}
+.journey[data-motion="on"] .pc-slot--sheet {
+  height: min(90cqh, 68cqw);
+  aspect-ratio: 1.2 / 1.46;
+}
+.journey[data-motion="on"] .pc-slot--phone {
+  height: min(84cqh, 62cqw);
+  aspect-ratio: 0.94 / 1.9;
+}
+
+/* 4: the name, alone */
+.journey[data-motion="on"] .pc-fig--name {
+  display: grid;
+  place-items: center;
+}
+
+.journey[data-motion="on"] .pc-tile,
+.journey[data-motion="on"] .pc-agent,
+.journey[data-motion="on"] .pc-ask,
+.journey[data-motion="on"] .pc-decode__send,
+.journey[data-motion="on"] .pc-pass__did {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* small figures: the same cards, tighter */
+@container fig (width < 470px) {
+  .pc-chip {
+    width: 34px;
+    height: 34px;
+  }
+  .pc-tile {
+    gap: 10px;
+    padding: 10px 12px 10px 10px;
+    border-radius: 18px;
+  }
+  .pc-tile__text small {
+    font-size: 12.5px;
+  }
+  .pc-tile > .pc-hidden {
+    width: 44px;
+  }
+  .pc-ask {
+    padding: 14px 16px;
+    border-radius: 18px;
+  }
+  .pc-ask__answer {
+    height: 40px;
+    font-size: 14px;
+  }
+  .pc-ask__note {
+    display: none;
+  }
+  .pc-agent {
+    gap: 5px;
+    padding: 10px 12px 10px 10px;
+    border-radius: 18px;
+  }
+  .pc-agent__head {
+    gap: 8px;
+  }
+  .pc-agent__head .pc-chip {
+    width: 28px;
+    height: 28px;
+  }
+  .pc-agent__head strong {
+    font-size: 16px;
+  }
+  .pc-agent__state {
+    padding: 1px 7px;
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+  }
+  .pc-agent__may,
+  .pc-agent__cap,
+  .pc-pass__did {
+    padding-left: 36px;
+    font-size: 12.5px;
+  }
+  .pc-meter {
+    width: 40px;
+  }
+  .pc-agent__skills {
+    display: none;
+  }
+  .pc-decode__send {
+    font-size: 13.5px;
+  }
+}
+/* the smallest figures: one line per tile, and the Midnight Passport a little smaller */
+@container fig (width < 400px) {
+  .pc-tile__text small {
+    display: none;
+  }
+  .pc-tile__text strong {
+    font-size: 16px;
+  }
+  .journey[data-motion="on"] .pc-fig--home .pc-slot--cover {
+    width: min(38cqw, 64cqh);
+  }
+  .pc-pass__did {
+    font-size: 12px;
+  }
+  .journey[data-motion="on"] .pc-ask {
+    width: 64cqw;
+  }
+  .pc-ask__answer > span {
+    padding: 0 14px;
+  }
+  .journey[data-motion="on"] .pc-fig--agents .pc-slot--cover {
+    width: min(24cqw, 56cqh);
+  }
+  .journey[data-motion="on"] .pc-fig--agents .pc-fig__stack {
+    margin-left: 5cqw;
+  }
+  .pc-agent__head strong {
+    font-size: 15px;
+  }
+  .pc-agent__state {
+    padding: 0 6px;
+    font-size: 9px;
+  }
+}
+
+/* A narrow window: the figure above, the words below, the figure filling what is left. */
+@media (max-width: 860px) {
+  .pc {
+    --m: clamp(92px, 25vw, 132px);
+  }
+  .journey[data-motion="on"] .pc-part {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(14px, 3svh, 28px);
+    padding: 76px 7% max(26px, 5svh);
+  }
+  .journey[data-motion="on"] .pc-part__figure {
+    flex: 1 1 0;
+  }
+  .journey[data-motion="on"] .pc-part__text {
+    flex: none;
+  }
+  .pc-steps {
+    width: 132px;
+  }
+  /* the words sit low here, so the land under them darkens */
+  .pc-dusk::after {
+    background:
+      linear-gradient(to bottom, var(--passport) 0%, rgba(29, 27, 23, 0) 42%),
+      linear-gradient(
+        to top,
+        rgba(29, 27, 23, 0.86) 0%,
+        rgba(29, 27, 23, 0.6) 30%,
+        rgba(29, 27, 23, 0) 58%
+      );
+  }
+  .journey[data-motion="on"] .pc-phrase {
+    inset-block-start: 56%;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------- */
+/* Motion off: the same chapter as a page, on a rounded panel of the same dusk                  */
+
+.journey[data-motion="off"] .pc {
+  --m: clamp(104px, 27vw, 150px);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0 clamp(10px, 2vw, 24px);
+  padding: clamp(64px, 9vw, 112px) clamp(20px, 5vw, 72px) clamp(56px, 8vw, 96px);
+  border-radius: 32px;
+  background: var(--passport);
+}
+.journey[data-motion="off"] .pc-ground {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.journey[data-motion="off"] .pc-dusk {
+  opacity: 1;
+}
+.journey[data-motion="off"] .pc-dusk img {
+  --w: max(100%, 900px);
+}
+.journey[data-motion="off"] .pc-mark {
+  display: none;
+}
+.journey[data-motion="off"] .pc-phrase {
+  text-align: center;
+}
+.journey[data-motion="off"] .pc-parts {
+  display: grid;
+  gap: clamp(64px, 9vw, 112px);
+  max-width: 1180px;
+  margin: clamp(72px, 10vw, 120px) auto 0;
+}
+.journey[data-motion="off"] .pc-part {
+  display: grid;
+  gap: 32px;
+  justify-items: center;
+}
+.journey[data-motion="off"] .pc-part__figure {
+  width: min(100%, 460px);
+}
+.journey[data-motion="off"] .pc-fig {
+  display: grid;
+  gap: 12px;
+  container: fig / inline-size;
+}
+.journey[data-motion="off"] .pc-slot--cover,
+.journey[data-motion="off"] .pc-slot--phone {
+  display: none;
+}
+.journey[data-motion="off"] .pc-part__text {
+  justify-self: stretch;
+}
+/* motion off: the fingerprint is already read */
+.journey[data-motion="off"] .pc-print path {
+  stroke-dasharray: none;
+}
+@media (min-width: 961px) {
+  .journey[data-motion="off"] .pc-part {
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+}
