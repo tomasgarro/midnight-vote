@@ -4,13 +4,19 @@ test('explores polls, saves one simulated answer, exports encrypted recovery and
   page,
 }) => {
   await page.goto('/#polls');
-  await expect(page.getByRole('heading', { name: 'A voice in what comes next.' })).toBeVisible();
-  await expect(page.getByText(/Official Midnight Passport connector/)).toBeVisible();
-  await page.getByRole('button', { name: 'Explore demo' }).first().click();
-  await page.getByRole('radio', { name: 'A shared library' }).check();
+  await expect(page.getByRole('heading', { name: 'Understand before you answer.' })).toBeVisible();
+  await expect(page.getByText(/Sign-in uses the real Midnight Passport/)).toBeVisible();
+  const card = page.getByRole('article').filter({ hasText: 'on Sundays?' });
+  await card.getByRole('button', { name: 'Open poll' }).click();
+  // Cleisthenes' briefing comes with the poll, marked as an example.
+  // (a phone shows it above the answers, a wide screen beside them: only one copy is visible)
+  const briefing = page.locator('.app-brief').filter({ visible: true });
+  await expect(briefing.getByText('Quieter, safer Sundays for people on foot.')).toBeVisible();
+  await expect(briefing.getByText(/An example briefing written for this demo/)).toBeVisible();
+  await page.getByRole('radio', { name: 'Yes', exact: true }).check();
   await page.getByRole('button', { name: 'Save a demo answer' }).click();
-  await expect(page.getByRole('button', { name: 'Demo answer saved' })).toBeDisabled();
-  await page.getByRole('link', { name: 'Export and verify your demo receipt' }).click();
+  await expect(page.getByRole('heading', { name: 'Your demo answer is saved.' })).toBeVisible();
+  await page.getByRole('link', { name: 'Keep a receipt' }).click();
   await page.getByLabel('Recovery passphrase').fill('this is a private recovery phrase');
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export encrypted receipt' }).click();
@@ -23,7 +29,7 @@ test('explores polls, saves one simulated answer, exports encrypted recovery and
   await expect(
     page.getByText('Your private opening matches the ballot commitment.', { exact: false }),
   ).toBeVisible();
-  await expect(page.getByText('A shared library', { exact: true })).toBeVisible();
+  await expect(page.getByRole('definition').filter({ hasText: /^Yes$/ })).toBeVisible();
   await expect(page.getByText('Blockchain confirmation — not established')).toBeVisible();
   await expect(page.getByText('Aggregate proof — not established')).toBeVisible();
 });
@@ -48,11 +54,11 @@ test('publishes immutable demo rules and refuses regional eligibility without a 
   await expect(
     page.getByText('Demo poll published on this device.', { exact: false }),
   ).toBeVisible();
-  await page.getByRole('link', { name: 'Explore', exact: true }).click();
+  await page.getByRole('link', { name: 'Polls', exact: true }).first().click();
   const card = page
     .getByRole('article')
     .filter({ hasText: 'Should we improve the community garden?' });
-  await card.getByRole('button', { name: 'Explore demo' }).click();
+  await card.getByRole('button', { name: 'Open poll' }).click();
   await expect(
     page.getByText('Requires verified residence: Geneva.', { exact: false }),
   ).toBeVisible();
@@ -63,7 +69,9 @@ test('shows Midnight Passport network and capability boundaries and has no horiz
   page,
 }) => {
   await page.goto('/#connect');
-  await expect(page.getByRole('heading', { name: 'Start with Midnight Passport.' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Sign in with Midnight Passport.' }),
+  ).toBeVisible();
   await expect(
     page.getByText('Current account network: Stagenet.', { exact: false }),
   ).toBeVisible();
@@ -84,12 +92,12 @@ test('requires explicit public disclosure consent and counts after closing witho
   await page.clock.install({ time: new Date('2026-11-09T12:00:00Z') });
   await page.goto('/#polls');
   const card = page.getByRole('article').filter({ hasText: 'Should our next meeting be hybrid?' });
-  await card.getByRole('button', { name: 'Explore demo' }).click();
+  await card.getByRole('button', { name: 'Open poll' }).click();
   await page.getByRole('radio', { name: 'Yes', exact: true }).check();
   await expect(page.getByRole('button', { name: 'Save a demo answer' })).toBeDisabled();
   await page.getByRole('checkbox', { name: /I understand that a public poll/ }).check();
   await page.getByRole('button', { name: 'Save a demo answer' }).click();
-  await expect(page.getByRole('button', { name: 'Demo answer saved' })).toBeDisabled();
+  await expect(page.getByRole('heading', { name: 'Your demo answer is saved.' })).toBeVisible();
   await page.clock.fastForward(8 * 86400_000);
   await expect(page.getByRole('heading', { name: 'Local demonstration totals' })).toBeVisible();
   await expect(page.getByText('Simulated account: Yes')).toBeVisible();

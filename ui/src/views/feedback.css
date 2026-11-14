@@ -1,92 +1,133 @@
-.feedback-page {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 28px 24px max(32px, env(safe-area-inset-bottom));
-  color: var(--ink, #272333);
+/*
+ * Help and feedback. The page sits in the workspace's paper (see poll-workspace.css for the
+ * header and tokens); the form is one paper card with one terracotta action, wherever it appears.
+ */
+.feedback-lang {
+  margin-left: auto;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--line, #d9cbb4);
+  border-radius: 999px;
+  background: var(--paper, #fffdf8);
+  font-size: 14px;
 }
-.feedback-page header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 48px;
+.feedback-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: clamp(36px, 6vw, 72px) 20px max(64px, env(safe-area-inset-bottom));
+  color: var(--ink, #252823);
 }
 .feedback-page h1 {
-  font-size: clamp(28px, 6vw, 40px);
-  line-height: 1.15;
-  margin-bottom: 16px;
+  margin-top: 4px;
+  font-family: var(--font-display, "Source Serif 4", serif);
+  font-size: clamp(38px, 5vw, 58px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink, #252823);
 }
-.feedback-page > p {
-  line-height: 1.6;
-  margin-bottom: 24px;
+.feedback-page > .app-lead {
+  margin-bottom: 32px;
 }
 .feedback-form {
   display: grid;
-  gap: 12px;
-  padding: 24px;
-  border: 1px solid var(--line, #ddd7ce);
-  border-radius: 24px;
-  background: var(--surface, #fffaf3);
-  color: var(--ink, #272333);
+  gap: 10px;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid rgba(217, 203, 180, 0.9);
+  border-radius: 22px;
+  background: #fffdf8;
+  box-shadow:
+    0 2px 6px rgba(60, 48, 32, 0.06),
+    0 18px 44px rgba(60, 48, 32, 0.1);
+  color: var(--ink, #252823);
 }
 .feedback-form label {
-  font-size: 14px;
-  font-weight: 500;
+  margin-top: 6px;
+  font-size: 14.5px;
+  font-weight: 600;
 }
 .feedback-form input,
-.feedback-form textarea,
-.feedback-page select {
+.feedback-form textarea {
   width: 100%;
   min-width: 0;
-  min-height: 48px;
-  padding: 12px;
-  border: 1px solid var(--line, #ddd7ce);
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong, #8f8168);
   border-radius: 12px;
-  background: var(--surface-sunken, #f6f3ec);
+  background: #fffdf8;
   color: inherit;
   font: inherit;
+  font-size: 16px;
+  transition:
+    border-color 160ms,
+    box-shadow 160ms;
 }
 .feedback-form textarea {
   resize: vertical;
 }
-.feedback-page select {
-  width: auto;
+.feedback-form :is(input, textarea):focus-visible {
+  border-color: var(--accent, #a24f40);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--accent-wash, #f4e3dc);
 }
 .feedback-form button {
-  min-height: 48px;
-  padding: 12px 20px;
+  justify-self: start;
+  min-height: 52px;
+  margin-top: 6px;
+  padding: 0 26px;
   border: 0;
   border-radius: 999px;
-  background: var(--ink, #272333);
-  color: var(--surface, #fffaf3);
+  background: var(--accent, #a24f40);
+  color: var(--accent-ink, #fffdf8);
   font: inherit;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 120ms ease-out;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 253, 248, 0.16),
+    0 8px 20px rgba(37, 40, 35, 0.12);
+  transition:
+    background 180ms,
+    transform 120ms ease-out;
+}
+.feedback-form button:hover:not(:disabled) {
+  background: var(--accent-hover, #7e3a2f);
 }
 .feedback-form button:active {
   transform: scale(0.98);
 }
 .feedback-form button:disabled {
-  opacity: 0.45;
-  cursor: default;
+  background: #e4d9c6;
+  color: #6f6a5c;
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
 }
-.feedback-form :focus-visible,
-.feedback-page select:focus-visible {
-  outline: 2px solid var(--accent, #b7653b);
+.feedback-form :focus-visible {
+  outline: 3px solid var(--ink, #252823);
   outline-offset: 3px;
 }
-.feedback-form a,
-.feedback-page a {
-  color: inherit;
-  text-underline-offset: 4px;
-  min-height: 44px;
+.feedback-form > a {
+  justify-self: start;
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
+  color: inherit;
+  font-size: 15px;
+  text-decoration-color: var(--line-strong, #8f8168);
+  text-underline-offset: 4px;
 }
 .feedback-form__note {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
-  color: var(--ink-muted, #716b72);
+  color: var(--ink-muted, #5c5e53);
+}
+.feedback-form [role="alert"] {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--danger-wash, #f6dcd8);
+  color: var(--danger, #8f1d1d);
+  font-size: 14px;
 }
 .feedback-form__trap {
   position: absolute;
@@ -96,36 +137,28 @@
   clip-path: inset(50%);
 }
 .feedback-form__success {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
   padding-block: 20px;
   text-align: center;
 }
 .feedback-form__success svg {
   width: 56px;
-  margin: 0 auto 16px;
+  color: var(--accent, #a24f40);
 }
-.feedback-form__success p {
-  margin-bottom: 24px;
+.feedback-form__success button {
+  justify-self: center;
 }
-[data-theme="dark"] .feedback-page {
-  color: #eee9e0;
+.feedback-shell .app-passport {
+  margin-left: 0;
 }
-[data-theme="dark"] .feedback-form {
-  background: #211e29;
-  color: #eee9e0;
-  border-color: #48424e;
-}
-[data-theme="dark"] .feedback-form input,
-[data-theme="dark"] .feedback-form textarea,
-[data-theme="dark"] .feedback-page select {
-  background: #292531;
-  border-color: #48424e;
-}
-@media (max-width: 359px) {
-  .feedback-form {
-    padding: 16px;
+@media (max-width: 700px) {
+  .feedback-lang {
+    margin-left: auto;
   }
-  .feedback-page {
-    padding-inline: 16px;
+  .feedback-shell .app-passport {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
